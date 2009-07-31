@@ -123,11 +123,15 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 			throw new ReadPendingException();
 		if (readString.length() > 0)
 		{
+			// Try satisfying the request using the buffer
 			try
 			{
 				int charactersTransferred = target.write(readString);
-				readString.delete(0, charactersTransferred);
-				handler.completed(charactersTransferred, attachment);
+				if (charactersTransferred > 0)
+				{
+					readString.delete(0, charactersTransferred);
+					handler.completed(charactersTransferred, attachment);
+				}
 			}
 			catch (IOException e)
 			{
@@ -136,6 +140,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 			return;
 		}
 		readPending = true;
+		readBytes.clear();
 		CompletionHandler<Integer, ByteBuffer> readHandler = new ReadHandler<A>(attachment, handler, target);
 		channel.read(readBytes, readBytes, readHandler);
 	}
@@ -160,11 +165,15 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 			throw new ReadPendingException();
 		if (readString.length() > 0)
 		{
+			// Try satisfying the request using the buffer
 			try
 			{
 				int charactersTransferred = target.write(readString);
-				readString.delete(0, charactersTransferred);
-				return new CompletedFuture(charactersTransferred);
+				if (charactersTransferred > 0)
+				{
+					readString.delete(0, charactersTransferred);
+					return new CompletedFuture(charactersTransferred);
+				}
 			}
 			catch (IOException e)
 			{
@@ -172,18 +181,21 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 			}
 		}
 		readPending = true;
+		readBytes.clear();
 		return new ReadFuture(channel.read(readBytes), readBytes, target);
 	}
 
-	public <A> void readLine(StringBuilder target, A attachment, CompletionHandler<Integer, ? super A> handler)
+	public <A> void readLine(A attachment, CompletionHandler<String, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
+		StringBuilder target = new StringBuilder();
 		read(attachment, new ReadLineHandler<A>(handler, target), new LineWriter(target));
 	}
 
-	public Future<Integer> readLine(StringBuilder target)
+	public Future<String> readLine()
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
+		StringBuilder target = new StringBuilder();
 		return new ReadLineFuture(read(new LineWriter(target)), target);
 	}
 
@@ -608,7 +620,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	 */
 	private class ReadLineHandler<A> implements CompletionHandler<Integer, A>
 	{
-		private final CompletionHandler<Integer, ? super A> handler;
+		private final CompletionHandler<String, ? super A> handler;
 		private final StringBuilder target;
 		/**
 		 * The length of the StringBuilder before the operation began.
@@ -625,7 +637,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		 * @param target
 		 *        The buffer into which characters are to be transferred
 		 */
-		public ReadLineHandler(CompletionHandler<Integer, ? super A> handler, StringBuilder target)
+		public ReadLineHandler(CompletionHandler<String, ? super A> handler, StringBuilder target)
 		{
 			this.handler = handler;
 			this.target = target;
@@ -635,7 +647,10 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		@Override
 		public void completed(Integer numBytesRead, A attachment)
 		{
-			handler.completed(target.length() - originalLength, attachment);
+			if (numBytesRead == -1)
+				handler.completed(null, attachment);
+			else
+				handler.completed(target.toString(), attachment);
 		}
 
 		@Override
@@ -650,14 +665,10 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	 *
 	 * @author Gili Tzabari
 	 */
-	private class ReadLineFuture implements Future<Integer>
+	private class ReadLineFuture implements Future<String>
 	{
 		private Future<Integer> future;
 		private final StringBuilder target;
-		/**
-		 * The length of the StringBuilder before the operation began.
-		 */
-		private final int originalLength;
 
 		/**
 		 * Creates a new ReadLineFuture.
@@ -671,7 +682,6 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		{
 			this.future = future;
 			this.target = target;
-			this.originalLength = target.length();
 		}
 
 		@Override
@@ -693,18 +703,22 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		}
 
 		@Override
-		public Integer get() throws CancellationException, InterruptedException, ExecutionException
+		public String get() throws CancellationException, InterruptedException, ExecutionException
 		{
-			future.get();
-			return target.length() - originalLength;
+			Integer result = future.get();
+			if (result == -1)
+				return null;
+			return target.toString();
 		}
 
 		@Override
-		public Integer get(long timeout, TimeUnit unit) throws CancellationException, InterruptedException,
-																													 ExecutionException, TimeoutException
+		public String get(long timeout, TimeUnit unit) throws CancellationException, InterruptedException,
+																													ExecutionException, TimeoutException
 		{
-			future.get(timeout, unit);
-			return target.length() - originalLength;
+			Integer result = future.get(timeout, unit);
+			if (result == -1)
+				return null;
+			return target.toString();
 		}
 	}
 
@@ -1151,6 +1165,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		public int write(CharSequence source) throws IOException
 		{
 			Matcher matcher = delimiters.matcher(source);
+			int startIndex = 0;
 			while (true)
 			{
 				if (!matcher.find())
@@ -1160,11 +1175,16 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 				else if (matcher.group().equals("\n"))
 				{
 					if (consumeNewline && matcher.start() == 0)
+					{
+						// "consumeNewline" gets reset if we find a real line terminator, otherwise we need to retain
+						// its value for the next method invocation.
+						startIndex = "\n".length();
 						continue;
+					}
 					consumeNewline = false;
 				}
 
-				target.append(source.subSequence(0, matcher.start()));
+				target.append(source.subSequence(startIndex, matcher.start()));
 
 				// Add 1 to strip out the line delimiter
 				return matcher.start() + 1;

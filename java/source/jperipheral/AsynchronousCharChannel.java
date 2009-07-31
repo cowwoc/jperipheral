@@ -121,9 +121,9 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * a carriage return <code>'\r'</code>, or a carriage return followed
 	 * immediately by a linefeed. The {@code handler} parameter is a completion
 	 * handler that is invoked when the read operation completes (or fails).
-	 * The result passed to the completion handler is the number of characters
-	 * read (excluding termination characters) or {@code -1} if no characters
-	 * could be read because the channel has reached end-of-stream.
+	 * The result passed to the completion handler is the line of characters
+	 * that was read (excluding termination characters) or {@code null} if no
+	 * characters could be read because the channel has reached end-of-stream.
 	 *
 	 * <p> Suppose that a character sequence of length <i>n</i> is read, where
 	 * <i>n</i>&nbsp;<tt>&gt;</tt>&nbsp;<tt>0</tt>. This character sequence
@@ -147,8 +147,6 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 *
 	 * @param   <A>
 	 *          The attachment type
-	 * @param   target
-	 *          The buffer into which characters are to be transferred
 	 * @param   attachment
 	 *          The object to attach to the I/O operation; can be {@code null}
 	 * @param   handler
@@ -162,8 +160,7 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * @throws ShutdownChannelGroupException
 	 *         If the channel group is shutdown
 	 */
-	<A> void readLine(StringBuilder target, A attachment,
-										CompletionHandler<Integer, ? super A> handler)
+	<A> void readLine(A attachment, CompletionHandler<String, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;
 
 	/**
@@ -178,11 +175,8 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * readLine(StringBuilder,Object,CompletionHandler)} method except that instead
 	 * of a completion handler, this method returns a {@code Future}
 	 * representing the pending result. The {@link Future#get() get} method
-	 * returns the number of characters read (excluding termination characters)
-	 * or {@code -1} if no characters could be read because the channel has reached end-of-stream.
-	 *
-	 * @param target
-	 *        The buffer into which characters are to be transferred
+	 * returns the line of characters that were read (excluding termination characters)
+	 * or {@code null} if no characters could be read because the channel has reached end-of-stream.
 	 *
 	 * @return A Future representing the result of the operation
 	 *
@@ -194,7 +188,7 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * @throws ShutdownChannelGroupException
 	 *         If the channel group is shutdown
 	 */
-	Future<Integer> readLine(StringBuilder target)
+	Future<String> readLine()
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;
 
 	/**

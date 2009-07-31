@@ -10,7 +10,6 @@
 <project name="JPeripheral.netbeans" default="default" basedir=".">
 	<description>Builds, tests, and runs the project JPeripheral.</description>
 	<import file="nbproject/build-impl.xml"/>
-	<import file="nbproject/profiler-build-impl.xml"/>
 
 	<!--<target name="BuildInJava">
 		<dirname file="${libs.BuildInJava.classpath}" property="libs.BuildInJava.directory"/>

@@ -1,9 +1,12 @@
 package jperipheral;
 
+import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import jperipheral.nio.channels.AsynchronousChannel;
 import jperipheral.nio.channels.CompletionHandler;
+import jperipheral.nio.channels.InterruptedByTimeoutException;
 import jperipheral.nio.channels.ReadPendingException;
 import jperipheral.nio.channels.ShutdownChannelGroupException;
 import jperipheral.nio.channels.WritePendingException;
@@ -23,6 +26,34 @@ import jperipheral.nio.channels.WritePendingException;
  * multiple concurrent threads. When a read or write operation is initiated then
  * care must be taken to ensure that the buffer is not accessed until the
  * operation completes.
+ *
+ * <h4>Optional methods</h4>
+ *
+ * <p> Some implementations may not perform one or more of these operations,
+ * throwing a runtime exception (<code>UnsupportedOperationException</code>) if
+ * they are attempted. Implementations must specify in their documentation which
+ * optional operations they support. </p>
+ *
+ * <h4>Timeouts</h4>
+ *
+ *  * <p> The {@link #read(ByteBuffer,long,TimeUnit,Object,CompletionHandler) read}
+ * and {@link #write(ByteBuffer,long,TimeUnit,Object,CompletionHandler) write}
+ * methods defined by this class allow a timeout to be specified when initiating
+ * a read or write operation. If the timeout elapses before an operation completes
+ * then the operation completes with the exception {@link
+ * InterruptedByTimeoutException}. A timeout may leave the channel, or the
+ * underlying connection, in an inconsistent state. Where the implementation
+ * cannot guarantee that bytes have not been read from the channel then it puts
+ * the channel into an implementation specific <em>error state</em>. A subsequent
+ * attempt to initiate a {@code read} operation causes an unspecified runtime
+ * exception to be thrown. Similarly if a {@code write} operation times out and
+ * the implementation cannot guarantee bytes have not been written to the
+ * channel then further attempts to {@code write} to the channel cause an
+ * unspecified runtime exception to be thrown. When a timeout elapses then the
+ * state of the {@link ByteBuffer}, or the sequence of buffers, for the I/O
+ * operation is not defined. Buffers should be discarded or at least care must
+ * be taken to ensure that the buffers are not accessed while the channel remains
+ * open.
  *
  * @author Gili Tzabari
  */
@@ -82,6 +113,59 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	<A> void read(CharBuffer target, A attachment,
 								CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;
+
+	/**
+	 * Reads a sequence of characters from this channel into the given buffer. <i>(optional operation)</i>
+	 *
+	 * <p> This method initiates an asynchronous read operation to read a
+	 * sequence of characters from this channel into the given buffer. The {@code
+	 * handler} parameter is a completion handler that is invoked when the read
+	 * operation completes (or fails). The result passed to the completion
+	 * handler is the number of characters read or {@code -1} if no characters could be
+	 * read because the channel has reached end-of-stream.
+	 *
+	 * <p> If a timeout is specified and the timeout elapses before the operation
+	 * completes then the operation completes with the exception {@link
+	 * InterruptedByTimeoutException}. Where a timeout occurs, and the
+	 * implementation cannot guarantee that characters have not been read, or will not
+	 * be read from the channel into the given buffer, then further attempts to
+	 * read from the channel will cause an unspecific runtime exception to be
+	 * thrown.
+	 *
+	 * <p> Otherwise this method works in the same manner as the {@link
+	 * AsynchronousCharChannel#read(CharBuffer,Object,CompletionHandler)}
+	 * method.
+	 *
+	 * @param   <A>
+	 *          The attachment type
+	 * @param   target
+	 *          The buffer into which characters are to be transferred
+	 * @param   timeout
+	 *          The timeout, or {@code 0L} for no timeout
+	 * @param   unit
+	 *          The time unit of the {@code timeout} argument
+	 * @param   attachment
+	 *          The object to attach to the I/O operation; can be {@code null}
+	 * @param   handler
+	 *          The handler for consuming the result
+	 *
+	 * @throws  IllegalArgumentException
+	 *          If the {@code timeout} parameter is negative or the buffer is
+	 *          read-only
+	 * @throws  ReadPendingException
+	 *          If a read operation is already in progress on this channel
+	 * @throws  ShutdownChannelGroupException
+	 *          If the channel group is shutdown
+	 * @throws  UnsupportedOperationException
+	 *          If the implementation does not support this operation
+	 */
+	<A> void read(CharBuffer target,
+								long timeout,
+								TimeUnit unit,
+								A attachment,
+								CompletionHandler<Integer, ? super A> handler)
+		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException,
+					 UnsupportedOperationException;
 
 	/**
 	 * Reads a sequence of characters from this channel into the given buffer.
@@ -246,6 +330,61 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 								 CompletionHandler<Integer, ? super A> handler,
 								 boolean endOfInput)
 		throws WritePendingException, ShutdownChannelGroupException;
+
+	/**
+	 * Writes a sequence of characters to this channel from the given buffer. <i>(optional operation)</i>
+	 *
+	 * <p> This method initiates an asynchronous write operation to write a
+	 * sequence of characters to this channel from the given buffer. The {@code
+	 * handler} parameter is a completion handler that is invoked when the write
+	 * operation completes (or fails). The result passed to the completion
+	 * handler is the number of characters written.
+	 *
+	 * <p> If a timeout is specified and the timeout elapses before the operation
+	 * completes then it completes with the exception {@link
+	 * InterruptedByTimeoutException}. Where a timeout occurs, and the
+	 * implementation cannot guarantee that characters have not been written, or will
+	 * not be written to the channel from the given buffer, then further attempts
+	 * to write to the channel will cause an unspecific runtime exception to be
+	 * thrown.
+	 *
+	 * <p> Otherwise this method works in the same manner as the {@link
+	 * AsynchronousCharChannel#write(CharBuffer,Object,CompletionHandler,boolean)}
+	 * method.
+	 *
+	 * @param   <A>
+	 *          The attachment type
+	 * @param   source
+	 *          The buffer from which characters are to be retrieved
+	 * @param   timeout
+	 *          The timeout, or {@code 0L} for no timeout
+	 * @param   unit
+	 *          The time unit of the {@code timeout} argument
+	 * @param   attachment
+	 *          The object to attach to the I/O operation; can be {@code null}
+	 * @param   handler
+	 *          The handler for consuming the result
+	 * @param   endOfInput
+	 *          <code>true</code> if, and only if, the invoker can provide no additional input characters beyond
+	 *          those in the given buffer.
+	 *
+	 * @throws  IllegalArgumentException
+	 *          If the {@code timeout} parameter is negative
+	 * @throws  WritePendingException
+	 *          If a write operation is already in progress on this channel
+	 * @throws  ShutdownChannelGroupException
+	 *          If the channel group is shutdown
+	 * @throws  UnsupportedOperationException
+	 *          If the implementation does not support this operation
+	 */
+	<A> void write(CharBuffer source,
+								 long timeout,
+								 TimeUnit unit,
+								 A attachment,
+								 CompletionHandler<Integer, ? super A> handler,
+								 boolean endOfInput)
+		throws IllegalArgumentException, WritePendingException, ShutdownChannelGroupException,
+					 UnsupportedOperationException;
 
 	/**
 	 * Writes a sequence of characters to this channel from the given buffer.

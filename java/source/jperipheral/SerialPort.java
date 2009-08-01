@@ -198,6 +198,12 @@ public class SerialPort extends ComPort
 	 */
 	private native void nativeClose() throws IOException;
 
+	@Override
+	public String toString()
+	{
+		return name + "[" + baudRate + " " + dataBits + "-" + parity + "-" + stopBits + " " + flowControl + "]";
+	}
+
 	/**
 	 * The number of data bits in a word.
 	 */
@@ -206,19 +212,43 @@ public class SerialPort extends ComPort
 		/**
 		 * 5 data bits.
 		 */
-		FIVE,
+		FIVE
+		{
+			public String toString()
+			{
+				return "5";
+			}
+		},
 		/**
 		 * 6 data bits.
 		 */
-		SIX,
+		SIX
+		{
+			public String toString()
+			{
+				return "6";
+			}
+		},
 		/**
 		 * 7 data bits.
 		 */
-		SEVEN,
+		SEVEN
+		{
+			public String toString()
+			{
+				return "7";
+			}
+		},
 		/**
 		 * 8 data bits.
 		 */
 		EIGHT
+		{
+			public String toString()
+			{
+				return "8";
+			}
+		}
 	}
 
 	/**
@@ -229,15 +259,33 @@ public class SerialPort extends ComPort
 		/**
 		 * Hardware flow control.
 		 */
-		RTS_CTS,
+		RTS_CTS
+		{
+			public String toString()
+			{
+				return "RTS/CTS";
+			}
+		},
 		/**
 		 * Software flow control.
 		 */
-		XON_XOFF,
+		XON_XOFF
+		{
+			public String toString()
+			{
+				return "XON/XOFF";
+			}
+		},
 		/**
 		 * No flow control.
 		 */
 		NONE
+		{
+			public String toString()
+			{
+				return "NONE";
+			}
+		}
 	}
 
 	/**
@@ -248,15 +296,33 @@ public class SerialPort extends ComPort
 		/**
 		 * 1 bit.
 		 */
-		ONE,
+		ONE
+		{
+			public String toString()
+			{
+				return "1";
+			}
+		},
 		/**
 		 * 1.5 bits.
 		 */
-		ONE_POINT_FIVE,
+		ONE_POINT_FIVE
+		{
+			public String toString()
+			{
+				return "1.5";
+			}
+		},
 		/**
 		 * 2 bits.
 		 */
 		TWO
+		{
+			public String toString()
+			{
+				return "2";
+			}
+		}
 	}
 
 	/**
@@ -267,22 +333,52 @@ public class SerialPort extends ComPort
 		/**
 		 * Indicates that the number of bits in a word must be even.
 		 */
-		EVEN,
+		EVEN
+		{
+			public String toString()
+			{
+				return "E";
+			}
+		},
 		/**
 		 * Indicates that the parity bit is always 1.
 		 */
-		MARK,
+		MARK
+		{
+			public String toString()
+			{
+				return "M";
+			}
+		},
 		/**
 		 * Indicates that parity checking is disabled.
 		 */
-		NONE,
+		NONE
+		{
+			public String toString()
+			{
+				return "N";
+			}
+		},
 		/**
 		 * Indicates that the number of bits in a word must be odd.
 		 */
-		ODD,
+		ODD
+		{
+			public String toString()
+			{
+				return "O";
+			}
+		},
 		/**
 		 * Indicates that the parity bit is always 0.
 		 */
 		SPACE
+		{
+			public String toString()
+			{
+				return "S";
+			}
+		}
 	}
 }

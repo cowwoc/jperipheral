@@ -33,6 +33,10 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	 */
 	private final AsynchronousByteChannel channel;
 	/**
+	 * The underlying AsynchronousByteChannelTimeouts or null if timeouts are not supported.
+	 */
+	private final AsynchronousByteChannelTimeouts channelTimeouts;
+	/**
 	 * Used by write() to encode bytes.
 	 */
 	private final CharsetEncoder encoder;
@@ -76,6 +80,10 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	private AsynchronousByteCharChannel(AsynchronousByteChannel channel, Charset charset)
 	{
 		this.channel = channel;
+		if (channel instanceof AsynchronousByteChannelTimeouts)
+			this.channelTimeouts = (AsynchronousByteChannelTimeouts) channel;
+		else
+			this.channelTimeouts = null;
 		this.encoder = charset.newEncoder();
 		this.decoder = charset.newDecoder();
 	}
@@ -103,24 +111,81 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	{
 		if (target.isReadOnly())
 			throw new IllegalArgumentException("target may not be read-only");
+		if (readPending)
+			throw new ReadPendingException();
 		if (target.remaining() <= 0)
 		{
 			handler.completed(0, attachment);
 			return;
 		}
-		read(attachment, handler, new CharBufferWriter(target));
+		read(new CharBufferWriter(target), attachment, handler);
+	}
+
+	public synchronized <A> void read(CharBuffer target,
+																		long timeout,
+																		TimeUnit unit,
+																		A attachment,
+																		CompletionHandler<Integer, ? super A> handler)
+		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
+	{
+		if (target.isReadOnly())
+			throw new IllegalArgumentException("target may not be read-only");
+		if (readPending)
+			throw new ReadPendingException();
+		if (target.remaining() <= 0)
+		{
+			handler.completed(0, attachment);
+			return;
+		}
+		read(new CharBufferWriter(target), timeout, unit, attachment, handler);
 	}
 
 	/**
 	 * @see #read(CharBuffer,Object,CompletionHandler)
 	 */
-	private synchronized <A> void read(A attachment,
-																		 CompletionHandler<Integer, ? super A> handler,
-																		 CharSequenceWriter target)
+	private synchronized <A> void read(CharSequenceWriter target, A attachment,
+																		 CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
-		if (readPending)
-			throw new ReadPendingException();
+		CompletionHandler<Integer, ByteBuffer> readHandler = getReadHandler(target, attachment, handler);
+		if (readHandler == null)
+			return;
+		channel.read(readBytes, readBytes, readHandler);
+	}
+
+	/**
+	 * @see #read(CharBuffer,long,TimeUnit,Object,CompletionHandler)
+	 */
+	private synchronized <A> void read(CharSequenceWriter target, long timeout, TimeUnit unit,
+																		 A attachment, CompletionHandler<Integer, ? super A> handler)
+		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException,
+					 UnsupportedOperationException
+	{
+		if (channelTimeouts == null)
+			throw new UnsupportedOperationException();
+		CompletionHandler<Integer, ByteBuffer> readHandler = getReadHandler(target, attachment, handler);
+		if (readHandler == null)
+			return;
+		channelTimeouts.read(readBytes, timeout, unit, readBytes, readHandler);
+	}
+
+	/**
+	 * Returns the CompletionHandler to use with the read operation.
+	 *
+	 * @param   <A>
+	 *          The attachment type
+	 * @param   target
+	 *          The buffer into which characters are to be transferred
+	 * @param   attachment
+	 *          The object to attach to the I/O operation; can be {@code null}
+	 * @param   handler
+	 *          The completion handler
+	 * @return  null if the operation completed without needing to read from the underlying channel
+	 */
+	private <A> CompletionHandler<Integer, ByteBuffer> getReadHandler(CharSequenceWriter target,
+																																		A attachment,
+																																		CompletionHandler<Integer, ? super A> handler)
+	{
 		if (readString.length() > 0)
 		{
 			// Try satisfying the request using the buffer
@@ -137,12 +202,11 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 			{
 				handler.failed(e, attachment);
 			}
-			return;
+			return null;
 		}
 		readPending = true;
 		readBytes.clear();
-		CompletionHandler<Integer, ByteBuffer> readHandler = new ReadHandler<A>(attachment, handler, target);
-		channel.read(readBytes, readBytes, readHandler);
+		return new ReadHandler<A>(attachment, handler, target);
 	}
 
 	public Future<Integer> read(CharBuffer target)
@@ -189,7 +253,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
 		StringBuilder target = new StringBuilder();
-		read(attachment, new ReadLineHandler<A>(handler, target), new LineWriter(target));
+		read(new LineWriter(target), attachment, new ReadLineHandler<A>(handler, target));
 	}
 
 	public Future<String> readLine()
@@ -220,6 +284,35 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		CompletionHandler<Integer, ByteBuffer> writeHandler = new WriteHandler<A>(attachment, handler, source,
 			endOfInput);
 		channel.write(bytesWritten, bytesWritten, writeHandler);
+	}
+
+	public <A> void write(CharBuffer source,
+												long timeout,
+												TimeUnit unit,
+												A attachment,
+												CompletionHandler<Integer, ? super A> handler,
+												boolean endOfInput)
+		throws IllegalArgumentException, WritePendingException, ShutdownChannelGroupException,
+					 UnsupportedOperationException
+	{
+		if (channelTimeouts == null)
+			throw new UnsupportedOperationException();
+		if (writePending)
+			throw new WritePendingException();
+		ByteBuffer bytesWritten = ByteBuffer.allocate((int) Math.ceil(encoder.maxBytesPerChar() *
+																																	source.remaining()));
+		// duplicate source to avoid modifying its position
+		CharBuffer sourceCopy = source.duplicate();
+		CoderResult encodingResult = encoder.encode(sourceCopy, bytesWritten, endOfInput);
+		if (encodingResult.isError())
+		{
+			delegateError(encodingResult, attachment, handler);
+			return;
+		}
+		writePending = true;
+		CompletionHandler<Integer, ByteBuffer> writeHandler = new WriteHandler<A>(attachment, handler, source,
+			endOfInput);
+		channelTimeouts.write(bytesWritten, timeout, unit, bytesWritten, writeHandler);
 	}
 
 	public Future<Integer> write(CharBuffer source, boolean endOfInput)

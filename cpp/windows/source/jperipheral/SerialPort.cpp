@@ -217,10 +217,10 @@ void SerialPort::printStatus()
     cout << comStat.cbOutQue << " bytes are awaiting transfer" << endl;
 }
 
-class CancelTask: public IoTask
+class CloseTask: public IoTask
 {
 public:
-	CancelTask(HANDLE port): 
+	CloseTask(HANDLE port): 
 		IoTask(port, 0, 0, 0), errorCode(ERROR_SUCCESS)
 	{
 		taskDone = CreateEvent(0, false, false, 0);
@@ -239,7 +239,7 @@ public:
 			throw IOException(L"SetEvent() failed with error: " + getErrorMessage(GetLastError()));
 	}
 
-	virtual ~CancelTask()
+	virtual ~CloseTask()
 	{
 		if (!CloseHandle(taskDone))
 			throw IOException(L"CloseHandle() failed with error: " + getErrorMessage(GetLastError()));
@@ -254,7 +254,7 @@ void SerialPort::nativeClose()
 	HANDLE port = getContext(getJaceProxy());
 
 	// block until cancel() completes
-	CancelTask* task = new CancelTask(port);
+	CloseTask* task = new CloseTask(port);
 
 	CompletionPortContext* windowsContext = getCompletionPortContext();
 	if (!PostQueuedCompletionStatus(windowsContext->completionPort, 0, IoTask::RUN, 

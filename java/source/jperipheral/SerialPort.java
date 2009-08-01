@@ -21,6 +21,7 @@ public class SerialPort extends ComPort
 	private Parity parity;
 	private FlowControl flowControl;
 	private final SerialChannel channel;
+	private boolean closed;
 
 	/**
 	 * Returns a SerialPort by its name.
@@ -157,6 +158,9 @@ public class SerialPort extends ComPort
 	@Override
 	public void close() throws IOException
 	{
+		if (closed)
+			return;
+		closed = true;
 		nativeClose();
 		ResourceLifecycleListener listener = (ResourceLifecycleListener) OperatingSystem.getCurrent();
 		listener.afterResourceDestroyed();

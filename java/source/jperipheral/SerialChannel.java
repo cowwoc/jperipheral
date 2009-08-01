@@ -107,7 +107,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 			handler.completed(0, attachment);
 			return;
 		}
-		nativeRead(target, unit.convert(timeout, TimeUnit.MILLISECONDS),
+		nativeRead(target, TimeUnit.MILLISECONDS.convert(timeout, unit),
 			new NativeListenerToCompletionHandler<A>(handler, attachment, new Runnable()
 		{
 			@Override
@@ -164,7 +164,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 			handler.completed(0, attachment);
 			return;
 		}
-		nativeWrite(source, unit.convert(timeout, TimeUnit.MILLISECONDS),
+		nativeWrite(source, TimeUnit.MILLISECONDS.convert(timeout, unit),
 			new NativeListenerToCompletionHandler<A>(handler, attachment, new Runnable()
 		{
 			@Override
@@ -414,10 +414,11 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 
 		@Override
-		public Integer get(long timeout, TimeUnit unit) throws CancellationException, InterruptedException,
-																													 ExecutionException, TimeoutException
+		public synchronized Integer get(long timeout, TimeUnit unit) throws CancellationException,
+																																				InterruptedException,
+																																				ExecutionException, TimeoutException
 		{
-			DateTime endTime = new DateTime().plus(new Duration(unit.convert(timeout, TimeUnit.MILLISECONDS)));
+			DateTime endTime = new DateTime().plus(new Duration(TimeUnit.MILLISECONDS.convert(timeout, unit)));
 			while (!done)
 			{
 				long timeLeft = new Duration(new DateTime(), endTime).getMillis();

@@ -37,11 +37,15 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	 */
 	private final AsynchronousByteChannelTimeouts channelTimeouts;
 	/**
-	 * Used by write() to encode bytes.
+	 * The character encoding.
+	 */
+	private final Charset charset;
+	/**
+	 * Used to encode characters being written.
 	 */
 	private final CharsetEncoder encoder;
 	/**
-	 * Used by <code>read()</code> and <code>readLine()</code> to decodes characters.
+	 * Used to decode characters being read.
 	 */
 	private final CharsetDecoder decoder;
 	/**
@@ -84,6 +88,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 			this.channelTimeouts = (AsynchronousByteChannelTimeouts) channel;
 		else
 			this.channelTimeouts = null;
+		this.charset = charset;
 		this.encoder = charset.newEncoder();
 		this.decoder = charset.newDecoder();
 	}
@@ -96,11 +101,8 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	 * @param charset
 	 *        The character set
 	 * @return A new asynchronous socket channel
-	 * @throws IOException
-	 *         If an I/O error occurs
 	 */
 	public static AsynchronousByteCharChannel open(AsynchronousByteChannel channel, Charset charset)
-		throws IOException
 	{
 		return new AsynchronousByteCharChannel(channel, charset);
 	}
@@ -268,27 +270,17 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 																		 boolean endOfInput)
 		throws WritePendingException, ShutdownChannelGroupException
 	{
-		if (writePending)
-			throw new WritePendingException();
-		ByteBuffer bytesWritten = ByteBuffer.allocate((int) Math.ceil(encoder.maxBytesPerChar() *
-																																	source.remaining()));
-		// duplicate source to avoid modifying its position
-		CharBuffer sourceCopy = source.duplicate();
-		CoderResult encodingResult = encoder.encode(sourceCopy, bytesWritten, endOfInput);
-		if (encodingResult.isError())
-		{
-			delegateError(encodingResult, attachment, handler);
+		ByteBuffer sourceBytes = getBytes(source, attachment, handler, endOfInput);
+		if (sourceBytes == null)
 			return;
-		}
-		writePending = true;
 		CompletionHandler<Integer, ByteBuffer> writeHandler = new WriteHandler<A>(attachment, handler, source,
 			endOfInput);
-		channel.write(bytesWritten, bytesWritten, writeHandler);
+		channel.write(sourceBytes, sourceBytes, writeHandler);
 	}
 
 	public <A> void write(CharBuffer source,
-												long timeout,
-												TimeUnit unit,
+												final long timeout,
+												final TimeUnit unit,
 												A attachment,
 												CompletionHandler<Integer, ? super A> handler,
 												boolean endOfInput)
@@ -297,44 +289,75 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	{
 		if (channelTimeouts == null)
 			throw new UnsupportedOperationException();
-		if (writePending)
-			throw new WritePendingException();
-		ByteBuffer bytesWritten = ByteBuffer.allocate((int) Math.ceil(encoder.maxBytesPerChar() *
-																																	source.remaining()));
-		// duplicate source to avoid modifying its position
-		CharBuffer sourceCopy = source.duplicate();
-		CoderResult encodingResult = encoder.encode(sourceCopy, bytesWritten, endOfInput);
-		if (encodingResult.isError())
-		{
-			delegateError(encodingResult, attachment, handler);
+		ByteBuffer sourceBytes = getBytes(source, attachment, handler, endOfInput);
+		if (sourceBytes == null)
 			return;
-		}
-		writePending = true;
 		CompletionHandler<Integer, ByteBuffer> writeHandler = new WriteHandler<A>(attachment, handler, source,
 			endOfInput);
-		channelTimeouts.write(bytesWritten, timeout, unit, bytesWritten, writeHandler);
+		channelTimeouts.write(sourceBytes, timeout, unit, sourceBytes, writeHandler);
 	}
 
 	public Future<Integer> write(CharBuffer source, boolean endOfInput)
 		throws WritePendingException, ShutdownChannelGroupException
 	{
+		PollableCompletionHandler handler = new PollableCompletionHandler();
+		ByteBuffer sourceBytes = getBytes(source, null, handler, endOfInput);
+		if (sourceBytes == null)
+			return new CompletedFuture(handler.throwable);
+		return new WriteFuture(channel.write(sourceBytes), source, sourceBytes, endOfInput);
+	}
+
+	/**
+	 * Returns the buffer from which bytes are to be retrieved.
+	 *
+	 * @param <A>
+	 *        The attachment type
+	 * @param source
+	 *        The buffer from which characters are to be retrieved
+	 * @param attachment
+	 *        The object to attach to the I/O operation; can be {@code null}
+	 * @param handler
+	 *        The completion handler object
+	 * @param endOfInput
+	 *        <code>true</code> if, and only if, the invoker can provide no additional input characters beyond
+	 *        those in the given buffer.
+	 *
+	 * @throws WritePendingException
+	 *         If the channel does not allow more than one write to be outstanding
+	 *         and a previous write has not completed
+	 * @throws ShutdownChannelGroupException
+	 *         If the channel group is shutdown
+	 * @return The buffer from which bytes are to be retrieved, or null if an error occured and was delegated
+	 *         to the <code>CompletionHandler</code>
+	 */
+	private <A> ByteBuffer getBytes(CharBuffer source,
+																	A attachment, CompletionHandler<Integer, ? super A> handler,
+																	boolean endOfInput)
+	{
 		if (writePending)
 			throw new WritePendingException();
-		ByteBuffer bytesWritten = ByteBuffer.allocate((int) Math.ceil(encoder.maxBytesPerChar() *
-																																	source.remaining()));
+		ByteBuffer sourceBytes = ByteBuffer.allocate((int) Math.ceil(encoder.maxBytesPerChar() *
+																																 source.remaining()));
 		// duplicate source to avoid modifying its position
 		CharBuffer sourceCopy = source.duplicate();
-		CoderResult encodingResult = encoder.encode(sourceCopy, bytesWritten, endOfInput);
+		CoderResult encodingResult = encoder.encode(sourceCopy, sourceBytes, endOfInput);
 		if (encodingResult.isError())
 		{
-			// TODO: do we really need PollableCompletionHandler here?
-			PollableCompletionHandler handler = new PollableCompletionHandler();
-			delegateError(encodingResult, null, handler);
-			return new CompletedFuture(handler.throwable);
+			delegateError(encodingResult, attachment, handler);
+			return null;
+		}
+		if (endOfInput)
+		{
+			encodingResult = encoder.flush(sourceBytes);
+			if (encodingResult.isError())
+			{
+				delegateError(encodingResult, attachment, handler);
+				return null;
+			}
 		}
 		writePending = true;
-		bytesWritten.flip();
-		return new WriteFuture(channel.write(bytesWritten), source, bytesWritten, endOfInput);
+		sourceBytes.flip();
+		return sourceBytes;
 	}
 
 	@Override
@@ -685,6 +708,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 			{
 				boolean endOfInput = future.get(timeout, unit) == -1;
 				PollableCompletionHandler handler = new PollableCompletionHandler();
+				source.flip();
 				if (onBytesRead(source, endOfInput, target, null, handler))
 				{
 					synchronized (AsynchronousByteCharChannel.this)
@@ -715,10 +739,6 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	{
 		private final CompletionHandler<String, ? super A> handler;
 		private final StringBuilder target;
-		/**
-		 * The length of the StringBuilder before the operation began.
-		 */
-		private final int originalLength;
 
 		/**
 		 * Creates a new ReadLineHandler.
@@ -734,7 +754,6 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		{
 			this.handler = handler;
 			this.target = target;
-			this.originalLength = target.length();
 		}
 
 		@Override
@@ -843,9 +862,10 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 																		 boolean endOfInput)
 	{
 		// Decode the bytes we sent out
-		final CharBuffer charBuffer = CharBuffer.allocate((int) Math.ceil(decoder.maxCharsPerByte() *
+		CharsetDecoder decoderForWrite = charset.newDecoder();
+		final CharBuffer charBuffer = CharBuffer.allocate((int) Math.ceil(decoderForWrite.maxCharsPerByte() *
 																																			bytesWritten.remaining()));
-		CoderResult decodingResult = decoder.decode(bytesWritten, charBuffer, endOfInput);
+		CoderResult decodingResult = decoderForWrite.decode(bytesWritten, charBuffer, endOfInput);
 		if (decodingResult.isUnmappable())
 		{
 			delegateError(decodingResult, attachment, handler);
@@ -854,7 +874,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		if (decodingResult.isMalformed())
 		{
 			// The write operation stopped in the middle of a codepoint
-			skipWellFormedBytes(source, bytesWritten, decoder);
+			skipWellFormedBytes(source, bytesWritten, decoderForWrite);
 
 			bytesWritten.clear();
 			putCodepoint(bytesWritten, source.toString().codePointAt(0), encoder);
@@ -870,7 +890,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		// We sent a whole number of codepoints
 		source.position(source.position() + charBuffer.position());
 		if (endOfInput)
-			flushDecoderForWrite(decoder, charBuffer, source);
+			flushDecoderForWrite(decoderForWrite, charBuffer, source);
 
 		handler.completed(source.position() - sourceOffset, attachment);
 		return true;
@@ -891,6 +911,8 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 																																malformedBytes.remaining()));
 		CoderResult decodingResult = decoder.decode(malformedBytes, charBuffer, true);
 		assertCoderResult(decodingResult);
+		decodingResult = decoder.flush(charBuffer);
+		assertCoderResult(decodingResult);
 		source.position(source.position() + charBuffer.position());
 	}
 
@@ -910,6 +932,8 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		codepointBuffer.put(Character.toChars(codepoint));
 		codepointBuffer.flip();
 		CoderResult result = encoder.encode(codepointBuffer, target, true);
+		assertCoderResult(result);
+		result = encoder.flush(target);
 		assertCoderResult(result);
 	}
 
@@ -1279,7 +1303,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 
 				target.append(source.subSequence(startIndex, matcher.start()));
 
-				// Add 1 to strip out the line delimiter
+				// +1 to strip out the line delimiter
 				return matcher.start() + 1;
 			}
 		}

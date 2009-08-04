@@ -419,18 +419,24 @@ public class SerialChannel extends AsynchronousSerialChannel
 																																				ExecutionException, TimeoutException
 		{
 			DateTime endTime = new DateTime().plus(new Duration(TimeUnit.MILLISECONDS.convert(timeout, unit)));
+			boolean timeoutOccured = false;
 			while (!done)
 			{
 				long timeLeft = new Duration(new DateTime(), endTime).getMillis();
-				if (timeLeft < 0)
+				if (timeLeft <= 0)
 				{
+					timeoutOccured = true;
 					cancel(true);
 					break;
 				}
 				wait(timeLeft);
 			}
 			if (cancelled)
+			{
+				if (timeoutOccured)
+					throw new TimeoutException();
 				throw new CancellationException();
+			}
 			if (throwable != null)
 				throw new ExecutionException(throwable);
 			return value;

@@ -11,6 +11,8 @@ using jperipheral::IoTask;
 using jperipheral::CompletionPortContext;
 using jperipheral::getCompletionPortContext;
 using jperipheral::getSourceCodePosition;
+using jperipheral::SerialPortContext;
+using jperipheral::FutureContext;
 
 #include "jace/proxy/java/io/IOException.h"
 using jace::proxy::java::io::IOException;
@@ -20,6 +22,11 @@ using jace::proxy::java::nio::ByteBuffer;
 
 #include <string>
 using std::string;
+
+#pragma warning(push)
+#pragma warning(disable: 4103 4244 4512)
+#include <boost/thread/mutex.hpp>
+#pragma warning(pop)
 
 
 class CancelTask: public IoTask
@@ -32,24 +39,27 @@ public:
 	virtual void updateJavaBuffer(int)
 	{}
 
-	virtual void run()
+	virtual bool run()
 	{
 		if (!CancelIo(port))
 			listener->onFailure(IOException(L"CancelIo() failed with error: " + getErrorMessage(GetLastError())));
+		return false;
 	}
 };
 
 void SerialChannel_SerialFuture::nativeCancel()
 {
-	HANDLE port = getContext(getJaceProxy());
-	CancelTask* task = new CancelTask(port, getJaceProxy());
-
-	CompletionPortContext* windowsContext = getCompletionPortContext();
-	if (!PostQueuedCompletionStatus(windowsContext->completionPort, 0, IoTask::RUN, 
-		&task->overlapped))
+	FutureContext* context = getContext(getJaceProxy());
 	{
-		delete task;
-		throw IOException(getSourceCodePosition(L__FILE__, __LINE__) + 
-			L"PostQueuedCompletionStatus() failed with error: " + getErrorMessage(GetLastError()));
+		boost::mutex::scoped_lock lock(context->thread.lock);
+		CancelTask* task = new CancelTask(context->port, getJaceProxy());
+		context->thread.workload = task;
+		context->thread.workloadChanged.notify_one();
 	}
+}
+
+void SerialChannel_SerialFuture::dispose()
+{
+	FutureContext* context = getContext(getJaceProxy());
+	delete context;
 }

@@ -124,6 +124,7 @@ public abstract class Common extends AbstractConfiguration
 	 */
 	private void compileJavaClasses() throws BuildException
 	{
+		
 	}
 
 	/**
@@ -146,7 +147,7 @@ public abstract class Common extends AbstractConfiguration
 
 			file = new File(project.getPath(),
 				"java/netbeans/build/classes/jperipheral/SerialChannel$SerialFuture.class");
-			new PeerEnhancer.Builder(file, file).library("JPeripheral").enhance();
+			new PeerEnhancer.Builder(file, file).library("JPeripheral").deallocationMethod("dispose").enhance();
 		}
 		catch (IOException e)
 		{
@@ -165,7 +166,7 @@ public abstract class Common extends AbstractConfiguration
 		File buildPath = new File(project.getPath(), "dist/" + getPlatform() + "/java");
 		if (!buildPath.exists() && !buildPath.mkdirs())
 			throw new BuildException("Cannot create " + buildPath);
-		copy.get().recursive(true).apply(netbeansPath, buildPath);
+		copy.get().apply(netbeansPath, buildPath);
 	}
 
 	/**
@@ -210,7 +211,7 @@ public abstract class Common extends AbstractConfiguration
 		File target = new File(project.getPath(), "cpp/build/" + getPlatform());
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target);
-		copy.get().recursive(true).filter(fileFilter.get().addFile("*").addDirectory("*").removeDirectory(".svn").
+		copy.get().filter(fileFilter.get().addFile("*").addDirectory("*").removeDirectory(".svn").
 			build()).apply(source, target);
 	}
 
@@ -284,7 +285,7 @@ public abstract class Common extends AbstractConfiguration
 		File target = new File(project.getPath(), "dist/" + getPlatform() + "/native");
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target);
-		copy.get().recursive(true).filter(fileFilter.get().addDirectory("*").addFile("*.dll").addFile("*.pdb").build()).
+		copy.get().filter(fileFilter.get().addDirectory("*").addFile("*.dll").addFile("*.pdb").build()).
 			apply(source, target);
 	}
 }

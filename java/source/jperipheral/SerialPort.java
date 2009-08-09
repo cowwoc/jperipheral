@@ -218,6 +218,7 @@ public class SerialPort extends ComPort
 		 */
 		FIVE
 		{
+			@Override
 			public String toString()
 			{
 				return "5";
@@ -228,6 +229,7 @@ public class SerialPort extends ComPort
 		 */
 		SIX
 		{
+			@Override
 			public String toString()
 			{
 				return "6";
@@ -238,6 +240,7 @@ public class SerialPort extends ComPort
 		 */
 		SEVEN
 		{
+			@Override
 			public String toString()
 			{
 				return "7";
@@ -248,6 +251,7 @@ public class SerialPort extends ComPort
 		 */
 		EIGHT
 		{
+			@Override
 			public String toString()
 			{
 				return "8";
@@ -265,6 +269,7 @@ public class SerialPort extends ComPort
 		 */
 		RTS_CTS
 		{
+			@Override
 			public String toString()
 			{
 				return "RTS/CTS";
@@ -275,6 +280,7 @@ public class SerialPort extends ComPort
 		 */
 		XON_XOFF
 		{
+			@Override
 			public String toString()
 			{
 				return "XON/XOFF";
@@ -285,6 +291,7 @@ public class SerialPort extends ComPort
 		 */
 		NONE
 		{
+			@Override
 			public String toString()
 			{
 				return "NONE";
@@ -302,6 +309,7 @@ public class SerialPort extends ComPort
 		 */
 		ONE
 		{
+			@Override
 			public String toString()
 			{
 				return "1";
@@ -312,6 +320,7 @@ public class SerialPort extends ComPort
 		 */
 		ONE_POINT_FIVE
 		{
+			@Override
 			public String toString()
 			{
 				return "1.5";
@@ -322,6 +331,7 @@ public class SerialPort extends ComPort
 		 */
 		TWO
 		{
+			@Override
 			public String toString()
 			{
 				return "2";
@@ -339,6 +349,7 @@ public class SerialPort extends ComPort
 		 */
 		EVEN
 		{
+			@Override
 			public String toString()
 			{
 				return "E";
@@ -349,6 +360,7 @@ public class SerialPort extends ComPort
 		 */
 		MARK
 		{
+			@Override
 			public String toString()
 			{
 				return "M";
@@ -359,6 +371,7 @@ public class SerialPort extends ComPort
 		 */
 		NONE
 		{
+			@Override
 			public String toString()
 			{
 				return "N";
@@ -369,6 +382,7 @@ public class SerialPort extends ComPort
 		 */
 		ODD
 		{
+			@Override
 			public String toString()
 			{
 				return "O";
@@ -379,6 +393,7 @@ public class SerialPort extends ComPort
 		 */
 		SPACE
 		{
+			@Override
 			public String toString()
 			{
 				return "S";

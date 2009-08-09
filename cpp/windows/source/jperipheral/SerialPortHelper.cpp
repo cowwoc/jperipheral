@@ -1,6 +1,9 @@
 #include "jperipheral/SerialPortHelper.h"
 using jperipheral::IoTask;
 using jperipheral::CompletionPortContext;
+using jperipheral::SerialPortContext;
+using jperipheral::WorkerThread;
+using jperipheral::FutureContext;
 
 #include "jace/proxy/jperipheral/SerialPort.h"
 using jace::proxy::jperipheral::SerialPort;
@@ -46,26 +49,32 @@ using std::wstring;
 #include <sstream>
 using std::stringstream;
 
+#pragma warning(push)
+#pragma warning(disable: 4103 4244 4512)
+#include <boost/bind.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/thread/mutex.hpp>
+#pragma warning(pop)
 
-HANDLE jperipheral::getContext(SerialPort serialPort)
+
+SerialPortContext* jperipheral::getContext(SerialPort serialPort)
 {
-	return reinterpret_cast<HANDLE>(static_cast<intptr_t>(serialPort.nativeContext()));
+	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(serialPort.nativeContext()));
 }
 
-HANDLE jperipheral::getContext(SerialChannel channel)
+SerialPortContext* jperipheral::getContext(SerialChannel channel)
 {
-	return reinterpret_cast<HANDLE>(static_cast<intptr_t>(channel.nativeContext()));
+	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(channel.nativeContext()));
 }
 
-HANDLE jperipheral::getContext(SerialChannel_SerialFuture future)
+FutureContext* jperipheral::getContext(SerialChannel_SerialFuture future)
 {
-	return reinterpret_cast<HANDLE>(static_cast<intptr_t>(future.nativeContext()));
+	return reinterpret_cast<FutureContext*>(static_cast<intptr_t>(future.getNativeContext()));
 }
 
 CompletionPortContext* jperipheral::getCompletionPortContext()
 {
-	::jace::proxy::jperipheral::WindowsOS windows = java_cast<::jace::proxy::jperipheral::WindowsOS>(
-		OperatingSystem::getCurrent());
+	::jace::proxy::jperipheral::WindowsOS windows = java_cast<::jace::proxy::jperipheral::WindowsOS>(OperatingSystem::getCurrent());
 	return reinterpret_cast<CompletionPortContext*>(static_cast<intptr_t>(windows.nativeContext()));
 }
 
@@ -91,6 +100,55 @@ IoTask::~IoTask()
 IoTask* IoTask::fromOverlapped(OVERLAPPED* overlapped)
 {
 	return reinterpret_cast<IoTask*>((char*) overlapped - offsetof(IoTask, overlapped));
+}
+
+void WorkHandler(WorkerThread& context)
+{
+	boost::mutex::scoped_lock lock(context.lock);
+	context.workloadChanged.wait(lock);
+	while (!context.shutdownRequested)
+	{
+		if (!context.workload->run())
+			delete context.workload;
+		context.workload = 0;
+		context.workloadChanged.wait(lock);
+	}
+	jace::helper::detach();
+};
+
+WorkerThread::WorkerThread():
+	workload(0), shutdownRequested(false)
+{
+	thread = new boost::thread(boost::bind(&WorkHandler, boost::ref(*this)));
+}
+
+WorkerThread::~WorkerThread()
+{
+	{
+		boost::mutex::scoped_lock lock(this->lock);
+		shutdownRequested = true;
+		workloadChanged.notify_one();
+	}
+	thread->join();
+	delete thread;
+	delete workload;
+}
+
+FutureContext::FutureContext(HANDLE _port, WorkerThread& _thread):
+	port(_port), thread(_thread)
+{}
+
+FutureContext::~FutureContext()
+{}
+
+SerialPortContext::SerialPortContext(HANDLE _port):
+	port(_port)
+{}
+
+SerialPortContext::~SerialPortContext()
+{
+	if (!CloseHandle(port))
+		throw IOException(L"CloseHandle() failed with error: " + getErrorMessage(GetLastError()));
 }
 
 /**

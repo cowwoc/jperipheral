@@ -72,7 +72,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 			throw new ReadPendingException();
 		if (target.remaining() <= 0)
 			return new NoOpFuture();
-		SerialFuture<Integer> result = new SerialFuture<Integer>(nativeContext, new Runnable()
+		SerialFuture<Integer> result = new SerialFuture<Integer>(new Runnable()
 		{
 			@Override
 			public void run()
@@ -131,7 +131,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 			throw new WritePendingException();
 		if (source.remaining() <= 0)
 			return new NoOpFuture();
-		SerialFuture<Integer> result = new SerialFuture<Integer>(nativeContext, new Runnable()
+		SerialFuture<Integer> result = new SerialFuture<Integer>(new Runnable()
 		{
 			@Override
 			public void run()
@@ -218,6 +218,20 @@ public class SerialChannel extends AsynchronousSerialChannel
 	 */
 	private static interface NativeListener
 	{
+		/**
+		 * Sets the native context.
+		 * 
+		 * @param context the native context
+		 */
+		void setNativeContext(long context);
+
+		/**
+		 * Returns the native context.
+		 *
+		 * @return the native context
+		 */
+		long getNativeContext();
+
 		/**
 		 * Invoked if the operation completed successfully.
 		 *
@@ -324,6 +338,17 @@ public class SerialChannel extends AsynchronousSerialChannel
 			handler.failed(new AsynchronousCloseException(), attachment);
 			onDone.run();
 		}
+
+		@Override
+		public void setNativeContext(long context)
+		{
+		}
+
+		@Override
+		public long getNativeContext()
+		{
+			throw new AssertionError("Never used by native code");
+		}
 	}
 
 	/**
@@ -334,7 +359,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 	 */
 	private static class SerialFuture<A> implements Future<Integer>, NativeListener
 	{
-		private final long nativeContext;
+		private long nativeContext;
 		private Integer value;
 		private Throwable throwable;
 		private boolean done;
@@ -345,12 +370,10 @@ public class SerialChannel extends AsynchronousSerialChannel
 		/**
 		 * Creates a new SerialFuture.
 		 *
-		 * @param nativeContext a pointer to the native context
 		 * @param onDone the Runnable to invoke when the operation completes
 		 */
-		public SerialFuture(long nativeContext, Runnable onDone)
+		public SerialFuture(Runnable onDone)
 		{
-			this.nativeContext = nativeContext;
 			this.onDone = onDone;
 		}
 
@@ -478,12 +501,29 @@ public class SerialChannel extends AsynchronousSerialChannel
 			onDone.run();
 		}
 
+		@Override
+		public void setNativeContext(long context)
+		{
+			this.nativeContext = context;
+		}
+
+		@Override
+		public long getNativeContext()
+		{
+			return nativeContext;
+		}
+
 		/**
 		 * Cancels an ongoing operation.
 		 *
 		 * @throws IOException if the operation fails
 		 */
 		private native void nativeCancel() throws IOException;
+
+		/**
+		 * Disposes the Future.
+		 */
+		private native void dispose();
 	}
 
 	/**

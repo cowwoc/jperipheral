@@ -67,7 +67,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="jace.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="$(JACE_HOME)\lib\msvc\i386\debug"
+				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\msvc\i386\debug&quot;;&quot;$(BOOST_HOME)\stage32\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				TargetMachine="1"
@@ -144,7 +144,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="jace.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="$(JACE_HOME)\lib\msvc\amd64\debug"
+				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\msvc\amd64\debug&quot;;&quot;$(BOOST_HOME)\stage64\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				TargetMachine="17"
@@ -222,7 +222,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="jace.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="$(JACE_HOME)\lib\msvc\i386\release"
+				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\msvc\i386\release&quot;;&quot;$(BOOST_HOME)\stage32\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -303,7 +303,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="jace.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="$(JACE_HOME)\lib\msvc\amd64\release"
+				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\msvc\amd64\release&quot;;&quot;$(BOOST_HOME)\stage64\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -571,6 +571,10 @@
 					<Filter
 						Name="jperipheral"
 						>
+						<File
+							RelativePath="..\..\source\jace\proxy\jperipheral\AsynchronousByteChannelTimeouts.cpp"
+							>
+						</File>
 						<File
 							RelativePath="..\..\source\jace\proxy\jperipheral\AsynchronousSerialChannel.cpp"
 							>

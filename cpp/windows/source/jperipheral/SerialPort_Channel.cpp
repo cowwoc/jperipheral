@@ -14,6 +14,8 @@ using jperipheral::getErrorMessage;
 using jperipheral::CompletionPortContext;
 using jperipheral::IoTask;
 using jperipheral::getSourceCodePosition;
+using jperipheral::SerialPortContext;
+using jperipheral::FutureContext;
 
 #include "jace/proxy/jperipheral/SerialChannel_NativeListener.h"
 using jace::proxy::jperipheral::SerialChannel_NativeListener;
@@ -48,7 +50,12 @@ using std::string;
 using std::cerr;
 using std::endl;
 
-
+#pragma warning(push)
+#pragma warning(disable: 4103 4244 4512)
+#include <boost/thread/thread.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition.hpp>
+#pragma warning(pop)
 
 /**
  * Sets the port read timeout.
@@ -119,7 +126,7 @@ public:
 		}
 	}
 
-	virtual void run()
+	virtual bool run()
 	{
 		try
 		{
@@ -127,7 +134,7 @@ public:
 			if (remaining <= 0)
 			{
 				listener->onFailure(AssertionError(L"ByteBuffer.remaining()==" + toWString((jint) remaining)));
-				return;
+				return false;
 			}
 			JNIEnv* env = jace::helper::attach();
 			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(this->nativeBuffer->getJavaJniObject()));
@@ -141,8 +148,12 @@ public:
 			{
 				DWORD errorCode = GetLastError();
 				if (errorCode != ERROR_IO_PENDING)
+				{
 					listener->onFailure(IOException(L"ReadFile() failed with error: " + getErrorMessage(errorCode)));
+					return false;
+				}
 			}
+			return true;
 		}
 		catch (Throwable& t)
 		{
@@ -152,9 +163,9 @@ public:
 			}
 			catch (Throwable& t)
 			{
-					cerr << __FILE__ << ":" << __LINE__ << endl;
-					t.printStackTrace();
+				t.printStackTrace();
 			}
+			return false;
 		}
 	}
 };
@@ -183,7 +194,7 @@ public:
 		javaBuffer->position(javaBuffer->position() + bytesTransfered);
 	}
 
-	virtual void run()
+	virtual bool run()
 	{
 		try
 		{
@@ -191,7 +202,7 @@ public:
 			if (remaining <= 0)
 			{
 				listener->onFailure(AssertionError(L"ByteBuffer.remaining()==" + toWString((jint) remaining)));
-				return;
+				return false;
 			}
 			JNIEnv* env = jace::helper::attach();
 			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(this->nativeBuffer->getJavaJniObject()));
@@ -205,8 +216,12 @@ public:
 			{
 				DWORD errorCode = GetLastError();
 				if (errorCode != ERROR_IO_PENDING)
+				{
 					listener->onFailure(IOException(L"WriteFile() failed with error: " + getErrorMessage(errorCode)));
+					return false;
+				}
 			}
+			return true;
 		}
 		catch (Throwable& t)
 		{
@@ -218,36 +233,49 @@ public:
 			{
 				t.printStackTrace();
 			}
+			return false;
 		}
 	}
 };
 
 void SerialChannel::nativeRead(ByteBuffer target, JLong timeout, SerialChannel_NativeListener listener)
 {
-	HANDLE port = getContext(getJaceProxy());
-	ReadTask* task = new ReadTask(port, target, (DWORD) min(timeout, MAXDWORD), listener);
-
-	CompletionPortContext* windowsContext = getCompletionPortContext();
-	if (!PostQueuedCompletionStatus(windowsContext->completionPort, 0, IoTask::RUN, 
-		&task->overlapped))
+	SerialPortContext* context = getContext(getJaceProxy());
+	FutureContext* futureContext = new FutureContext(context->port, context->readThread);
+	listener.setNativeContext(reinterpret_cast<intptr_t>(futureContext));
 	{
-		delete task;
-		throw IOException(getSourceCodePosition(L__FILE__, __LINE__) + 
-			L" PostQueuedCompletionStatus() failed with error: " + getErrorMessage(GetLastError()));
+		boost::mutex::scoped_lock lock(context->readThread.lock);
+		try
+		{
+			ReadTask* task = new ReadTask(context->port, target, (DWORD) min(timeout, MAXDWORD), listener);
+			context->readThread.workload = task;
+			context->readThread.workloadChanged.notify_one();
+		}
+		catch (...)
+		{
+			delete futureContext;
+			throw;
+		}
 	}
 }
 
 void SerialChannel::nativeWrite(ByteBuffer source, JLong timeout, SerialChannel_NativeListener listener)
 {
-	HANDLE port = getContext(getJaceProxy());
-	WriteTask* task = new WriteTask(port, source, (DWORD) min(timeout, MAXDWORD), listener);
-
-	CompletionPortContext* windowsContext = getCompletionPortContext();
-	if (!PostQueuedCompletionStatus(windowsContext->completionPort, 0, IoTask::RUN, 
-		&task->overlapped))
+	SerialPortContext* context = getContext(getJaceProxy());
+	FutureContext* futureContext = new FutureContext(context->port, context->readThread);
+	listener.setNativeContext(reinterpret_cast<intptr_t>(futureContext));
 	{
-		delete task;
-		throw IOException(getSourceCodePosition(L__FILE__, __LINE__) + 
-			L"PostQueuedCompletionStatus() failed with error: " + getErrorMessage(GetLastError()));
+		boost::mutex::scoped_lock lock(context->writeThread.lock);
+		try
+		{
+			WriteTask* task = new WriteTask(context->port, source, (DWORD) min(timeout, MAXDWORD), listener);
+			context->writeThread.workload = task;
+			context->writeThread.workloadChanged.notify_one();
+		}
+		catch (...)
+		{
+			delete futureContext;
+			throw;
+		}
 	}
 }

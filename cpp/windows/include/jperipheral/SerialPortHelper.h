@@ -28,24 +28,18 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#pragma warning(push)
+#pragma warning(disable: 4103 4244 4512)
+#include <boost/thread/thread.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition.hpp>
+#pragma warning(pop)
+
 BEGIN_NAMESPACE_1( jperipheral )
 
 #define WIDEN2(x) L ## x
 #define WIDEN(x) WIDEN2(x)
 #define L__FILE__ WIDEN(__FILE__)
-
-/**
- * Returns the SerialPort handle.
- */
-HANDLE getContext(::jace::proxy::jperipheral::SerialPort port);
-/**
- * Returns the SerialPort handle.
- */
-HANDLE getContext(::jace::proxy::jperipheral::SerialChannel channel);
-/**
- * Returns the SerialPort handle.
- */
-HANDLE getContext(::jace::proxy::jperipheral::SerialChannel_SerialFuture future);
 
 /**
  * A task that updates a Future.
@@ -58,10 +52,6 @@ public:
 	 */
 	enum CompletionKey
 	{
-		/**
-		 * Run the operation.
-		 */
-		RUN,
 		/**
 		 * Handle the completion of an existing operation.
 		 */
@@ -84,8 +74,10 @@ public:
 		::jace::proxy::jperipheral::SerialChannel_NativeListener listener);
 	/**
 	 * Invokes an I/O operation.
+	 *
+	 * @return false if the task should be deleted
 	 */
-	virtual void run() = 0;
+	virtual bool run() = 0;
 	/**
 	 * Copies changes from nativeBuffer to javaBuffer.
 	 *
@@ -128,6 +120,77 @@ public:
 	 */
 	::jace::proxy::jperipheral::SerialChannel_NativeListener* listener;
 };
+
+/**
+ * A thread that only executes one workload at a time.
+ */
+class WorkerThread
+{
+public:
+	WorkerThread();
+	~WorkerThread();
+
+	boost::thread* thread;
+	bool shutdownRequested;
+	IoTask* workload;
+	boost::mutex lock;
+	boost::condition workloadChanged;
+};
+
+/**
+ * Data associated with the serial port.
+ */
+class SerialPortContext
+{
+public:
+	/**
+	 * Creates a new SerialPortContext.
+	 *
+	 * @param port the serial port
+	 */
+	SerialPortContext(HANDLE port);
+
+	/**
+	 * Destroys the SerialPortContext.
+	 */
+	~SerialPortContext();
+
+	HANDLE port;
+	WorkerThread readThread;
+	WorkerThread writeThread;
+};
+
+/**
+ * Data associated with a Future.
+ */
+class FutureContext
+{
+public:
+	/**
+	 * Creates a new FutureContext.
+	 *
+	 * @param port the serial port
+	 * @param thread the worker thread
+	 */
+	FutureContext(HANDLE port, WorkerThread& thread);
+	~FutureContext();
+
+	HANDLE port;
+	WorkerThread& thread;
+};
+
+/**
+ * Returns the SerialPort handle.
+ */
+SerialPortContext* getContext(::jace::proxy::jperipheral::SerialPort port);
+/**
+ * Returns the SerialPort handle.
+ */
+SerialPortContext* getContext(::jace::proxy::jperipheral::SerialChannel channel);
+/**
+ * Returns the SerialPort handle.
+ */
+FutureContext* getContext(::jace::proxy::jperipheral::SerialChannel_SerialFuture future);
 
 /**
  * Data associated with the completion port.

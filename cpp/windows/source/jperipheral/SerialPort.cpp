@@ -33,23 +33,29 @@ using jperipheral::CompletionPortContext;
 using jperipheral::getCompletionPortContext;
 using jperipheral::getSourceCodePosition;
 using jperipheral::IoTask;
+using jperipheral::SerialPortContext;
 
 #include <iostream>
 using std::cout;
 using std::endl;
 
+#pragma warning(push)
+#pragma warning(disable: 4103 4244 4512)
+#include <boost/thread/mutex.hpp>
+#pragma warning(pop)
+
 
 JLong SerialPort::nativeOpen(String name, String path)
 {
 	wstring pathAsString = path;
-	HANDLE result = CreateFile(pathAsString.c_str(),
+	HANDLE port = CreateFile(pathAsString.c_str(),
 		GENERIC_READ | GENERIC_WRITE,
 		0,											// must be opened with exclusive-access
 		0,											// default security attributes
 		OPEN_EXISTING,					// must use OPEN_EXISTING
 		FILE_FLAG_OVERLAPPED,		// overlapped I/O
 		0);											// hTemplate must be NULL for comm devices
-	if (result == INVALID_HANDLE_VALUE)
+	if (port == INVALID_HANDLE_VALUE)
 	{
 		DWORD errorCode = GetLastError();
 
@@ -66,7 +72,8 @@ JLong SerialPort::nativeOpen(String name, String path)
 
 	// Associate the file handle with the completion port
 	CompletionPortContext* context = getCompletionPortContext();
-	HANDLE completionPort = CreateIoCompletionPort(result, context->completionPort, IoTask::COMPLETION, 0);
+	SerialPortContext* result = new SerialPortContext(port);
+	HANDLE completionPort = CreateIoCompletionPort(port, context->completionPort, IoTask::COMPLETION, 0);
 	if (completionPort==0)
 		throw AssertionError(L"CreateIoCompletionPort() failed with error: " + getErrorMessage(GetLastError()));
 	return reinterpret_cast<intptr_t>(result);
@@ -78,10 +85,10 @@ void SerialPort::nativeConfigure(JInt baudRate,
 																 SerialPort_StopBits stopBits,
 																 SerialPort_FlowControl flowControl)
 {
-	HANDLE port = getContext(getJaceProxy());
+	SerialPortContext* context = getContext(getJaceProxy());
 	DCB dcb = {0};
 	
-	if (!GetCommState(port, &dcb))
+	if (!GetCommState(context->port, &dcb))
 		throw IOException(L"GetCommState() failed with error: " + getErrorMessage(GetLastError()));
 	dcb.BaudRate = baudRate;
 
@@ -159,7 +166,7 @@ void SerialPort::nativeConfigure(JInt baudRate,
 	else
 		throw AssertionError(flowControl);
 
-	if (!SetCommState(port, &dcb))
+	if (!SetCommState(context->port, &dcb))
 		throw IOException(L"SetCommState() failed with error: " + getErrorMessage(GetLastError()));
 }
 
@@ -170,8 +177,8 @@ void SerialPort::printStatus()
   bool fOOP, fOVERRUN, fPTO, fRXOVER, fRXPARITY, fTXFULL, fBREAK, fDNS, fFRAME, fIOE, fMODE;
 
   // Get and clear current errors on the port.
-	HANDLE port = getContext(getJaceProxy());
-  if (!ClearCommError(port, &errors, &comStat))
+	SerialPortContext* context = getContext(getJaceProxy());
+  if (!ClearCommError(context->port, &errors, &comStat))
 		throw IOException(L"ClearCommError() failed with error: " + getErrorMessage(GetLastError()));
 
   // Get error flags.
@@ -231,12 +238,13 @@ public:
 	virtual void updateJavaBuffer(int)
 	{}
 
-	virtual void run()
+	virtual bool run()
 	{
 		if (!CancelIo(port))
 			errorCode = GetLastError();
 		if (!SetEvent(taskDone))
 			throw IOException(L"SetEvent() failed with error: " + getErrorMessage(GetLastError()));
+		return false;
 	}
 
 	virtual ~CloseTask()
@@ -251,33 +259,11 @@ public:
 
 void SerialPort::nativeClose()
 {
-	HANDLE port = getContext(getJaceProxy());
-
-	// block until cancel() completes
-	CloseTask* task = new CloseTask(port);
-
-	CompletionPortContext* windowsContext = getCompletionPortContext();
-	if (!PostQueuedCompletionStatus(windowsContext->completionPort, 0, IoTask::RUN, 
-		&task->overlapped))
+	SerialPortContext* context = getContext(getJaceProxy());
 	{
-		delete task;
-		throw IOException(getSourceCodePosition(L__FILE__, __LINE__) + 
-			L"PostQueuedCompletionStatus() failed with error: " + getErrorMessage(GetLastError()));
+		CloseTask task(context->port);
+		task.run();
 	}
-	switch (WaitForSingleObject(task->taskDone, INFINITE))
-	{
-		case WAIT_OBJECT_0:
-		{
-			if (task->errorCode != ERROR_SUCCESS)
-				throw IOException(L"WaitForSingleObject() failed with error: " + getErrorMessage(GetLastError()));
-			break;
-		}
-		default:
-			throw IOException(L"WaitForSingleObject() failed with error: " + getErrorMessage(GetLastError()));
-	}
-
-	delete task;
-	if (!CloseHandle(port))
-		throw IOException(L"CloseHandle() failed with error: " + getErrorMessage(GetLastError()));
+	delete context;
 	jace::helper::detach();
 }

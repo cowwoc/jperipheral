@@ -42,7 +42,7 @@ using std::endl;
 /**
  * Thread used carry out all I/O operations.
  */
-DWORD WINAPI WorkerThread(LPVOID _completionPort)
+DWORD WINAPI CompletionHandler(LPVOID _completionPort)
 {
 	HANDLE completionPort = (HANDLE) _completionPort;
 	DWORD bytesTransfered;
@@ -85,11 +85,6 @@ DWORD WINAPI WorkerThread(LPVOID _completionPort)
 			IoTask* task = IoTask::fromOverlapped(overlapped);
 			switch (completionKey)
 			{
-				case IoTask::RUN:
-				{
-					task->run();
-					break;
-				}
 				case IoTask::COMPLETION:
 				{
 					if (bytesTransfered < 1)
@@ -158,7 +153,7 @@ CompletionPortContext::CompletionPortContext()
 		throw AssertionError(String(L"CreateIoCompletionPort() failed with error: " + getErrorMessage(GetLastError())));
 
 	DWORD threadId;
-	workerThread = CreateThread(0, 0, WorkerThread, completionPort, 0, &threadId);
+	workerThread = CreateThread(0, 0, CompletionHandler, completionPort, 0, &threadId);
 	if (!workerThread)
 	{
 		CloseHandle(completionPort);

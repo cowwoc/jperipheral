@@ -19,6 +19,6 @@ public class Release extends Common
 	@Inject
 	public Release(Wiring wiring, Project project)
 	{
-		super(wiring, project, "debug");
+		super(wiring, project, "release");
 	}
 }

@@ -6,6 +6,8 @@ import buildinjava.Project;
 import buildinjava.io.Copy;
 import buildinjava.io.Delete;
 import buildinjava.io.FileFilterBuilder;
+import buildinjava.java.Jar;
+import buildinjava.java.JavaCompiler;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import jace.parser.ClassFile;
@@ -15,6 +17,7 @@ import jace.proxy.AutoProxy;
 import jace.proxy.ProxyGenerator.AccessibilityType;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -31,7 +34,11 @@ public abstract class Common extends AbstractConfiguration
 	private final Project project;
 	private final Provider<Delete> delete;
 	private final Provider<Copy> copy;
-	private final Provider<FileFilterBuilder> fileFilter;
+	private final FileFilterBuilder.Builder fileFilter;
+	private final Provider<JavaCompiler> javaCompiler;
+	private final Provider<Jar> jar;
+	private final String javaOutputPath = "java/build";
+	private final FileFilter acceptAll;
 
 	/**
 	 * Insulates subclasses from a growing list of wiring objects.
@@ -42,21 +49,29 @@ public abstract class Common extends AbstractConfiguration
 	{
 		private final Provider<Delete> delete;
 		private final Provider<Copy> copy;
-		private final Provider<FileFilterBuilder> filterBuilder;
+		private final FileFilterBuilder.Builder filterBuilder;
+		private final Provider<JavaCompiler> javaCompiler;
+		private final Provider<Jar> jar;
 
 		/**
 		 * Creates a new Wiring.
 		 *
 		 * @param delete an instance of <code>Provider<Delete></code>
 		 * @param copy an instance of <code>Provider<Copy></code>
-		 * @param filterBuilder an instance of <code>Provider<FileFilterBuilder></code>
+		 * @param filterBuilder an instance of <code>FileFilterBuilder.Builder</code>
+		 * @param javaCompiler an instance of <code>Provider<JavaCompiler></code>
+		 * @param jar an instance of <code>Provider<Jar></code>
 		 */
 		@Inject
-		public Wiring(Provider<Delete> delete, Provider<Copy> copy, Provider<FileFilterBuilder> filterBuilder)
+		public Wiring(Provider<Delete> delete, Provider<Copy> copy,
+									FileFilterBuilder.Builder filterBuilder,
+									Provider<JavaCompiler> javaCompiler, Provider<Jar> jar)
 		{
 			this.delete = delete;
 			this.copy = copy;
 			this.filterBuilder = filterBuilder;
+			this.javaCompiler = javaCompiler;
+			this.jar = jar;
 		}
 	}
 
@@ -73,7 +88,10 @@ public abstract class Common extends AbstractConfiguration
 		this.delete = wiring.delete;
 		this.copy = wiring.copy;
 		this.fileFilter = wiring.filterBuilder;
+		this.javaCompiler = wiring.javaCompiler;
+		this.jar = wiring.jar;
 		this.project = project;
+		this.acceptAll = fileFilter.acceptAll().build();
 	}
 
 	/**
@@ -89,9 +107,8 @@ public abstract class Common extends AbstractConfiguration
 	@Override
 	public void clean()
 	{
-		delete.get().recursive(true).file(new File(project.getPath(), "java/netbeans/build"));
-		delete.get().recursive(true).file(new File(project.getPath(), "java/netbeans/dist"));
-		delete.get().recursive(true).file(new File(project.getPath(), "dist/" + getPlatform()));
+		delete.get().filter(acceptAll).file(new File(project.getPath(), "cpp/build/" + getPlatform()));
+		delete.get().filter(acceptAll).file(new File(project.getPath(), "dist/" + getPlatform()));
 	}
 
 	/**
@@ -109,7 +126,9 @@ public abstract class Common extends AbstractConfiguration
 	{
 		compileJavaClasses();
 		enhanceJavaPeers();
-		copyJavaClasses();
+		//copyJavaClasses();
+		packageJavaClasses();
+
 		copyCppClasses();
 		generateCppPeers();
 		generateCppProxies();
@@ -124,7 +143,16 @@ public abstract class Common extends AbstractConfiguration
 	 */
 	private void compileJavaClasses() throws BuildException
 	{
-		
+		File source = new File(project.getPath(), "java/source");
+		File target = new File(project.getPath(), javaOutputPath);
+		FileFilter filter = fileFilter.rejectAll().addDirectory("*").removeDirectory(".svn").addFile("*.java").
+			build();
+		List<File> classPath = new ArrayList<File>();
+		classPath.add(new File(project.getPath(), "java/libraries/joda-time/joda-time-1.6.jar"));
+
+		if (!target.exists() && !target.mkdirs())
+			throw new BuildException("Cannot create " + target.getAbsolutePath());
+		javaCompiler.get().filter(filter).classPath(classPath).apply(source, target);
 	}
 
 	/**
@@ -136,18 +164,18 @@ public abstract class Common extends AbstractConfiguration
 	{
 		try
 		{
-			File file = new File(project.getPath(), "java/netbeans/build/classes/jperipheral/WindowsOS.class");
+			File file = new File(project.getPath(), javaOutputPath + "/jperipheral/WindowsOS.class");
 			new PeerEnhancer.Builder(file, file).library("JPeripheral").enhance();
 
-			file = new File(project.getPath(), "java/netbeans/build/classes/jperipheral/SerialPort.class");
+			file = new File(project.getPath(), javaOutputPath + "/jperipheral/SerialPort.class");
 			new PeerEnhancer.Builder(file, file).library("JPeripheral").deallocationMethod("close").enhance();
 
-			file = new File(project.getPath(), "java/netbeans/build/classes/jperipheral/SerialChannel.class");
+			file = new File(project.getPath(), javaOutputPath + "/jperipheral/SerialChannel.class");
 			new PeerEnhancer.Builder(file, file).library("JPeripheral").deallocationMethod("close").enhance();
 
 			file = new File(project.getPath(),
-				"java/netbeans/build/classes/jperipheral/SerialChannel$SerialFuture.class");
-			new PeerEnhancer.Builder(file, file).library("JPeripheral").deallocationMethod("dispose").enhance();
+				javaOutputPath + "/jperipheral/SerialChannel$SerialFuture.class");
+			new PeerEnhancer.Builder(file, file).library("JPeripheral").enhance();
 		}
 		catch (IOException e)
 		{
@@ -162,11 +190,26 @@ public abstract class Common extends AbstractConfiguration
 	 */
 	private void copyJavaClasses() throws BuildException
 	{
-		File netbeansPath = new File(project.getPath(), "java/netbeans/build/classes");
+		File netbeansPath = new File(project.getPath(), javaOutputPath);
 		File buildPath = new File(project.getPath(), "dist/" + getPlatform() + "/java");
 		if (!buildPath.exists() && !buildPath.mkdirs())
 			throw new BuildException("Cannot create " + buildPath);
-		copy.get().apply(netbeansPath, buildPath);
+		copy.get().filter(acceptAll).apply(netbeansPath, buildPath);
+	}
+
+	/**
+	 * Packages the Java classes into a JAR file.
+	 *
+	 * @throws BuildException if an expected build error occurs
+	 */
+	private void packageJavaClasses() throws BuildException
+	{
+		File sourcePath = new File(project.getPath(), javaOutputPath);
+		File target = new File(project.getPath(), "dist/" + getPlatform() + "/java/jperipheral.jar");
+		File targetDirectory = target.getParentFile();
+		if (!targetDirectory.exists() && !targetDirectory.mkdirs())
+			throw new BuildException("Cannot create " + targetDirectory);
+		jar.get().filter(acceptAll).addTo(sourcePath, target);
 	}
 
 	/**
@@ -181,17 +224,17 @@ public abstract class Common extends AbstractConfiguration
 			File includeDir = new File(project.getPath(), "cpp/build/" + getPlatform() + "/include");
 			File sourceDir = new File(project.getPath(), "cpp/build/" + getPlatform() + "/source");
 
-			File classFile = new File(project.getPath(), "java/netbeans/build/classes/jperipheral/WindowsOS.class");
+			File classFile = new File(project.getPath(), javaOutputPath + "/jperipheral/WindowsOS.class");
 			new PeerGenerator(new ClassFile(classFile), includeDir, sourceDir, false).generate();
 
-			classFile = new File(project.getPath(), "java/netbeans/build/classes/jperipheral/SerialPort.class");
+			classFile = new File(project.getPath(), javaOutputPath + "/jperipheral/SerialPort.class");
 			new PeerGenerator(new ClassFile(classFile), includeDir, sourceDir, false).generate();
 
-			classFile = new File(project.getPath(), "java/netbeans/build/classes/jperipheral/SerialChannel.class");
+			classFile = new File(project.getPath(), javaOutputPath + "/jperipheral/SerialChannel.class");
 			new PeerGenerator(new ClassFile(classFile), includeDir, sourceDir, false).generate();
 
 			classFile = new File(project.getPath(),
-				"java/netbeans/build/classes/jperipheral/SerialChannel$SerialFuture.class");
+				javaOutputPath + "/jperipheral/SerialChannel$SerialFuture.class");
 			new PeerGenerator(new ClassFile(classFile), includeDir, sourceDir, false).generate();
 		}
 		catch (IOException e)
@@ -211,8 +254,7 @@ public abstract class Common extends AbstractConfiguration
 		File target = new File(project.getPath(), "cpp/build/" + getPlatform());
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target);
-		copy.get().filter(fileFilter.get().addFile("*").addDirectory("*").removeDirectory(".svn").
-			build()).apply(source, target);
+		copy.get().filter(fileFilter.acceptAll().removeDirectory(".svn").build()).apply(source, target);
 	}
 
 	/**
@@ -228,7 +270,7 @@ public abstract class Common extends AbstractConfiguration
 		File outputSources = new File(getProject().getPath(), "cpp/build/" + getPlatform() + "/source");
 		List<File> classPath = new ArrayList<File>();
 		classPath.add(new File(System.getenv("JAVA_HOME"), "jre/lib/rt.jar"));
-		classPath.add(new File(getProject().getPath(), "dist/" + getPlatform() + "/java"));
+		classPath.add(new File(getProject().getPath(), javaOutputPath));
 		try
 		{
 			new AutoProxy.Builder(Collections.singleton(inputHeaders), Collections.singleton(inputSources),
@@ -285,7 +327,7 @@ public abstract class Common extends AbstractConfiguration
 		File target = new File(project.getPath(), "dist/" + getPlatform() + "/native");
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target);
-		copy.get().filter(fileFilter.get().addDirectory("*").addFile("*.dll").addFile("*.pdb").build()).
+		copy.get().filter(fileFilter.rejectAll().addDirectory("*").addFile("*.dll").addFile("*.pdb").build()).
 			apply(source, target);
 	}
 }

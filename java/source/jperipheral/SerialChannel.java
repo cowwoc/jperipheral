@@ -519,11 +519,6 @@ public class SerialChannel extends AsynchronousSerialChannel
 		 * @throws IOException if the operation fails
 		 */
 		private native void nativeCancel() throws IOException;
-
-		/**
-		 * Disposes the Future.
-		 */
-		private native void dispose();
 	}
 
 	/**

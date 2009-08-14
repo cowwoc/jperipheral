@@ -40,7 +40,7 @@ public abstract class Common extends AbstractConfiguration
 	private final String javaOutputPath = "java/build";
 
 	/**
-	 * Insulates subclasses from a growing list of wiring objects.
+	 * Insulates subclasses from a growing list of dependencies.
 	 *
 	 * @author Gili Tzabari
 	 */
@@ -90,16 +90,6 @@ public abstract class Common extends AbstractConfiguration
 		this.javaCompiler = wiring.javaCompiler;
 		this.jar = wiring.jar;
 		this.project = project;
-	}
-
-	/**
-	 * Returns the project.
-	 *
-	 * @return the project
-	 */
-	protected Project getProject()
-	{
-		return project;
 	}
 
 	@Override
@@ -263,13 +253,13 @@ public abstract class Common extends AbstractConfiguration
 	 */
 	private void generateCppProxies() throws BuildException
 	{
-		File inputHeaders = new File(getProject().getPath(), "cpp/build/" + getPlatform() + "/include");
-		File inputSources = new File(getProject().getPath(), "cpp/build/" + getPlatform() + "/source");
-		File outputHeaders = new File(getProject().getPath(), "cpp/build/" + getPlatform() + "/include");
-		File outputSources = new File(getProject().getPath(), "cpp/build/" + getPlatform() + "/source");
+		File inputHeaders = new File(project.getPath(), "cpp/build/" + getPlatform() + "/include");
+		File inputSources = new File(project.getPath(), "cpp/build/" + getPlatform() + "/source");
+		File outputHeaders = new File(project.getPath(), "cpp/build/" + getPlatform() + "/include");
+		File outputSources = new File(project.getPath(), "cpp/build/" + getPlatform() + "/source");
 		List<File> classPath = new ArrayList<File>();
 		classPath.add(new File(System.getenv("JAVA_HOME"), "jre/lib/rt.jar"));
-		classPath.add(new File(getProject().getPath(), javaOutputPath));
+		classPath.add(new File(project.getPath(), javaOutputPath));
 		try
 		{
 			new AutoProxy.Builder(Collections.singleton(inputHeaders), Collections.singleton(inputSources),

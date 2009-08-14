@@ -41,6 +41,9 @@ BEGIN_NAMESPACE_1( jperipheral )
 #define WIDEN(x) WIDEN2(x)
 #define L__FILE__ WIDEN(__FILE__)
 
+
+class WorkerThread;
+
 /**
  * A task that updates a Future.
  */
@@ -65,12 +68,13 @@ public:
 	/**
 	 * Creates a new IoTask.
 	 *
+	 * @param workerThread the thread that will execute the task
 	 * @param port the comport
 	 * @param javaBuffer the java buffer associated with the operation
 	 * @param timeout the maximum number of milliseconds to wait before throwing InterruptedByTimeoutException
 	 * @param nativeListener the NativeListener associated with the operation.
 	 */
-	IoTask(HANDLE port, ::jace::proxy::java::nio::ByteBuffer javaBuffer, DWORD timeout, 
+	IoTask(WorkerThread& workerThread, HANDLE port, ::jace::proxy::java::nio::ByteBuffer javaBuffer, DWORD timeout, 
 		::jace::proxy::jperipheral::SerialChannel_NativeListener listener);
 	/**
 	 * Invokes an I/O operation.
@@ -119,6 +123,10 @@ public:
 	 * The NativeListener associated with the operation.
 	 */
 	::jace::proxy::jperipheral::SerialChannel_NativeListener* listener;
+	/**
+	 * The worker thread associated with the operation.
+	 */
+	WorkerThread& thread;
 };
 
 /**
@@ -161,25 +169,6 @@ public:
 };
 
 /**
- * Data associated with a Future.
- */
-class FutureContext
-{
-public:
-	/**
-	 * Creates a new FutureContext.
-	 *
-	 * @param port the serial port
-	 * @param thread the worker thread
-	 */
-	FutureContext(HANDLE port, WorkerThread& thread);
-	~FutureContext();
-
-	HANDLE port;
-	WorkerThread& thread;
-};
-
-/**
  * Returns the SerialPort handle.
  */
 SerialPortContext* getContext(::jace::proxy::jperipheral::SerialPort port);
@@ -190,7 +179,7 @@ SerialPortContext* getContext(::jace::proxy::jperipheral::SerialChannel channel)
 /**
  * Returns the SerialPort handle.
  */
-FutureContext* getContext(::jace::proxy::jperipheral::SerialChannel_SerialFuture future);
+IoTask* getContext(::jace::proxy::jperipheral::SerialChannel_SerialFuture future);
 
 /**
  * Data associated with the completion port.

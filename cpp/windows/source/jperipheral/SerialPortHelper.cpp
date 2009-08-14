@@ -3,7 +3,6 @@ using jperipheral::IoTask;
 using jperipheral::CompletionPortContext;
 using jperipheral::SerialPortContext;
 using jperipheral::WorkerThread;
-using jperipheral::FutureContext;
 
 #include "jace/proxy/jperipheral/SerialPort.h"
 using jace::proxy::jperipheral::SerialPort;
@@ -67,9 +66,9 @@ SerialPortContext* jperipheral::getContext(SerialChannel channel)
 	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(channel.nativeContext()));
 }
 
-FutureContext* jperipheral::getContext(SerialChannel_SerialFuture future)
+IoTask* jperipheral::getContext(SerialChannel_SerialFuture future)
 {
-	return reinterpret_cast<FutureContext*>(static_cast<intptr_t>(future.getNativeContext()));
+	return reinterpret_cast<IoTask*>(static_cast<intptr_t>(future.getNativeContext()));
 }
 
 CompletionPortContext* jperipheral::getCompletionPortContext()
@@ -78,11 +77,12 @@ CompletionPortContext* jperipheral::getCompletionPortContext()
 	return reinterpret_cast<CompletionPortContext*>(static_cast<intptr_t>(windows.nativeContext()));
 }
 
-IoTask::IoTask(HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout, SerialChannel_NativeListener _listener):
-  port(_port), timeout(_timeout), nativeBuffer(0), javaBuffer(0)
+IoTask::IoTask(WorkerThread& _thread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout, SerialChannel_NativeListener _listener):
+  thread(_thread), port(_port), timeout(_timeout), nativeBuffer(0), javaBuffer(0)
 {
 	memset(&overlapped, 0, sizeof(OVERLAPPED));
 	listener = new SerialChannel_NativeListener(_listener);
+	listener->setNativeContext(reinterpret_cast<intptr_t>(this));
 }
 
 IoTask::~IoTask()
@@ -133,13 +133,6 @@ WorkerThread::~WorkerThread()
 	delete thread;
 	delete workload;
 }
-
-FutureContext::FutureContext(HANDLE _port, WorkerThread& _thread):
-	port(_port), thread(_thread)
-{}
-
-FutureContext::~FutureContext()
-{}
 
 SerialPortContext::SerialPortContext(HANDLE _port):
 	port(_port)

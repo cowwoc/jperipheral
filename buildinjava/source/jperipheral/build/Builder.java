@@ -3,7 +3,6 @@ package jperipheral.build;
 import buildinjava.Configuration;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import jperipheral.build.configurations.Debug;
 
 /**
  * Builds the project.
@@ -14,10 +13,10 @@ public class Builder
 {
 	public static void main(String[] args)
 	{
-		Injector injector = Guice.createInjector(new buildinjava.Module());//, new buildinjava.ant.Module());
+		Injector injector = Guice.createInjector(new buildinjava.Module());
 		Project project = injector.getInstance(Project.class);
-		Configuration configuration = injector.getInstance(Debug.class);
-		//configuration.clean();
+		Configuration configuration = injector.getInstance(project.getDefaultConfiguration());
+		configuration.clean();
 		configuration.build();
 	}
 }

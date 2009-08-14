@@ -15,7 +15,7 @@ using jperipheral::CompletionPortContext;
 using jperipheral::IoTask;
 using jperipheral::getSourceCodePosition;
 using jperipheral::SerialPortContext;
-using jperipheral::FutureContext;
+using jperipheral::WorkerThread;
 
 #include "jace/proxy/jperipheral/SerialChannel_NativeListener.h"
 using jace::proxy::jperipheral::SerialChannel_NativeListener;
@@ -105,8 +105,8 @@ void setWriteTimeout(HANDLE port, DWORD timeout)
 class ReadTask: public IoTask
 {
 public:
-	ReadTask(HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout, SerialChannel_NativeListener _listener):
-		IoTask(_port, _javaBuffer, _timeout, _listener)
+	ReadTask(WorkerThread& _thread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout, SerialChannel_NativeListener _listener):
+		IoTask(_thread, _port, _javaBuffer, _timeout, _listener)
 	{
 		javaBuffer = new ByteBuffer(_javaBuffer);
 		if (javaBuffer->isDirect())
@@ -173,8 +173,8 @@ public:
 class WriteTask: public IoTask
 {
 public:
-	WriteTask(HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout, SerialChannel_NativeListener _listener): 
-		IoTask(_port, _javaBuffer, _timeout, _listener)
+	WriteTask(WorkerThread& _thread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout, SerialChannel_NativeListener _listener): 
+		IoTask(_thread, _port, _javaBuffer, _timeout, _listener)
 	{
 		javaBuffer = new ByteBuffer(_javaBuffer);
 		if (javaBuffer->isDirect())
@@ -241,41 +241,23 @@ public:
 void SerialChannel::nativeRead(ByteBuffer target, JLong timeout, SerialChannel_NativeListener listener)
 {
 	SerialPortContext* context = getContext(getJaceProxy());
-	FutureContext* futureContext = new FutureContext(context->port, context->readThread);
-	listener.setNativeContext(reinterpret_cast<intptr_t>(futureContext));
 	{
 		boost::mutex::scoped_lock lock(context->readThread.lock);
-		try
-		{
-			ReadTask* task = new ReadTask(context->port, target, (DWORD) min(timeout, MAXDWORD), listener);
-			context->readThread.workload = task;
-			context->readThread.workloadChanged.notify_one();
-		}
-		catch (...)
-		{
-			delete futureContext;
-			throw;
-		}
+		ReadTask* task = new ReadTask(context->readThread, context->port, target, (DWORD) min(timeout, MAXDWORD), 
+			listener);
+		task->thread.workload = task;
+		task->thread.workloadChanged.notify_one();
 	}
 }
 
 void SerialChannel::nativeWrite(ByteBuffer source, JLong timeout, SerialChannel_NativeListener listener)
 {
 	SerialPortContext* context = getContext(getJaceProxy());
-	FutureContext* futureContext = new FutureContext(context->port, context->readThread);
-	listener.setNativeContext(reinterpret_cast<intptr_t>(futureContext));
 	{
 		boost::mutex::scoped_lock lock(context->writeThread.lock);
-		try
-		{
-			WriteTask* task = new WriteTask(context->port, source, (DWORD) min(timeout, MAXDWORD), listener);
-			context->writeThread.workload = task;
-			context->writeThread.workloadChanged.notify_one();
-		}
-		catch (...)
-		{
-			delete futureContext;
-			throw;
-		}
+		WriteTask* task = new WriteTask(context->writeThread, context->port, source, (DWORD) min(timeout, MAXDWORD),
+			listener);
+		task->thread.workload = task;
+		task->thread.workloadChanged.notify_one();
 	}
 }

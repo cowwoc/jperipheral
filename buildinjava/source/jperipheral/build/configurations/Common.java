@@ -38,7 +38,6 @@ public abstract class Common extends AbstractConfiguration
 	private final Provider<JavaCompiler> javaCompiler;
 	private final Provider<Jar> jar;
 	private final String javaOutputPath = "java/build";
-	private final FileFilter acceptAll;
 
 	/**
 	 * Insulates subclasses from a growing list of wiring objects.
@@ -91,7 +90,6 @@ public abstract class Common extends AbstractConfiguration
 		this.javaCompiler = wiring.javaCompiler;
 		this.jar = wiring.jar;
 		this.project = project;
-		this.acceptAll = fileFilter.acceptAll().build();
 	}
 
 	/**
@@ -107,8 +105,9 @@ public abstract class Common extends AbstractConfiguration
 	@Override
 	public void clean()
 	{
-		delete.get().filter(acceptAll).file(new File(project.getPath(), "cpp/build/" + getPlatform()));
-		delete.get().filter(acceptAll).file(new File(project.getPath(), "dist/" + getPlatform()));
+		delete.get().file(new File(project.getPath(), javaOutputPath));
+		delete.get().file(new File(project.getPath(), "cpp/build/" + getPlatform()));
+		delete.get().file(new File(project.getPath(), "dist/" + getPlatform()));
 	}
 
 	/**
@@ -194,7 +193,7 @@ public abstract class Common extends AbstractConfiguration
 		File buildPath = new File(project.getPath(), "dist/" + getPlatform() + "/java");
 		if (!buildPath.exists() && !buildPath.mkdirs())
 			throw new BuildException("Cannot create " + buildPath);
-		copy.get().filter(acceptAll).apply(netbeansPath, buildPath);
+		copy.get().apply(netbeansPath, buildPath);
 	}
 
 	/**
@@ -209,7 +208,7 @@ public abstract class Common extends AbstractConfiguration
 		File targetDirectory = target.getParentFile();
 		if (!targetDirectory.exists() && !targetDirectory.mkdirs())
 			throw new BuildException("Cannot create " + targetDirectory);
-		jar.get().filter(acceptAll).addTo(sourcePath, target);
+		jar.get().create(sourcePath, target);
 	}
 
 	/**

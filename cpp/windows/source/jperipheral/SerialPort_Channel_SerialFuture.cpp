@@ -12,7 +12,7 @@ using jperipheral::CompletionPortContext;
 using jperipheral::getCompletionPortContext;
 using jperipheral::getSourceCodePosition;
 using jperipheral::SerialPortContext;
-using jperipheral::FutureContext;
+using jperipheral::WorkerThread;
 
 #include "jace/proxy/java/io/IOException.h"
 using jace::proxy::java::io::IOException;
@@ -32,8 +32,8 @@ using std::string;
 class CancelTask: public IoTask
 {
 public:
-	CancelTask(HANDLE port, jace::proxy::jperipheral::SerialChannel_SerialFuture future): 
-		IoTask(port, 0, 0, future)
+	CancelTask(WorkerThread& thread, HANDLE port, jace::proxy::jperipheral::SerialChannel_SerialFuture future): 
+		IoTask(thread, port, 0, 0, future)
 	{}
 
 	virtual void updateJavaBuffer(int)
@@ -49,17 +49,11 @@ public:
 
 void SerialChannel_SerialFuture::nativeCancel()
 {
-	FutureContext* context = getContext(getJaceProxy());
+	IoTask* context = getContext(getJaceProxy());
 	{
 		boost::mutex::scoped_lock lock(context->thread.lock);
-		CancelTask* task = new CancelTask(context->port, getJaceProxy());
-		context->thread.workload = task;
-		context->thread.workloadChanged.notify_one();
+		CancelTask* task = new CancelTask(context->thread, context->port, getJaceProxy());
+		task->thread.workload = task;
+		task->thread.workloadChanged.notify_one();
 	}
-}
-
-void SerialChannel_SerialFuture::dispose()
-{
-	FutureContext* context = getContext(getJaceProxy());
-	delete context;
 }

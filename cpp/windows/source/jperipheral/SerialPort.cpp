@@ -224,46 +224,11 @@ void SerialPort::printStatus()
     cout << comStat.cbOutQue << " bytes are awaiting transfer" << endl;
 }
 
-class CloseTask: public IoTask
-{
-public:
-	CloseTask(HANDLE port): 
-		IoTask(port, 0, 0, 0), errorCode(ERROR_SUCCESS)
-	{
-		taskDone = CreateEvent(0, false, false, 0);
-		if (taskDone == 0)
-			throw IOException(L"CreateEvent() failed with error: " + getErrorMessage(GetLastError()));
-	}
-
-	virtual void updateJavaBuffer(int)
-	{}
-
-	virtual bool run()
-	{
-		if (!CancelIo(port))
-			errorCode = GetLastError();
-		if (!SetEvent(taskDone))
-			throw IOException(L"SetEvent() failed with error: " + getErrorMessage(GetLastError()));
-		return false;
-	}
-
-	virtual ~CloseTask()
-	{
-		if (!CloseHandle(taskDone))
-			throw IOException(L"CloseHandle() failed with error: " + getErrorMessage(GetLastError()));
-	}
-
-	DWORD errorCode;
-	HANDLE taskDone;
-};
-
 void SerialPort::nativeClose()
 {
 	SerialPortContext* context = getContext(getJaceProxy());
-	{
-		CloseTask task(context->port);
-		task.run();
-	}
+	if (!CancelIo(context->port))
+		throw IOException(L"CancelIo() failed with error: " + getErrorMessage(GetLastError()));
 	delete context;
 	jace::helper::detach();
 }

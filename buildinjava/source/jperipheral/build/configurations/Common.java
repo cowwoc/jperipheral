@@ -118,7 +118,7 @@ public abstract class Common extends AbstractConfiguration
 		//copyJavaClasses();
 		packageJavaClasses();
 
-		copyCppClasses();
+		copyCppSourceToBuild();
 		generateCppPeers();
 		generateCppProxies();
 		compileCppClasses();
@@ -136,11 +136,11 @@ public abstract class Common extends AbstractConfiguration
 		File target = new File(project.getPath(), javaOutputPath);
 		FileFilter filter = fileFilter.rejectAll().addDirectory("*").removeDirectory(".svn").addFile("*.java").
 			build();
-		List<File> classPath = new ArrayList<File>();
-		classPath.add(new File(project.getPath(), "java/libraries/joda-time/joda-time-1.6.jar"));
 
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target.getAbsolutePath());
+		List<File> classPath = new ArrayList<File>();
+		classPath.add(new File(project.getPath(), "java/libraries/joda-time/joda-time-1.6.jar"));
 		javaCompiler.get().filter(filter).classPath(classPath).apply(source, target);
 	}
 
@@ -183,7 +183,7 @@ public abstract class Common extends AbstractConfiguration
 		File buildPath = new File(project.getPath(), "dist/" + getPlatform() + "/java");
 		if (!buildPath.exists() && !buildPath.mkdirs())
 			throw new BuildException("Cannot create " + buildPath);
-		copy.get().apply(netbeansPath, buildPath);
+		copy.get().fromDirectory(netbeansPath).toDirectory(buildPath);
 	}
 
 	/**
@@ -237,13 +237,14 @@ public abstract class Common extends AbstractConfiguration
 	 *
 	 * @throws BuildException if an expected build error occurs
 	 */
-	private void copyCppClasses() throws BuildException
+	private void copyCppSourceToBuild() throws BuildException
 	{
 		File source = new File(project.getPath(), "cpp/windows");
 		File target = new File(project.getPath(), "cpp/build/" + getPlatform());
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target);
-		copy.get().filter(fileFilter.acceptAll().removeDirectory(".svn").build()).apply(source, target);
+		copy.get().filter(fileFilter.acceptAll().removeDirectory(".svn").build()).fromDirectory(source).
+			toDirectory(target);
 	}
 
 	/**
@@ -317,6 +318,6 @@ public abstract class Common extends AbstractConfiguration
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target);
 		copy.get().filter(fileFilter.rejectAll().addDirectory("*").addFile("*.dll").addFile("*.pdb").build()).
-			apply(source, target);
+			fromDirectory(source).toDirectory(target);
 	}
 }

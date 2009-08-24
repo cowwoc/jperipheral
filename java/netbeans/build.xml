@@ -33,7 +33,7 @@
 		<Clean configuration="debug"/>
 	</target>-->
 
-	<target name="-post-compile" depends="jace.task, check.config, enhance.proxies, generate.proxies"/>
+	<!--<target name="-post-compile" depends="jace.task, check.config, enhance.proxies, generate.proxies"/>-->
 
 	<target name="check.config">
 		<condition property="generate.proxies.skip" value="true">

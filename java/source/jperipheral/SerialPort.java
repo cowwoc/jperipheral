@@ -28,11 +28,15 @@ public class SerialPort extends ComPort
 	 *
 	 * @param name the name
 	 * @return the serial port
+	 * @throws IllegalArgumentException if name is null
 	 * @throws PortNotFoundException if the comport does not exist
 	 * @throws PortInUseException if the comport is locked by another application
 	 */
-	public static SerialPort getByName(String name) throws PortNotFoundException, PortInUseException
+	public static SerialPort getByName(String name)
+		throws IllegalArgumentException, PortNotFoundException, PortInUseException
 	{
+		if (name == null)
+			throw new IllegalArgumentException("name may not be null");
 		return new SerialPort(name);
 	}
 

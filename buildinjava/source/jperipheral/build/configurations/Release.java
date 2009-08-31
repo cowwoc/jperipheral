@@ -1,7 +1,6 @@
 package jperipheral.build.configurations;
 
-import jperipheral.build.*;
-import com.google.inject.Inject;
+import java.io.File;
 
 /**
  * The debug configuration.
@@ -11,14 +10,12 @@ import com.google.inject.Inject;
 public class Release extends Common
 {
 	/**
-	 * Creates a DebugConfiguration.
+	 * Creates a Release configuration.
 	 * 
-	 * @param wiring an instance of <code>Wiring</code>
-	 * @param project the parent project
+	 * @param projectPath the project path
 	 */
-	@Inject
-	public Release(Wiring wiring, Project project)
+	public Release(File projectPath)
 	{
-		super(wiring, project, "release");
+		super("release", projectPath);
 	}
 }

@@ -1,7 +1,6 @@
 package jperipheral.build.configurations;
 
-import jperipheral.build.Project;
-import com.google.inject.Inject;
+import java.io.File;
 
 /**
  * The debug configuration.
@@ -11,14 +10,12 @@ import com.google.inject.Inject;
 public class Debug extends Common
 {
 	/**
-	 * Creates a Debug.
+	 * Creates a Debug configuration.
 	 * 
-	 * @param wiring an instance of <code>Wiring</code>
-	 * @param project the parent project
+	 * @param projectPath the project path
 	 */
-	@Inject
-	public Debug(Wiring wiring, Project project)
+	public Debug(File projectPath)
 	{
-		super(wiring, project, "debug");
+		super("debug", projectPath);
 	}
 }

@@ -2,14 +2,11 @@ package jperipheral.build.configurations;
 
 import buildinjava.AbstractConfiguration;
 import buildinjava.BuildException;
-import buildinjava.Project;
 import buildinjava.io.Copy;
 import buildinjava.io.Delete;
 import buildinjava.io.FileFilterBuilder;
 import buildinjava.java.Jar;
 import buildinjava.java.JavaCompiler;
-import com.google.inject.Inject;
-import com.google.inject.Provider;
 import jace.parser.ClassFile;
 import jace.peer.PeerEnhancer;
 import jace.peer.PeerGenerator;
@@ -31,73 +28,27 @@ import java.util.List;
  */
 public abstract class Common extends AbstractConfiguration
 {
-	private final Project project;
-	private final Provider<Delete> delete;
-	private final Provider<Copy> copy;
-	private final FileFilterBuilder.Builder fileFilter;
-	private final Provider<JavaCompiler> javaCompiler;
-	private final Provider<Jar> jar;
+	private final File projectPath;
 	private final String javaOutputPath = "java/build";
 
 	/**
-	 * Insulates subclasses from a growing list of dependencies.
+	 * Creates a Common configuration.
 	 *
-	 * @author Gili Tzabari
-	 */
-	protected static class Wiring
-	{
-		private final Provider<Delete> delete;
-		private final Provider<Copy> copy;
-		private final FileFilterBuilder.Builder filterBuilder;
-		private final Provider<JavaCompiler> javaCompiler;
-		private final Provider<Jar> jar;
-
-		/**
-		 * Creates a new Wiring.
-		 *
-		 * @param delete an instance of <code>Provider<Delete></code>
-		 * @param copy an instance of <code>Provider<Copy></code>
-		 * @param filterBuilder an instance of <code>FileFilterBuilder.Builder</code>
-		 * @param javaCompiler an instance of <code>Provider<JavaCompiler></code>
-		 * @param jar an instance of <code>Provider<Jar></code>
-		 */
-		@Inject
-		public Wiring(Provider<Delete> delete, Provider<Copy> copy,
-									FileFilterBuilder.Builder filterBuilder,
-									Provider<JavaCompiler> javaCompiler, Provider<Jar> jar)
-		{
-			this.delete = delete;
-			this.copy = copy;
-			this.filterBuilder = filterBuilder;
-			this.javaCompiler = javaCompiler;
-			this.jar = jar;
-		}
-	}
-
-	/**
-	 * Creates a Common.
-	 *
-	 * @param wiring an instance of <code>Wiring</code>
-	 * @param project the parent project
 	 * @param name the configuration name
+	 * @param projectPath the project path
 	 */
-	public Common(Wiring wiring, Project project, String name)
+	public Common(String name, File projectPath)
 	{
 		super(name);
-		this.delete = wiring.delete;
-		this.copy = wiring.copy;
-		this.fileFilter = wiring.filterBuilder;
-		this.javaCompiler = wiring.javaCompiler;
-		this.jar = wiring.jar;
-		this.project = project;
+		this.projectPath = projectPath;
 	}
 
 	@Override
 	public void clean()
 	{
-		delete.get().file(new File(project.getPath(), javaOutputPath));
-		delete.get().file(new File(project.getPath(), "cpp/build/" + getPlatform()));
-		delete.get().file(new File(project.getPath(), "dist/" + getPlatform()));
+		new Delete().file(new File(projectPath, javaOutputPath));
+		new Delete().file(new File(projectPath, "cpp/build/" + getPlatform()));
+		new Delete().file(new File(projectPath, "dist/" + getPlatform()));
 	}
 
 	/**
@@ -132,16 +83,16 @@ public abstract class Common extends AbstractConfiguration
 	 */
 	private void compileJavaClasses() throws BuildException
 	{
-		File source = new File(project.getPath(), "java/source");
-		File target = new File(project.getPath(), javaOutputPath);
-		FileFilter filter = fileFilter.rejectAll().addDirectory("*").removeDirectory(".svn").addFile("*.java").
+		File source = new File(projectPath, "java/source");
+		File target = new File(projectPath, javaOutputPath);
+		FileFilter filter = new FileFilterBuilder().addDirectory("*").removeDirectory(".svn").addFile("*.java").
 			build();
 
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target.getAbsolutePath());
 		List<File> classPath = new ArrayList<File>();
-		classPath.add(new File(project.getPath(), "java/libraries/joda-time/joda-time-1.6.jar"));
-		javaCompiler.get().filter(filter).classPath(classPath).apply(source, target);
+		classPath.add(new File(projectPath, "java/libraries/joda-time/joda-time-1.6.jar"));
+		new JavaCompiler().filter(filter).classPath(classPath).apply(source, target);
 	}
 
 	/**
@@ -153,16 +104,16 @@ public abstract class Common extends AbstractConfiguration
 	{
 		try
 		{
-			File file = new File(project.getPath(), javaOutputPath + "/jperipheral/WindowsOS.class");
+			File file = new File(projectPath, javaOutputPath + "/jperipheral/WindowsOS.class");
 			new PeerEnhancer.Builder(file, file).library("JPeripheral").enhance();
 
-			file = new File(project.getPath(), javaOutputPath + "/jperipheral/SerialPort.class");
+			file = new File(projectPath, javaOutputPath + "/jperipheral/SerialPort.class");
 			new PeerEnhancer.Builder(file, file).library("JPeripheral").deallocationMethod("close").enhance();
 
-			file = new File(project.getPath(), javaOutputPath + "/jperipheral/SerialChannel.class");
+			file = new File(projectPath, javaOutputPath + "/jperipheral/SerialChannel.class");
 			new PeerEnhancer.Builder(file, file).library("JPeripheral").deallocationMethod("close").enhance();
 
-			file = new File(project.getPath(),
+			file = new File(projectPath,
 				javaOutputPath + "/jperipheral/SerialChannel$SerialFuture.class");
 			new PeerEnhancer.Builder(file, file).library("JPeripheral").enhance();
 		}
@@ -179,11 +130,11 @@ public abstract class Common extends AbstractConfiguration
 	 */
 	private void copyJavaClasses() throws BuildException
 	{
-		File netbeansPath = new File(project.getPath(), javaOutputPath);
-		File buildPath = new File(project.getPath(), "dist/" + getPlatform() + "/java");
+		File netbeansPath = new File(projectPath, javaOutputPath);
+		File buildPath = new File(projectPath, "dist/" + getPlatform() + "/java");
 		if (!buildPath.exists() && !buildPath.mkdirs())
 			throw new BuildException("Cannot create " + buildPath);
-		copy.get().fromDirectory(netbeansPath).toDirectory(buildPath);
+		new Copy().fromDirectory(netbeansPath).toDirectory(buildPath);
 	}
 
 	/**
@@ -193,12 +144,12 @@ public abstract class Common extends AbstractConfiguration
 	 */
 	private void packageJavaClasses() throws BuildException
 	{
-		File sourcePath = new File(project.getPath(), javaOutputPath);
-		File target = new File(project.getPath(), "dist/" + getPlatform() + "/java/jperipheral.jar");
+		File sourcePath = new File(projectPath, javaOutputPath);
+		File target = new File(projectPath, "dist/" + getPlatform() + "/java/jperipheral.jar");
 		File targetDirectory = target.getParentFile();
 		if (!targetDirectory.exists() && !targetDirectory.mkdirs())
 			throw new BuildException("Cannot create " + targetDirectory);
-		jar.get().create(sourcePath, target);
+		new Jar().create(sourcePath, target);
 	}
 
 	/**
@@ -210,21 +161,24 @@ public abstract class Common extends AbstractConfiguration
 	{
 		try
 		{
-			File includeDir = new File(project.getPath(), "cpp/build/" + getPlatform() + "/include");
-			File sourceDir = new File(project.getPath(), "cpp/build/" + getPlatform() + "/source");
+			File includeDir = new File(projectPath, "cpp/build/" + getPlatform() + "/include");
+			File sourceDir = new File(projectPath, "cpp/build/" + getPlatform() + "/source");
 
-			File classFile = new File(project.getPath(), javaOutputPath + "/jperipheral/WindowsOS.class");
-			new PeerGenerator(new ClassFile(classFile), includeDir, sourceDir, false).generate();
+			File classFile = new File(projectPath, javaOutputPath + "/jperipheral/WindowsOS.class");
+			new PeerGenerator(new ClassFile(classFile), classFile.lastModified(), includeDir, sourceDir, false).
+				generate();
 
-			classFile = new File(project.getPath(), javaOutputPath + "/jperipheral/SerialPort.class");
-			new PeerGenerator(new ClassFile(classFile), includeDir, sourceDir, false).generate();
+			classFile = new File(projectPath, javaOutputPath + "/jperipheral/SerialPort.class");
+			new PeerGenerator(new ClassFile(classFile), classFile.lastModified(), includeDir, sourceDir, false).
+				generate();
 
-			classFile = new File(project.getPath(), javaOutputPath + "/jperipheral/SerialChannel.class");
-			new PeerGenerator(new ClassFile(classFile), includeDir, sourceDir, false).generate();
+			classFile = new File(projectPath, javaOutputPath + "/jperipheral/SerialChannel.class");
+			new PeerGenerator(new ClassFile(classFile), classFile.lastModified(), includeDir, sourceDir, false).
+				generate();
 
-			classFile = new File(project.getPath(),
-				javaOutputPath + "/jperipheral/SerialChannel$SerialFuture.class");
-			new PeerGenerator(new ClassFile(classFile), includeDir, sourceDir, false).generate();
+			classFile = new File(projectPath, javaOutputPath + "/jperipheral/SerialChannel$SerialFuture.class");
+			new PeerGenerator(new ClassFile(classFile), classFile.lastModified(), includeDir, sourceDir, false).
+				generate();
 		}
 		catch (IOException e)
 		{
@@ -239,12 +193,12 @@ public abstract class Common extends AbstractConfiguration
 	 */
 	private void copyCppSourceToBuild() throws BuildException
 	{
-		File source = new File(project.getPath(), "cpp/windows");
-		File target = new File(project.getPath(), "cpp/build/" + getPlatform());
+		File source = new File(projectPath, "cpp/windows");
+		File target = new File(projectPath, "cpp/build/" + getPlatform());
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target);
-		copy.get().filter(fileFilter.acceptAll().removeDirectory(".svn").build()).fromDirectory(source).
-			toDirectory(target);
+		new Copy().filter(new FileFilterBuilder().acceptAll().removeDirectory(".svn").build()).
+			fromDirectory(source).toDirectory(target);
 	}
 
 	/**
@@ -254,13 +208,13 @@ public abstract class Common extends AbstractConfiguration
 	 */
 	private void generateCppProxies() throws BuildException
 	{
-		File inputHeaders = new File(project.getPath(), "cpp/build/" + getPlatform() + "/include");
-		File inputSources = new File(project.getPath(), "cpp/build/" + getPlatform() + "/source");
-		File outputHeaders = new File(project.getPath(), "cpp/build/" + getPlatform() + "/include");
-		File outputSources = new File(project.getPath(), "cpp/build/" + getPlatform() + "/source");
+		File inputHeaders = new File(projectPath, "cpp/build/" + getPlatform() + "/include");
+		File inputSources = new File(projectPath, "cpp/build/" + getPlatform() + "/source");
+		File outputHeaders = new File(projectPath, "cpp/build/" + getPlatform() + "/include");
+		File outputSources = new File(projectPath, "cpp/build/" + getPlatform() + "/source");
 		List<File> classPath = new ArrayList<File>();
 		classPath.add(new File(System.getenv("JAVA_HOME"), "jre/lib/rt.jar"));
-		classPath.add(new File(project.getPath(), javaOutputPath));
+		classPath.add(new File(projectPath, javaOutputPath));
 		try
 		{
 			new AutoProxy.Builder(Collections.singleton(inputHeaders), Collections.singleton(inputSources),
@@ -284,7 +238,7 @@ public abstract class Common extends AbstractConfiguration
 			System.getenv("VS90COMNTOOLS") + "..\\IDE\\devenv.com", "JPeripheral.sln",
 			"/build", getName() + "^|Win32");
 
-		builder.directory(new File(project.getPath(), "cpp/build/" + getPlatform() + "/msvc"));
+		builder.directory(new File(projectPath, "cpp/build/" + getPlatform() + "/msvc"));
 		builder.redirectErrorStream(true);
 		try
 		{
@@ -313,11 +267,11 @@ public abstract class Common extends AbstractConfiguration
 	 */
 	private void copyCppBinaries()
 	{
-		File source = new File(project.getPath(), "cpp/build/" + getPlatform() + "/msvc/" + getPlatform());
-		File target = new File(project.getPath(), "dist/" + getPlatform() + "/native");
+		File source = new File(projectPath, "cpp/build/" + getPlatform() + "/msvc/" + getPlatform());
+		File target = new File(projectPath, "dist/" + getPlatform() + "/native");
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target);
-		copy.get().filter(fileFilter.rejectAll().addDirectory("*").addFile("*.dll").addFile("*.pdb").build()).
+		new Copy().filter(new FileFilterBuilder().addDirectory("*").addFile("*.dll").addFile("*.pdb").build()).
 			fromDirectory(source).toDirectory(target);
 	}
 }

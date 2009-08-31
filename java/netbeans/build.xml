@@ -11,29 +11,27 @@
 	<description>Builds, tests, and runs the project JPeripheral.</description>
 	<import file="nbproject/build-impl.xml"/>
 
-	<!--<target name="BuildInJava">
-		<dirname file="${libs.BuildInJava.classpath}" property="libs.BuildInJava.directory"/>
+	<target name="BuildInJava">
+		<property name="buildinjava.path" value="C:/Users/Gili/Documents/buildinjava/trunk"/>
+		<property name="project.path" value="${build.classes.dir}/../../../.."/>
 		<taskdef resource="buildinjava/ant/task.properties">
 			<classpath>
-				<fileset dir="${libs.BuildInJava.directory}" includes="**/*.jar"/>
-				<path path="${libs.jace.classpath}"/>
-				<path path="${build.classes.dir}"/>
+				<fileset dir="${buildinjava.path}/netbeans/dist" includes="**/*.jar"/>
+				<path location="${project.path}/buildinjava/source"/>
 			</classpath>
 		</taskdef>
-		<CreateInjector>
-			<Module name="build.jperipheral.Module"/>
-		</CreateInjector>
+		<Project name="jperipheral" path="${project.path}" buildinjava="${buildinjava.path}"/>
 	</target>
 
 	<target name="-post-compile" depends="BuildInJava">
-		<Build configuration="debug"/>
+		<Build project="jperipheral" configuration="${config}"/>
 	</target>
 
 	<target name="-do-clean" depends="BuildInJava">
-		<Clean configuration="debug"/>
-	</target>-->
+		<Clean project="jperipheral" configuration="${config}"/>
+	</target>
 
-	<!--<target name="-post-compile" depends="jace.task, check.config, enhance.proxies, generate.proxies"/>-->
+	<!--<target name="-post-compile" depends="jace.task, check.config, enhance.proxies, generate.proxies"/>
 
 	<target name="check.config">
 		<condition property="generate.proxies.skip" value="true">
@@ -111,7 +109,7 @@
 	<target name="-post-clean">
 		<delete quiet="true" dir="${src.source.dir}/../../cpp/windows/source/jace"/>
 		<delete quiet="true" dir="${src.source.dir}/../../cpp/windows/include/jace"/>
-	</target>
+	</target>-->
     <!--
 
     There exist several targets which are by default empty and which can be 

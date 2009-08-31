@@ -5,8 +5,6 @@ import jperipheral.build.configurations.Release;
 import buildinjava.BuildException;
 import buildinjava.Configuration;
 import java.io.File;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 
@@ -18,28 +16,17 @@ import java.util.Collection;
 public class Project implements buildinjava.Project
 {
 	private final File path;
+	private Configuration debug;
+	private Configuration release;
 
 	/**
 	 * Creates a new Project.
+	 *
+	 * @param path the project path
 	 */
-	public Project()
+	public Project(File path)
 	{
-		// "path" must be initialized ahead of time because Configuration.clean() removes classes
-		try
-		{
-			String name = getClass().getName().replace(".", "/") + ".class";
-			int packageDepth = getClass().getPackage().getName().split("\\.").length;
-			URL projectURL = getClass().getClassLoader().getResource(name);
-			assert (projectURL != null);
-			File temp = new File(projectURL.toURI()).getParentFile();
-			for (int i = 0; i < packageDepth; ++i)
-				temp = temp.getParentFile();
-			this.path = temp.getParentFile().getParentFile().getParentFile().getParentFile();
-		}
-		catch (URISyntaxException e)
-		{
-			throw new BuildException(e);
-		}
+		this.path = path;
 	}
 
 	@Override
@@ -61,5 +48,38 @@ public class Project implements buildinjava.Project
 	public File getPath() throws BuildException
 	{
 		return path;
+	}
+
+	@Override
+	public Configuration getConfigurationByName(String name)
+	{
+		if (name.equals("debug"))
+		{
+			if (debug == null)
+				debug = new Debug(path);
+			return debug;
+		}
+		else if (name.equals("release"))
+		{
+			if (release == null)
+				release = new Release(path);
+			return release;
+		}
+		else
+			throw new IllegalArgumentException(name + " is not supported");
+	}
+
+	/**
+	 * Creates a new Project.
+	 * 
+	 * @author Gili Tzabari
+	 */
+	public static class Builder implements buildinjava.Project.Builder
+	{
+		@Override
+		public buildinjava.Project create(File path)
+		{
+			return new Project(path);
+		}
 	}
 }

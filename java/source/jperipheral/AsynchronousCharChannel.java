@@ -190,8 +190,8 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * @throws  ReadPendingException
 	 *          If the channel does not allow more than one read to be outstanding
 	 *          and a previous read has not completed
-	 * @throws ShutdownChannelGroupException
-	 *         If the channel group is shutdown
+	 * @throws  ShutdownChannelGroupException
+	 *          If the channel group is shutdown
 	 */
 	Future<Integer> read(CharBuffer target)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;

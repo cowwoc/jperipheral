@@ -2,9 +2,11 @@ package jperipheral.build.configurations;
 
 import buildinjava.AbstractConfiguration;
 import buildinjava.BuildException;
+import buildinjava.cpp.VisualStudio;
 import buildinjava.io.Copy;
 import buildinjava.io.Delete;
 import buildinjava.io.FileFilterBuilder;
+import buildinjava.io.WildcardFileFilter;
 import buildinjava.java.Jar;
 import buildinjava.java.JavaCompiler;
 import jace.parser.ClassFile;
@@ -12,11 +14,9 @@ import jace.peer.PeerEnhancer;
 import jace.peer.PeerGenerator;
 import jace.proxy.AutoProxy;
 import jace.proxy.ProxyGenerator.AccessibilityType;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -85,14 +85,14 @@ public abstract class Common extends AbstractConfiguration
 	{
 		File source = new File(projectPath, "java/source");
 		File target = new File(projectPath, javaOutputPath);
-		FileFilter filter = new FileFilterBuilder().addDirectory("*").removeDirectory(".svn").addFile("*.java").
-			build();
 
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target.getAbsolutePath());
 		List<File> classPath = new ArrayList<File>();
 		classPath.add(new File(projectPath, "java/libraries/joda-time/joda-time-1.6.jar"));
-		new JavaCompiler().filter(filter).classPath(classPath).apply(source, target);
+		FileFilter directories = new FileFilterBuilder().addDirectory("*").removeDirectory(".svn").build();
+		new JavaCompiler().filter(directories, new WildcardFileFilter("*.java")).classPath(classPath).
+			apply(source, target);
 	}
 
 	/**
@@ -234,30 +234,8 @@ public abstract class Common extends AbstractConfiguration
 	 */
 	private void compileCppClasses() throws BuildException
 	{
-		ProcessBuilder builder = new ProcessBuilder("cmd.exe", "/c",
-			System.getenv("VS90COMNTOOLS") + "..\\IDE\\devenv.com", "JPeripheral.sln",
-			"/build", getName() + "^|Win32");
-
-		builder.directory(new File(projectPath, "cpp/build/" + getPlatform() + "/msvc"));
-		builder.redirectErrorStream(true);
-		try
-		{
-			Process process = builder.start();
-			BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream()));
-			while (true)
-			{
-				String line = in.readLine();
-				if (line == null)
-					break;
-				System.out.println(line);
-			}
-			if (process.exitValue() != 0)
-				throw new BuildException("Return code: " + process.exitValue());
-		}
-		catch (IOException e)
-		{
-			throw new BuildException(e);
-		}
+		new VisualStudio().solution(new File(projectPath, "cpp/build/" + getPlatform() + "/msvc/JPeripheral.sln")).
+			configuration(getName()).platform("Win32").build();
 	}
 
 	/**

@@ -7,11 +7,11 @@
 <!-- the Compile on Save feature is turned off for the project. -->
 <!-- You can turn off the Compile on Save (or Deploy on Save) setting -->
 <!-- in the project's Project Properties dialog box.-->
-<project name="JPeripheral.netbeans" default="default" basedir=".">
+<project name="JPeripheral" default="default" basedir=".">
 	<description>Builds, tests, and runs the project JPeripheral.</description>
 	<import file="nbproject/build-impl.xml"/>
 
-	<target name="BuildInJava">
+	<target name="-BuildInJava">
 		<property name="buildinjava.path" value="C:/Users/Gili/Documents/buildinjava/trunk"/>
 		<property name="project.path" value="${build.classes.dir}/../../../.."/>
 		<taskdef resource="buildinjava/ant/task.properties">
@@ -20,15 +20,15 @@
 				<path location="${project.path}/buildinjava/source"/>
 			</classpath>
 		</taskdef>
-		<Project name="jperipheral" path="${project.path}" buildinjava="${buildinjava.path}"/>
+		<Project name="JPeripheral" path="${project.path}" buildinjava="${buildinjava.path}"/>
 	</target>
 
-	<target name="-post-compile" depends="BuildInJava">
-		<Build project="jperipheral" configuration="${config}"/>
+	<target name="-post-compile" depends="-BuildInJava">
+		<Build project="JPeripheral" configuration="${config}"/>
 	</target>
 
-	<target name="-do-clean" depends="BuildInJava">
-		<Clean project="jperipheral" configuration="${config}"/>
+	<target name="-post-clean" depends="-BuildInJava">
+		<Clean project="JPeripheral" configuration="${config}"/>
 	</target>
 
 	<!--<target name="-post-compile" depends="jace.task, check.config, enhance.proxies, generate.proxies"/>

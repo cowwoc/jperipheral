@@ -1,11 +1,13 @@
 package jperipheral;
 
+import java.io.IOException;
+
 /**
  * An attempt was made to access a nonexistent comport.
  *
  * @author Gili Tzbari
  */
-public class PortNotFoundException extends Exception
+public class PortNotFoundException extends IOException
 {
 	private static final long serialVersionUID = 0L;
 

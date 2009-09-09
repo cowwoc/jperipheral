@@ -706,7 +706,43 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 			}
 			while (true)
 			{
-				boolean endOfInput = future.get(timeout, unit) == -1;
+				boolean endOfInput;
+				try
+				{
+					endOfInput = future.get(timeout, unit) == -1;
+				}
+				catch (CancellationException e)
+				{
+					synchronized (AsynchronousByteCharChannel.this)
+					{
+						readPending = false;
+					}
+					throw e;
+				}
+				catch (InterruptedException e)
+				{
+					synchronized (AsynchronousByteCharChannel.this)
+					{
+						readPending = false;
+					}
+					throw e;
+				}
+				catch (ExecutionException e)
+				{
+					synchronized (AsynchronousByteCharChannel.this)
+					{
+						readPending = false;
+					}
+					throw e;
+				}
+				catch (TimeoutException e)
+				{
+					synchronized (AsynchronousByteCharChannel.this)
+					{
+						readPending = false;
+					}
+					throw e;
+				}
 				PollableCompletionHandler handler = new PollableCompletionHandler();
 				source.flip();
 				if (onBytesRead(source, endOfInput, target, null, handler))
@@ -1176,10 +1212,45 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 			}
 			while (true)
 			{
-				future.get(timeout, unit);
+				try
+				{
+					future.get(timeout, unit);
+				}
+				catch (CancellationException e)
+				{
+					synchronized (AsynchronousByteCharChannel.this)
+					{
+						writePending = false;
+					}
+					throw e;
+				}
+				catch (InterruptedException e)
+				{
+					synchronized (AsynchronousByteCharChannel.this)
+					{
+						writePending = false;
+					}
+					throw e;
+				}
+				catch (ExecutionException e)
+				{
+					synchronized (AsynchronousByteCharChannel.this)
+					{
+						writePending = false;
+					}
+					throw e;
+				}
+				catch (TimeoutException e)
+				{
+					synchronized (AsynchronousByteCharChannel.this)
+					{
+						writePending = false;
+					}
+					throw e;
+				}
 
 				// Ensure we wrote a whole number of characters
-				source.flip();
+				bytesWritten.flip();
 				PollableCompletionHandler handler = new PollableCompletionHandler();
 				if (onBytesWritten(source, sourceOffset, bytesWritten, null, handler, endOfInput))
 				{

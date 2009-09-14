@@ -90,6 +90,7 @@ public abstract class Common extends AbstractConfiguration
 			throw new BuildException("Cannot create " + target.getAbsolutePath());
 		List<File> classPath = new ArrayList<File>();
 		classPath.add(new File(projectPath, "java/libraries/joda-time/joda-time-1.6.jar"));
+		classPath.add(target);
 		FileFilter directories = new FileFilterBuilder().addDirectory("*").removeDirectory(".svn").build();
 		new JavaCompiler().filter(directories, new WildcardFileFilter("*.java")).classPath(classPath).
 			apply(source, target);

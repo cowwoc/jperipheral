@@ -5,12 +5,13 @@
         <data xmlns="http://www.netbeans.org/ns/j2se-project/3">
             <name>JPeripheral.Build</name>
             <source-roots>
+                <root id="src.bootstrap.dir" name="Bootstrap Packages"/>
                 <root id="src.source.dir" name="Source Packages"/>
             </source-roots>
             <test-roots/>
         </data>
         <libraries xmlns="http://www.netbeans.org/ns/ant-project-libraries/1">
-            <definitions>../libraries\nblibraries.properties</definitions>
+            <definitions>../../java/libraries\nblibraries.properties</definitions>
         </libraries>
         <references xmlns="http://www.netbeans.org/ns/ant-project-references/1"/>
     </configuration>

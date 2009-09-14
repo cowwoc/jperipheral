@@ -53,13 +53,13 @@ public class Project implements buildinjava.Project
 	@Override
 	public Configuration getConfigurationByName(String name)
 	{
-		if (name.equals("debug"))
+		if (name.equals("i386.debug"))
 		{
 			if (debug == null)
 				debug = new Debug(path);
 			return debug;
 		}
-		else if (name.equals("release"))
+		else if (name.equals("i386.release"))
 		{
 			if (release == null)
 				release = new Release(path);

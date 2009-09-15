@@ -6,6 +6,7 @@ import buildinjava.cpp.VisualStudio;
 import buildinjava.io.Copy;
 import buildinjava.io.Delete;
 import buildinjava.io.FileFilterBuilder;
+import buildinjava.io.FileFilters;
 import buildinjava.io.WildcardFileFilter;
 import buildinjava.java.Jar;
 import buildinjava.java.JavaCompiler;
@@ -30,6 +31,8 @@ public abstract class Common extends AbstractConfiguration
 {
 	private final File projectPath;
 	private final String javaOutputPath = "java/build";
+	private final FileFilter directoryFilter = new FileFilterBuilder().addDirectory("*").removeDirectory(".svn").
+		build();
 
 	/**
 	 * Creates a Common configuration.
@@ -91,8 +94,7 @@ public abstract class Common extends AbstractConfiguration
 		List<File> classPath = new ArrayList<File>();
 		classPath.add(new File(projectPath, "java/libraries/joda-time/joda-time-1.6.jar"));
 		classPath.add(target);
-		FileFilter directories = new FileFilterBuilder().addDirectory("*").removeDirectory(".svn").build();
-		new JavaCompiler().filter(directories, new WildcardFileFilter("*.java")).classPath(classPath).
+		new JavaCompiler().filter(directoryFilter, new WildcardFileFilter("*.java")).classPath(classPath).
 			apply(source, target);
 	}
 
@@ -198,8 +200,7 @@ public abstract class Common extends AbstractConfiguration
 		File target = new File(projectPath, "cpp/build/" + getPlatform());
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target);
-		new Copy().filter(new FileFilterBuilder().acceptAll().removeDirectory(".svn").build()).
-			fromDirectory(source).toDirectory(target);
+		new Copy().filter(directoryFilter, new FileFilters().acceptAll()).fromDirectory(source).toDirectory(target);
 	}
 
 	/**
@@ -250,7 +251,8 @@ public abstract class Common extends AbstractConfiguration
 		File target = new File(projectPath, "dist/" + getPlatform() + "/native");
 		if (!target.exists() && !target.mkdirs())
 			throw new BuildException("Cannot create " + target);
-		new Copy().filter(new FileFilterBuilder().addDirectory("*").addFile("*.dll").addFile("*.pdb").build()).
+		FileFilter directories = new FileFilterBuilder().addDirectory("*").removeDirectory(".svn").build();
+		new Copy().filter(directories, new FileFilterBuilder().addFile("*.dll").addFile("*.pdb").build()).
 			fromDirectory(source).toDirectory(target);
 	}
 }

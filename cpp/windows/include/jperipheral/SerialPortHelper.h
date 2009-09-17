@@ -56,11 +56,11 @@ public:
 	enum CompletionKey
 	{
 		/**
-		 * Handle the completion of an existing operation.
+		 * Handle the completion of an existing operation. IoTask is valid.
 		 */
 		COMPLETION,
 		/**
-		 * Shutdown the worker thread.
+		 * Shutdown the worker thread. IoTask is invalid.
 		 */
 		SHUTDOWN
 	};
@@ -70,12 +70,26 @@ public:
 	 *
 	 * @param workerThread the thread that will execute the task
 	 * @param port the comport
-	 * @param javaBuffer the java buffer associated with the operation
-	 * @param timeout the maximum number of milliseconds to wait before throwing InterruptedByTimeoutException
-	 * @param nativeListener the NativeListener associated with the operation.
 	 */
-	IoTask(WorkerThread& workerThread, HANDLE port, ::jace::proxy::java::nio::ByteBuffer javaBuffer, DWORD timeout, 
-		::jace::proxy::jperipheral::SerialChannel_NativeListener listener);
+	IoTask(WorkerThread& workerThread, HANDLE port);
+	/**
+	 * Sets the java buffer associated with the operation.
+	 *
+	 * @param javaBuffer the java buffer associated with the operation
+	 */
+	void setJavaBuffer(::jace::proxy::java::nio::ByteBuffer* javaBuffer);
+	/**
+	 * Sets the maximum number of milliseconds to wait before throwing InterruptedByTimeoutException.
+	 *
+	 * @param timeout the maximum number of milliseconds to wait before throwing InterruptedByTimeoutException
+	 */
+	void setTimeout(DWORD timeout);
+	/**
+	 * Sets the NativeListener associated with the operation.
+	 *
+	 * @param listener the NativeListener associated with the operation.
+	 */
+	void setListener(::jace::proxy::jperipheral::SerialChannel_NativeListener* listener);
 	/**
 	 * Invokes an I/O operation.
 	 *
@@ -142,7 +156,13 @@ public:
 	bool shutdownRequested;
 	IoTask* workload;
 	boost::mutex lock;
+	/**
+	 * Indicates if a read or write operation is pending. Cancel operations do not affect this variable.
+	 */
+	bool taskPending;
+	boost::condition running;
 	boost::condition workloadChanged;
+	boost::condition taskDone;
 };
 
 /**
@@ -198,7 +218,9 @@ public:
 	~CompletionPortContext();
 
 
-	HANDLE workerThread;
+	boost::thread* thread;
+	boost::mutex lock;
+	boost::condition running;
 	HANDLE completionPort;
 };
 

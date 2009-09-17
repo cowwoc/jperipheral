@@ -37,10 +37,10 @@ int main(int argc, char* argv[])
 	OptionList options;
 
   options.push_back( ClassPath( "C:/Users/Gili/Documents/jace/trunk/release/lib/jace-runtime.jar;" 
-		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/joda-time/joda-time-1.6.jar"
-		"C:/Users/Gili/Documents/jperipheral/trunk/java/netbeans/dist/JPeripheral.jar;" 
+		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/joda-time/joda-time-1.6.jar;"
+		"C:/Users/Gili/Documents/jperipheral/trunk/dist/i386/release/java/jperipheral.jar;" 
 		"C:/Users/Gili/Documents/blueeye/trunk/videoease/java/netbeans/dist/VideoEase.jar;" ) );
-	options.push_back( LibraryPath( "C:/Users/Gili/Documents/jperipheral/trunk/dist/i386/debug/native" ) );
+	options.push_back( LibraryPath( "C:/Users/Gili/Documents/jperipheral/trunk/cpp/build/i386/release/msvc/i386/release" ) );
 	//options.push_back( Verbose( Verbose::JNI ) );
 	//options.push_back( Verbose( Verbose::CLASS ) );
   options.push_back( CustomOption( "-Xmx256M" ) ); 

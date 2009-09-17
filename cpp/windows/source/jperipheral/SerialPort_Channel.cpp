@@ -46,15 +46,12 @@ using jace::helper::toWString;
 #include <string>
 using std::string;
 
-#include <iostream>
-using std::cerr;
-using std::endl;
-
 #pragma warning(push)
 #pragma warning(disable: 4103 4244 4512)
 #include <boost/thread/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition.hpp>
+#include <boost/function.hpp>
 #pragma warning(pop)
 
 /**
@@ -105,14 +102,18 @@ void setWriteTimeout(HANDLE port, DWORD timeout)
 class ReadTask: public IoTask
 {
 public:
-	ReadTask(WorkerThread& _thread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout, SerialChannel_NativeListener _listener):
-		IoTask(_thread, _port, _javaBuffer, _timeout, _listener)
+	ReadTask(WorkerThread& _thread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout,
+		SerialChannel_NativeListener _listener,	boost::function<void (WorkerThread&)> _onDestruction):
+			IoTask(_thread, _port),
+				onDestruction(_onDestruction)
 	{
-		javaBuffer = new ByteBuffer(_javaBuffer);
+		setJavaBuffer(new ByteBuffer(_javaBuffer));
 		if (javaBuffer->isDirect())
 			nativeBuffer = javaBuffer;
 		else
 			nativeBuffer = new ByteBuffer(ByteBuffer::allocateDirect(javaBuffer->remaining()));
+		setTimeout(_timeout);
+		setListener(new SerialChannel_NativeListener(_listener));
 	}
 
 	virtual void updateJavaBuffer(int bytesTransfered)
@@ -168,15 +169,25 @@ public:
 			return false;
 		}
 	}
+
+	virtual ~ReadTask()
+	{
+		onDestruction(thread);
+	}
+
+private:
+	boost::function<void (WorkerThread&)> onDestruction;
 };
 
 class WriteTask: public IoTask
 {
 public:
-	WriteTask(WorkerThread& _thread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout, SerialChannel_NativeListener _listener): 
-		IoTask(_thread, _port, _javaBuffer, _timeout, _listener)
+	WriteTask(WorkerThread& _thread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout,
+		SerialChannel_NativeListener _listener, boost::function<void (WorkerThread&)> _onDestruction): 
+			IoTask(_thread, _port),
+			onDestruction(_onDestruction)
 	{
-		javaBuffer = new ByteBuffer(_javaBuffer);
+		setJavaBuffer(new ByteBuffer(_javaBuffer));
 		if (javaBuffer->isDirect())
 			nativeBuffer = javaBuffer;
 		else
@@ -187,6 +198,8 @@ public:
 			nativeBuffer->flip();
 			javaBuffer->position(oldPosition);
 		}
+		setTimeout(_timeout);
+		setListener(new SerialChannel_NativeListener(_listener));
 	}
 
 	virtual void updateJavaBuffer(int bytesTransfered)
@@ -236,7 +249,24 @@ public:
 			return false;
 		}
 	}
+
+	virtual ~WriteTask()
+	{
+		onDestruction(thread);
+	}
+private:
+	boost::function<void (WorkerThread&)> onDestruction;
 };
+
+/**
+ * Invoked when the task is deleted.
+ */
+static void onTaskDestruction(WorkerThread& thread)
+{
+	boost::mutex::scoped_lock lock(thread.lock);
+	thread.taskPending = false;
+	thread.taskDone.notify_one();
+}
 
 void SerialChannel::nativeRead(ByteBuffer target, JLong timeout, SerialChannel_NativeListener listener)
 {
@@ -244,7 +274,7 @@ void SerialChannel::nativeRead(ByteBuffer target, JLong timeout, SerialChannel_N
 	{
 		boost::mutex::scoped_lock lock(context->readThread.lock);
 		ReadTask* task = new ReadTask(context->readThread, context->port, target, (DWORD) min(timeout, MAXDWORD), 
-			listener);
+			listener, onTaskDestruction);
 		task->thread.workload = task;
 		task->thread.workloadChanged.notify_one();
 	}
@@ -256,7 +286,7 @@ void SerialChannel::nativeWrite(ByteBuffer source, JLong timeout, SerialChannel_
 	{
 		boost::mutex::scoped_lock lock(context->writeThread.lock);
 		WriteTask* task = new WriteTask(context->writeThread, context->port, source, (DWORD) min(timeout, MAXDWORD),
-			listener);
+			listener, onTaskDestruction);
 		task->thread.workload = task;
 		task->thread.workloadChanged.notify_one();
 	}

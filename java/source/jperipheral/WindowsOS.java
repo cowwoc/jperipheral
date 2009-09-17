@@ -74,12 +74,14 @@ public class WindowsOS extends OperatingSystem implements ResourceLifecycleListe
 				throw new AssertionError(e);
 			}
 		}
+		assert (resourceCount < Integer.MAX_VALUE): resourceCount;
 		++resourceCount;
 	}
 
 	@Override
 	public synchronized void afterResourceDestroyed()
 	{
+		assert (resourceCount > 0): resourceCount;
 		--resourceCount;
 		if (resourceCount <= 0)
 		{

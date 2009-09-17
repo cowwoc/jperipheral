@@ -42,13 +42,17 @@ using std::endl;
 /**
  * Thread used carry out all I/O operations.
  */
-DWORD WINAPI CompletionHandler(LPVOID _completionPort)
+static void CompletionHandler(CompletionPortContext& context)
 {
-	HANDLE completionPort = (HANDLE) _completionPort;
+	HANDLE completionPort = context.completionPort;
 	DWORD bytesTransfered;
 	ULONG_PTR completionKey;
 	OVERLAPPED* overlapped;
 
+	{
+		boost::mutex::scoped_lock lock(context.lock);
+		context.running.notify_one();
+	}
 	while (true)
 	{
 		if (!GetQueuedCompletionStatus(completionPort, &bytesTransfered, &completionKey,
@@ -130,7 +134,7 @@ DWORD WINAPI CompletionHandler(LPVOID _completionPort)
 					// Someone used PostQueuedCompletionStatus() to post an I/O packet with a shutdown CompletionKey.
 					//
 					jace::helper::detach();
-					return 0;
+					return;
 				}
 				default:
 				{
@@ -141,7 +145,6 @@ DWORD WINAPI CompletionHandler(LPVOID _completionPort)
 			}
 		}
 	}
-	return 0;
 }
 
 CompletionPortContext::CompletionPortContext()
@@ -152,19 +155,20 @@ CompletionPortContext::CompletionPortContext()
 	if (completionPort==0)
 		throw AssertionError(String(L"CreateIoCompletionPort() failed with error: " + getErrorMessage(GetLastError())));
 
-	DWORD threadId;
-	workerThread = CreateThread(0, 0, CompletionHandler, completionPort, 0, &threadId);
-	if (!workerThread)
-	{
-		CloseHandle(completionPort);
-		throw AssertionError(String(L"CreateThread() failed with error: " + getErrorMessage(GetLastError())));
-	}
+	boost::mutex::scoped_lock lock(this->lock);
+	thread = new boost::thread(boost::bind(&CompletionHandler, boost::ref(*this)));
+	running.wait(lock);
 }
 
 CompletionPortContext::~CompletionPortContext()
 {
-	if (!CloseHandle(workerThread))
-		throw IOException(L"CloseHandle(workerThread) failed with error: " + getErrorMessage(GetLastError()));
+	if (!PostQueuedCompletionStatus(completionPort, 0, IoTask::SHUTDOWN, 0))
+	{
+		throw IOException(getSourceCodePosition(WIDEN(__FILE__), __LINE__) + 
+			L" PostQueuedCompletionStatus() failed with error: " + getErrorMessage(GetLastError()));
+	}
+	thread->join();
+	delete thread;
 	if (!CloseHandle(completionPort))
 		throw IOException(L"CloseHandle(completionPort) failed with error: " + getErrorMessage(GetLastError()));
 }
@@ -177,21 +181,5 @@ JLong WindowsOS::nativeInitialize()
 void WindowsOS::nativeDispose()
 {
 	CompletionPortContext* context = getCompletionPortContext();
-	if (!PostQueuedCompletionStatus(context->completionPort, 0, IoTask::SHUTDOWN, 0))
-	{
-		throw IOException(getSourceCodePosition(WIDEN(__FILE__), __LINE__) + 
-			L" PostQueuedCompletionStatus() failed with error: " + getErrorMessage(GetLastError()));
-	}
-
-	// Wait for thread to shut down
-	switch (WaitForSingleObject(context->workerThread, INFINITE))
-	{
-		case WAIT_ABANDONED_0:
-			throw IOException("WaitForSingleObject() returned WAIT_ABANDONED_0");
-		case WAIT_OBJECT_0:
-			break;
-		default:
-			throw IOException(L"WaitForSingleObject() failed with error: " + getErrorMessage(GetLastError()));
-	}
 	delete context;
 }

@@ -36,7 +36,7 @@ using jperipheral::IoTask;
 using jperipheral::SerialPortContext;
 
 #include <iostream>
-using std::cout;
+using std::cerr;
 using std::endl;
 
 #pragma warning(push)
@@ -197,38 +197,36 @@ void SerialPort::printStatus()
   // COMSTAT structure contains information regarding
   // communications status.
   if (comStat.fCtsHold)
-		cout << "Tx waiting for CTS signal" << endl;
+		cerr << "Tx waiting for CTS signal" << endl;
 
   if (comStat.fDsrHold)
-		cout << "Tx waiting for DSR signal" << endl;
+		cerr << "Tx waiting for DSR signal" << endl;
 
   if (comStat.fRlsdHold)
-    cout << "Tx waiting for RLSD signal" << endl;
+    cerr << "Tx waiting for RLSD signal" << endl;
 
   if (comStat.fXoffHold)
-    cout << "Tx waiting, XOFF char rec'd" << endl;
+    cerr << "Tx waiting, XOFF char rec'd" << endl;
 
   if (comStat.fXoffSent)
-    cout << "Tx waiting, XOFF char sent" << endl;
+    cerr << "Tx waiting, XOFF char sent" << endl;
   
   if (comStat.fEof)
-    cout << "EOF character received" << endl;
+    cerr << "EOF character received" << endl;
   
   if (comStat.fTxim)
-    cout << "Character waiting for Tx; char queued with TransmitCommChar" << endl;
+    cerr << "Character waiting for Tx; char queued with TransmitCommChar" << endl;
 
   if (comStat.cbInQue)
-    cout << comStat.cbInQue << " bytes have been received, but not read" << endl;
+    cerr << comStat.cbInQue << " bytes have been received, but not read" << endl;
 
   if (comStat.cbOutQue)
-    cout << comStat.cbOutQue << " bytes are awaiting transfer" << endl;
+    cerr << comStat.cbOutQue << " bytes are awaiting transfer" << endl;
 }
 
 void SerialPort::nativeClose()
 {
 	SerialPortContext* context = getContext(getJaceProxy());
-	if (!CancelIo(context->port))
-		throw IOException(L"CancelIo() failed with error: " + getErrorMessage(GetLastError()));
 	delete context;
 	jace::helper::detach();
 }

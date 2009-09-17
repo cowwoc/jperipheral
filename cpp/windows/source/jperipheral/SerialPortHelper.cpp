@@ -3,6 +3,7 @@ using jperipheral::IoTask;
 using jperipheral::CompletionPortContext;
 using jperipheral::SerialPortContext;
 using jperipheral::WorkerThread;
+using jperipheral::getErrorMessage;
 
 #include "jace/proxy/jperipheral/SerialPort.h"
 using jace::proxy::jperipheral::SerialPort;
@@ -77,11 +78,25 @@ CompletionPortContext* jperipheral::getCompletionPortContext()
 	return reinterpret_cast<CompletionPortContext*>(static_cast<intptr_t>(windows.nativeContext()));
 }
 
-IoTask::IoTask(WorkerThread& _thread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout, SerialChannel_NativeListener _listener):
-  thread(_thread), port(_port), timeout(_timeout), nativeBuffer(0), javaBuffer(0)
+IoTask::IoTask(WorkerThread& _thread, HANDLE _port):
+  thread(_thread), port(_port), timeout(0), nativeBuffer(0), javaBuffer(0), listener(0)
 {
 	memset(&overlapped, 0, sizeof(OVERLAPPED));
-	listener = new SerialChannel_NativeListener(_listener);
+}
+
+void IoTask::setJavaBuffer(::jace::proxy::java::nio::ByteBuffer* _javaBuffer)
+{
+	javaBuffer = _javaBuffer;
+}
+
+void IoTask::setTimeout(DWORD _timeout)
+{
+	timeout = _timeout;
+}
+
+void IoTask::setListener(::jace::proxy::jperipheral::SerialChannel_NativeListener* _listener)
+{
+	listener = _listener;
 	listener->setNativeContext(reinterpret_cast<intptr_t>(this));
 }
 
@@ -102,33 +117,31 @@ IoTask* IoTask::fromOverlapped(OVERLAPPED* overlapped)
 	return reinterpret_cast<IoTask*>((char*) overlapped - offsetof(IoTask, overlapped));
 }
 
-void WorkHandler(WorkerThread& context)
+static void WorkHandler(WorkerThread& context)
 {
 	boost::mutex::scoped_lock lock(context.lock);
-	context.workloadChanged.wait(lock);
+	context.running.notify_one();
 	while (!context.shutdownRequested)
 	{
+		context.workloadChanged.wait(lock);
 		if (!context.workload->run())
 			delete context.workload;
 		context.workload = 0;
-		context.workloadChanged.wait(lock);
 	}
 	jace::helper::detach();
 };
 
 WorkerThread::WorkerThread():
-	workload(0), shutdownRequested(false)
+	workload(0), shutdownRequested(false), taskPending(false)
 {
+	boost::mutex::scoped_lock lock(this->lock);
 	thread = new boost::thread(boost::bind(&WorkHandler, boost::ref(*this)));
+	// If we don't wait, the worker thread may miss condition notification
+	running.wait(lock);
 }
 
 WorkerThread::~WorkerThread()
 {
-	{
-		boost::mutex::scoped_lock lock(this->lock);
-		shutdownRequested = true;
-		workloadChanged.notify_one();
-	}
 	thread->join();
 	delete thread;
 	delete workload;
@@ -138,8 +151,44 @@ SerialPortContext::SerialPortContext(HANDLE _port):
 	port(_port)
 {}
 
+class ShutdownTask: public IoTask
+{
+public:
+	ShutdownTask(WorkerThread& _thread, HANDLE _port): 
+		IoTask(_thread, _port)
+	{}
+
+	virtual void updateJavaBuffer(int)
+	{}
+
+	virtual bool run()
+	{
+		// Wait for the task to complete
+		if (thread.taskPending)
+		{
+			if (!CancelIo(port))
+				throw IOException(L"CancelIo() failed with error: " + getErrorMessage(GetLastError()));
+			thread.taskDone.wait(thread.lock);
+		}
+		thread.shutdownRequested = true;
+		return false;
+	}
+};
+
 SerialPortContext::~SerialPortContext()
 {
+	{
+		boost::mutex::scoped_lock lock(readThread.lock);
+		ShutdownTask* task = new ShutdownTask(readThread, port);
+		task->thread.workload = task;
+		task->thread.workloadChanged.notify_one();
+	}
+	{
+		boost::mutex::scoped_lock lock(writeThread.lock);
+		ShutdownTask* task = new ShutdownTask(writeThread, port);
+		task->thread.workload = task;
+		task->thread.workloadChanged.notify_one();
+	}
 	if (!CloseHandle(port))
 		throw IOException(L"CloseHandle() failed with error: " + getErrorMessage(GetLastError()));
 }

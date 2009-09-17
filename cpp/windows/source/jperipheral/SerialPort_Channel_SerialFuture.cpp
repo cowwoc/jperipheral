@@ -4,6 +4,9 @@ using jace::proxy::types::JBoolean;
 
 #include "jace/proxy/jperipheral/SerialChannel_SerialFuture.h"
 
+#include "jace/proxy/jperipheral/SerialChannel_NativeListener.h"
+using jace::proxy::jperipheral::SerialChannel_NativeListener;
+
 #include "jperipheral/SerialPortHelper.h"
 using jperipheral::getContext;
 using jperipheral::getErrorMessage;
@@ -32,9 +35,11 @@ using std::string;
 class CancelTask: public IoTask
 {
 public:
-	CancelTask(WorkerThread& thread, HANDLE port, jace::proxy::jperipheral::SerialChannel_SerialFuture future): 
-		IoTask(thread, port, 0, 0, future)
-	{}
+	CancelTask(WorkerThread& thread, HANDLE port, SerialChannel_NativeListener future): 
+		IoTask(thread, port)
+	{
+		setListener(new SerialChannel_NativeListener(future));
+	}
 
 	virtual void updateJavaBuffer(int)
 	{}

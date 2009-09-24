@@ -10,15 +10,27 @@ import java.io.IOException;
 public class PortInUseException extends IOException
 {
 	private static final long serialVersionUID = 0L;
+	private final String port;
 
 	/**
 	 * Creates a new PortInUseException.
 	 *
-	 * @param message the detailed message
+	 * @param port the port name
 	 * @param cause the underlying cause
 	 */
-	public PortInUseException(String message, Throwable cause)
+	public PortInUseException(String port, Throwable cause)
 	{
-		super(message, cause);
+		super("Port in use: " + port, cause);
+		this.port = port;
+	}
+
+	/**
+	 * Returns the port name.
+	 *
+	 * @return the port name
+	 */
+	public String getPort()
+	{
+		return port;
 	}
 }

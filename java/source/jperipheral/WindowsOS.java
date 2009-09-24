@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Windows operating system.
@@ -20,6 +22,7 @@ public class WindowsOS extends OperatingSystem implements ResourceLifecycleListe
 	 * The number of open resources.
 	 */
 	private long resourceCount;
+	private final Logger log = LoggerFactory.getLogger(WindowsOS.class);
 
 	/**
 	 * Returns the path of the device directory.
@@ -47,7 +50,7 @@ public class WindowsOS extends OperatingSystem implements ResourceLifecycleListe
 			}
 			catch (PortInUseException e)
 			{
-				// skip
+				log.trace("Port in use: " + e.getPort());
 			}
 		}
 		return result;

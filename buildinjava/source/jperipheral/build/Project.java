@@ -22,7 +22,7 @@ public class Project implements buildinjava.Project
 	/**
 	 * Creates a new Project.
 	 *
-	 * @param path the project path
+	 * @param path the project directory
 	 */
 	public Project(File path)
 	{

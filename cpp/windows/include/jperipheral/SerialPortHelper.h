@@ -141,6 +141,12 @@ public:
 	 * The worker thread associated with the operation.
 	 */
 	WorkerThread& thread;
+
+private:
+	/**
+	 * Prevent assignment.
+	 */
+	IoTask& operator=(IoTask&);
 };
 
 /**

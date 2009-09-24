@@ -105,7 +105,7 @@ public:
 	ReadTask(WorkerThread& _thread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout,
 		SerialChannel_NativeListener _listener,	boost::function<void (WorkerThread&)> _onDestruction):
 			IoTask(_thread, _port),
-				onDestruction(_onDestruction)
+			onDestruction(_onDestruction)
 	{
 		setJavaBuffer(new ByteBuffer(_javaBuffer));
 		if (javaBuffer->isDirect())

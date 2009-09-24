@@ -38,9 +38,16 @@ int main(int argc, char* argv[])
 
   options.push_back( ClassPath( "C:/Users/Gili/Documents/jace/trunk/release/lib/jace-runtime.jar;" 
 		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/joda-time/joda-time-1.6.jar;"
-		"C:/Users/Gili/Documents/jperipheral/trunk/dist/i386/release/java/jperipheral.jar;" 
-		"C:/Users/Gili/Documents/blueeye/trunk/videoease/java/netbeans/dist/VideoEase.jar;" ) );
-	options.push_back( LibraryPath( "C:/Users/Gili/Documents/jperipheral/trunk/cpp/build/i386/release/msvc/i386/release" ) );
+		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/slf4j/slf4j-api-1.5.6.jar;"
+		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/logback/logback-classic-0.9.15.jar;"
+		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/logback/logback-core-0.9.15.jar;"
+		"C:/Users/Gili/Documents/jperipheral/trunk/dist/i386/release/java/jperipheral.jar;" ) );
+#ifdef _DEBUG
+	std::string libPath = "C:/Users/Gili/Documents/jperipheral/trunk/cpp/build/i386/release/msvc/i386/debug";
+#else
+	std::string libPath = "C:/Users/Gili/Documents/jperipheral/trunk/cpp/build/i386/release/msvc/i386/release";
+#endif
+	options.push_back( LibraryPath( libPath ) );
 	//options.push_back( Verbose( Verbose::JNI ) );
 	//options.push_back( Verbose( Verbose::CLASS ) );
   options.push_back( CustomOption( "-Xmx256M" ) ); 
@@ -55,9 +62,11 @@ int main(int argc, char* argv[])
   }
 	try
 	{
+		std::wstring libPathW(libPath.length(), L'');
+		std::copy(libPath.begin(), libPath.end(), libPathW.begin());
+		LoadLibrary(std::wstring(libPathW + L"\\JPeripheral.dll").c_str());
 		Main main;
-		JArray<String> args(1);
-		args[0] = "test";
+		JArray<String> args(0);
 		main.main(args);
 	}
 	catch (std::exception& e)

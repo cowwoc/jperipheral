@@ -836,6 +836,18 @@
 							</Filter>
 						</Filter>
 					</Filter>
+					<Filter
+						Name="org"
+						>
+						<Filter
+							Name="slf4j"
+							>
+							<File
+								RelativePath="..\..\source\jace\proxy\org\slf4j\Logger.cpp"
+								>
+							</File>
+						</Filter>
+					</Filter>
 				</Filter>
 			</Filter>
 		</Filter>

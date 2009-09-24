@@ -14,6 +14,7 @@ import jace.parser.ClassFile;
 import jace.peer.PeerEnhancer;
 import jace.peer.PeerGenerator;
 import jace.proxy.AutoProxy;
+import jace.proxy.ClassPath;
 import jace.proxy.ProxyGenerator.AccessibilityType;
 import java.io.File;
 import java.io.FileFilter;
@@ -93,6 +94,7 @@ public abstract class Common extends AbstractConfiguration
 			throw new BuildException("Cannot create " + target.getAbsolutePath());
 		List<File> classPath = new ArrayList<File>();
 		classPath.add(new File(projectPath, "java/libraries/joda-time/joda-time-1.6.jar"));
+		classPath.add(new File(projectPath, "java/libraries/slf4j/slf4j-api-1.5.6.jar"));
 		classPath.add(target);
 		new JavaCompiler().filter(directoryFilter, new WildcardFileFilter("*.java")).classPath(classPath).
 			apply(source, target);
@@ -216,12 +218,13 @@ public abstract class Common extends AbstractConfiguration
 		File outputSources = new File(projectPath, "cpp/build/" + getPlatform() + "/source");
 		List<File> classPath = new ArrayList<File>();
 		classPath.add(new File(System.getenv("JAVA_HOME"), "jre/lib/rt.jar"));
+		classPath.add(new File(projectPath, "java/libraries/slf4j/slf4j-api-1.5.6.jar"));
 		classPath.add(new File(projectPath, javaOutputPath));
 		try
 		{
 			new AutoProxy.Builder(Collections.singleton(inputHeaders), Collections.singleton(inputSources),
-				outputHeaders, outputSources, classPath).accessibility(AccessibilityType.PRIVATE).exportSymbols(true).
-				generateProxies();
+				outputHeaders, outputSources, new ClassPath(classPath)).accessibility(AccessibilityType.PRIVATE).
+				exportSymbols(true).generateProxies();
 		}
 		catch (IOException e)
 		{

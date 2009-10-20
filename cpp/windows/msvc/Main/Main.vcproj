@@ -91,7 +91,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="copy &quot;%JAVA32_HOME%\bin\msvcr71.dll&quot; &quot;$(TargetDir)&quot;"
+				CommandLine="xcopy &quot;$(JAVA32_HOME)\bin\msvcr71.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 		<Configuration
@@ -168,6 +168,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				CommandLine="xcopy &quot;$(JAVA64_HOME)\bin\msvcr71.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 		<Configuration
@@ -245,7 +246,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="copy &quot;%JAVA32_HOME%\bin\msvcr71.dll&quot; &quot;$(TargetDir)&quot;"
+				CommandLine="xcopy &quot;$(JAVA32_HOME)\bin\msvcr71.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 		<Configuration
@@ -324,6 +325,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				CommandLine="xcopy &quot;$(JAVA64_HOME)\bin\msvcr71.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 	</Configurations>

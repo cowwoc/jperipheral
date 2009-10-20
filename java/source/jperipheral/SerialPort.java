@@ -46,9 +46,12 @@ public class SerialPort extends ComPort
 	 * @param name the port name
 	 * @throws PortNotFoundException if the comport does not exist
 	 * @throws PortInUseException if the comport is locked by another application
+	 * @throws IllegalArgumentException if name is null
 	 */
 	private SerialPort(String name) throws PortNotFoundException, PortInUseException
 	{
+		if (name == null)
+			throw new IllegalArgumentException("name may not be null");
 		OperatingSystem os = OperatingSystem.getCurrent();
 		ResourceLifecycleListener listener = (ResourceLifecycleListener) os;
 		listener.beforeResourceCreated();
@@ -160,10 +163,11 @@ public class SerialPort extends ComPort
 	}
 
 	@Override
-	public void close() throws IOException
+	public synchronized void close() throws IOException
 	{
 		if (closed)
 			return;
+		channel.close();
 		closed = true;
 		nativeClose();
 		ResourceLifecycleListener listener = (ResourceLifecycleListener) OperatingSystem.getCurrent();

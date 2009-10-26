@@ -36,21 +36,24 @@ int main(int argc, char* argv[])
 
 	OptionList options;
 
-  options.push_back( ClassPath( "C:/Users/Gili/Documents/jace/trunk/release/lib/jace-runtime.jar;" 
+	options.push_back( ClassPath( "C:/Users/Gili/Documents/jace/trunk/release/lib/jace-runtime.jar;"
 		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/joda-time/joda-time-1.6.jar;"
 		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/slf4j/slf4j-api-1.5.6.jar;"
+		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/google-collections/google-collect-1.0-rc2.jar;"
+		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/guice/guice-2.0.jar;"
 		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/logback/logback-classic-0.9.15.jar;"
 		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/logback/logback-core-0.9.15.jar;"
-		"C:/Users/Gili/Documents/jperipheral/trunk/dist/i386/release/java/jperipheral.jar;" ) );
 #ifdef _DEBUG
-	std::string libPath = "C:/Users/Gili/Documents/jperipheral/trunk/cpp/build/i386/release/msvc/i386/debug";
+		"C:/Users/Gili/Documents/jperipheral/trunk/dist/i386/debug/java/jperipheral.jar;" ) );
+	std::string libPath = "C:/Users/Gili/Documents/jperipheral/trunk/cpp/build/i386/debug/msvc/i386/debug";
 #else
+		"C:/Users/Gili/Documents/jperipheral/trunk/dist/i386/release/java/jperipheral.jar;" ) );
 	std::string libPath = "C:/Users/Gili/Documents/jperipheral/trunk/cpp/build/i386/release/msvc/i386/release";
 #endif
 	options.push_back( LibraryPath( libPath ) );
 	//options.push_back( Verbose( Verbose::JNI ) );
 	//options.push_back( Verbose( Verbose::CLASS ) );
-  options.push_back( CustomOption( "-Xmx256M" ) ); 
+	options.push_back( CustomOption( "-Xmx256M" ) );
 	try
 	{
     jace::helper::createVm( loader, options, false );

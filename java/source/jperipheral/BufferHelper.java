@@ -12,7 +12,7 @@ import java.nio.charset.CoderResult;
  *
  * @author Gili Tzabari
  */
-public class BufferHelper
+final class BufferHelper
 {
 	private static BufferHelper instance;
 

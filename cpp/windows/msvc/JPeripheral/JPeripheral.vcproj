@@ -346,7 +346,7 @@
 				Name="jperipheral"
 				>
 				<File
-					RelativePath="..\..\source\jperipheral\SerialPort.cpp"
+					RelativePath="..\..\source\jperipheral\CanonicalSerialPort.cpp"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
@@ -549,11 +549,11 @@
 						>
 					</File>
 					<File
-						RelativePath="..\..\source\jace\peer\jperipheral\SerialPort_peer.cpp"
+						RelativePath="..\..\source\jace\peer\jperipheral\CanonicalSerialPort_peer.cpp"
 						>
 					</File>
 					<File
-						RelativePath="..\..\source\jace\peer\jperipheral\SerialPortMappings.cpp"
+						RelativePath="..\..\source\jace\peer\jperipheral\CanonicalSerialPortMappings.cpp"
 						>
 					</File>
 					<File
@@ -580,10 +580,6 @@
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\ComPort.cpp"
-							>
-						</File>
-						<File
 							RelativePath="..\..\source\jace\proxy\jperipheral\Main.cpp"
 							>
 						</File>
@@ -592,15 +588,15 @@
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\PortInUseException.cpp"
+							RelativePath="..\..\source\jace\proxy\jperipheral\Peripheral.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\PortNotFoundException.cpp"
+							RelativePath="..\..\source\jace\proxy\jperipheral\PeripheralInUseException.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\ResourceLifecycleListener.cpp"
+							RelativePath="..\..\source\jace\proxy\jperipheral\PeripheralNotFoundException.cpp"
 							>
 						</File>
 						<File
@@ -616,7 +612,15 @@
 							>
 						</File>
 						<File
+							RelativePath="..\..\source\jace\proxy\jperipheral\CanonicalSerialPort.cpp"
+							>
+						</File>
+						<File
 							RelativePath="..\..\source\jace\proxy\jperipheral\SerialPort.cpp"
+							>
+						</File>
+						<File
+							RelativePath="..\..\source\jace\proxy\jperipheral\ReferenceCounted.cpp"
 							>
 						</File>
 						<File
@@ -807,7 +811,7 @@
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\util\Set.cpp"
+								RelativePath="..\..\source\jace\proxy\java\util\List.cpp"
 								>
 							</File>
 							<Filter
@@ -819,6 +823,14 @@
 								</File>
 								<File
 									RelativePath="..\..\source\jace\proxy\java\util\concurrent\ExecutionException.cpp"
+									>
+								</File>
+								<File
+									RelativePath="..\..\source\jace\proxy\java\util\concurrent\Executor.cpp"
+									>
+								</File>
+								<File
+									RelativePath="..\..\source\jace\proxy\java\util\concurrent\ExecutorService.cpp"
 									>
 								</File>
 								<File
@@ -866,7 +878,7 @@
 						Name="jperipheral"
 						>
 						<File
-							RelativePath="..\..\include\jace\peer\jperipheral\SerialPort.h"
+							RelativePath="..\..\include\jace\peer\jperipheral\CanonicalSerialPort.h"
 							>
 						</File>
 						<File
@@ -875,6 +887,10 @@
 						</File>
 						<File
 							RelativePath="..\..\include\jace\peer\jperipheral\SerialPort_Channel_SerialFuture.h"
+							>
+						</File>
+						<File
+							RelativePath="..\..\include\jace\peer\jperipheral\WindowsOS.h"
 							>
 						</File>
 					</Filter>

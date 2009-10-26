@@ -2,8 +2,6 @@ package jperipheral;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,92 +10,53 @@ import org.slf4j.LoggerFactory;
  *
  * @author Gili Tzabari
  */
-public class WindowsOS extends OperatingSystem implements ResourceLifecycleListener
+final class WindowsOS implements OperatingSystem
 {
+	/**
+	 * Referenced by native code.
+	 */
+	private final Logger log = LoggerFactory.getLogger(WindowsOS.class);
+	private final File peripheralPath = new File("//./");
 	/**
 	 * The native context associated with the object.
 	 */
 	private long nativeContext;
-	/**
-	 * The number of open resources.
-	 */
-	private long resourceCount;
-	private final Logger log = LoggerFactory.getLogger(WindowsOS.class);
 
 	/**
-	 * Returns the path of the device directory.
-	 *
-	 * @return the path of the device directory
+	 * Creates a new WindowsOS object.
 	 */
-	private File getDeviceDirectory()
+	WindowsOS()
 	{
-		return new File("//./");
-	}
-
-	@Override
-	public Set<ComPort> getComPorts()
-	{
-		Set<ComPort> result = new HashSet<ComPort>();
-		for (int i = 1; i <= 256; i++)
+		try
 		{
-			try
-			{
-				result.add(SerialPort.getByName("COM" + i));
-			}
-			catch (PortNotFoundException e)
-			{
-				// skip
-			}
-			catch (PortInUseException e)
-			{
-				log.trace("Port in use: " + e.getPort());
-			}
+			this.nativeContext = nativeInitialize();
 		}
-		return result;
+		catch (IOException e)
+		{
+			// Unrecoverable error
+			throw new AssertionError(e);
+		}
 	}
 
 	@Override
 	public String getPortPath(String name)
 	{
-		return new File(getDeviceDirectory(), name).getAbsolutePath();
+		return new File(peripheralPath, name).getAbsolutePath();
 	}
 
 	@Override
-	public synchronized void beforeResourceCreated()
+	protected void finalize() throws Throwable
 	{
-		if (resourceCount == 0)
+		try
 		{
-			try
-			{
-				this.nativeContext = nativeInitialize();
-			}
-			catch (IOException e)
-			{
-				// Unrecoverable error
-				throw new AssertionError(e);
-			}
+			System.err.println("finalizer!");
+			nativeDispose();
+			nativeContext = 0;
 		}
-		assert (resourceCount < Integer.MAX_VALUE): resourceCount;
-		++resourceCount;
-	}
-
-	@Override
-	public synchronized void afterResourceDestroyed()
-	{
-		assert (resourceCount > 0): resourceCount;
-		--resourceCount;
-		if (resourceCount <= 0)
+		catch (IOException e)
 		{
-			try
-			{
-				nativeDispose();
-				this.nativeContext = 0;
-			}
-			catch (IOException e)
-			{
-				// Unrecoverable error
-				throw new AssertionError(e);
-			}
+			// Unrecoverable error
+			throw new AssertionError(e);
 		}
 	}
 

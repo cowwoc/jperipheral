@@ -5,8 +5,8 @@ using jperipheral::SerialPortContext;
 using jperipheral::WorkerThread;
 using jperipheral::getErrorMessage;
 
-#include "jace/proxy/jperipheral/SerialPort.h"
-using jace::proxy::jperipheral::SerialPort;
+#include "jace/proxy/jperipheral/CanonicalSerialPort.h"
+using jace::proxy::jperipheral::CanonicalSerialPort;
 
 #include "jace/proxy/jperipheral/SerialChannel.h"
 using jace::proxy::jperipheral::SerialChannel;
@@ -35,8 +35,6 @@ using jace::proxy::java::nio::ByteBuffer;
 #include "jace/proxy/jperipheral/OperatingSystem.h"
 using ::jace::proxy::jperipheral::OperatingSystem;
 
-#include "jace/peer/jperipheral/WindowsOS.h"
-
 #include "jace/javacast.h"
 using jace::java_cast;
 
@@ -57,7 +55,7 @@ using std::stringstream;
 #pragma warning(pop)
 
 
-SerialPortContext* jperipheral::getContext(SerialPort serialPort)
+SerialPortContext* jperipheral::getContext(CanonicalSerialPort serialPort)
 {
 	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(serialPort.nativeContext()));
 }
@@ -72,9 +70,8 @@ IoTask* jperipheral::getContext(SerialChannel_SerialFuture future)
 	return reinterpret_cast<IoTask*>(static_cast<intptr_t>(future.getNativeContext()));
 }
 
-CompletionPortContext* jperipheral::getCompletionPortContext()
+CompletionPortContext* jperipheral::getCompletionPortContext(WindowsOS windows)
 {
-	::jace::proxy::jperipheral::WindowsOS windows = java_cast<::jace::proxy::jperipheral::WindowsOS>(OperatingSystem::getCurrent());
 	return reinterpret_cast<CompletionPortContext*>(static_cast<intptr_t>(windows.nativeContext()));
 }
 

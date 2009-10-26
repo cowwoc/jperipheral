@@ -25,8 +25,8 @@
 
 package jperipheral.nio.channels;
 
-import java.nio.channels.*;
 import java.io.IOException;
+import java.nio.channels.Channel;
 import java.util.concurrent.Future;  // javadoc
 
 /**

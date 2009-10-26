@@ -5,8 +5,8 @@
 #include "jace/namespace.h"
 #endif
 
-#ifndef JACE_PEER_JPERIPHERAL_SERIALPORT_H
-#include "jace/peer/jperipheral/SerialPort.h"
+#ifndef JACE_PEER_JPERIPHERAL_CANONICALSERIALPORT_H
+#include "jace/peer/jperipheral/CanonicalSerialPort.h"
 #endif
 
 #ifndef JACE_PEER_JPERIPHERAL_SERIALCHANNEL_H
@@ -23,6 +23,10 @@
 
 #ifndef JACE_PROXY_JPERIPHERAL_SERIALCHANNEL_SERIALFUTURE_H
 #include "jace/proxy/jperipheral/SerialChannel_SerialFuture.h"
+#endif
+
+#ifndef JACE_PROXY_JPERIPHERAL_SERIALPORT_WINDOWSOS_H
+#include "jace/proxy/jperipheral/WindowsOS.h"
 #endif
 
 #define WIN32_LEAN_AND_MEAN
@@ -197,7 +201,7 @@ public:
 /**
  * Returns the SerialPort handle.
  */
-SerialPortContext* getContext(::jace::proxy::jperipheral::SerialPort port);
+SerialPortContext* getContext(::jace::proxy::jperipheral::CanonicalSerialPort port);
 /**
  * Returns the SerialPort handle.
  */
@@ -216,7 +220,7 @@ public:
 	/**
 	 * Creates a new CompletionPortContext.
 	 */
-	CompletionPortContext();
+	CompletionPortContext(jace::peer::jperipheral::WindowsOS windowsOS);
 
 	/**
 	 * Creates a new ~CompletionPortContext.
@@ -228,12 +232,15 @@ public:
 	boost::mutex lock;
 	boost::condition running;
 	HANDLE completionPort;
+	jace::peer::jperipheral::WindowsOS windowsOS;
 };
 
 /**
  * Returns the CompletionPort handle.
+ *
+ * @param os the operating system
  */
-CompletionPortContext* getCompletionPortContext();
+CompletionPortContext* getCompletionPortContext(jace::proxy::jperipheral::WindowsOS os);
 
 /**
  * Returns the String representation of the current source-code position.

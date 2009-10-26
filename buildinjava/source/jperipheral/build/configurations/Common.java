@@ -70,7 +70,6 @@ public abstract class Common extends AbstractConfiguration
 	{
 		compileJavaClasses();
 		enhanceJavaPeers();
-		//copyJavaClasses();
 		packageJavaClasses();
 
 		copyCppSourceToBuild();
@@ -95,6 +94,8 @@ public abstract class Common extends AbstractConfiguration
 		List<File> classPath = new ArrayList<File>();
 		classPath.add(new File(projectPath, "java/libraries/joda-time/joda-time-1.6.jar"));
 		classPath.add(new File(projectPath, "java/libraries/slf4j/slf4j-api-1.5.6.jar"));
+		classPath.add(new File(projectPath, "java/libraries/guice/guice-2.0.jar"));
+		classPath.add(new File(projectPath, "java/libraries/google-collections/google-collect-1.0-rc2.jar"));
 		classPath.add(target);
 		new JavaCompiler().filter(directoryFilter, new WildcardFileFilter("*.java")).classPath(classPath).
 			apply(source, target);
@@ -112,7 +113,7 @@ public abstract class Common extends AbstractConfiguration
 			File file = new File(projectPath, javaOutputPath + "/jperipheral/WindowsOS.class");
 			new PeerEnhancer.Builder(file, file).library("JPeripheral").enhance();
 
-			file = new File(projectPath, javaOutputPath + "/jperipheral/SerialPort.class");
+			file = new File(projectPath, javaOutputPath + "/jperipheral/CanonicalSerialPort.class");
 			new PeerEnhancer.Builder(file, file).library("JPeripheral").deallocationMethod("close").enhance();
 
 			file = new File(projectPath, javaOutputPath + "/jperipheral/SerialChannel.class");
@@ -126,20 +127,6 @@ public abstract class Common extends AbstractConfiguration
 		{
 			throw new BuildException(e);
 		}
-	}
-
-	/**
-	 * Copies the Java classes into the build directory.
-	 *
-	 * @throws BuildException if an expected build error occurs
-	 */
-	private void copyJavaClasses() throws BuildException
-	{
-		File netbeansPath = new File(projectPath, javaOutputPath);
-		File buildPath = new File(projectPath, "dist/" + getPlatform() + "/java");
-		if (!buildPath.exists() && !buildPath.mkdirs())
-			throw new BuildException("Cannot create " + buildPath);
-		new Copy().fromDirectory(netbeansPath).toDirectory(buildPath);
 	}
 
 	/**
@@ -173,7 +160,7 @@ public abstract class Common extends AbstractConfiguration
 			new PeerGenerator(new ClassFile(classFile), classFile.lastModified(), includeDir, sourceDir, false).
 				generate();
 
-			classFile = new File(projectPath, javaOutputPath + "/jperipheral/SerialPort.class");
+			classFile = new File(projectPath, javaOutputPath + "/jperipheral/CanonicalSerialPort.class");
 			new PeerGenerator(new ClassFile(classFile), classFile.lastModified(), includeDir, sourceDir, false).
 				generate();
 

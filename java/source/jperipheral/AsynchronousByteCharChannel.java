@@ -336,8 +336,8 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	{
 		if (writePending)
 			throw new WritePendingException();
-		ByteBuffer sourceBytes = ByteBuffer.allocate((int) Math.ceil(encoder.maxBytesPerChar() *
-																																 source.remaining()));
+		ByteBuffer sourceBytes = ByteBuffer.allocate((int) Math.ceil(encoder.maxBytesPerChar()
+																																 * source.remaining()));
 		// duplicate source to avoid modifying its position
 		CharBuffer sourceCopy = source.duplicate();
 		CoderResult encodingResult = encoder.encode(sourceCopy, sourceBytes, endOfInput);
@@ -501,8 +501,8 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 																				 StringBuilder target)
 		throws CharacterCodingException
 	{
-		final CharBuffer charBuffer = CharBuffer.allocate((int) Math.ceil(decoder.maxCharsPerByte() *
-																																			source.remaining()));
+		final CharBuffer charBuffer = CharBuffer.allocate((int) Math.ceil(decoder.maxCharsPerByte() * source.
+			remaining()));
 		CoderResult decodingResult = decoder.decode(source, charBuffer, endOfInput);
 		if (decodingResult.isError())
 			decodingResult.throwException();
@@ -899,8 +899,8 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	{
 		// Decode the bytes we sent out
 		CharsetDecoder decoderForWrite = charset.newDecoder();
-		final CharBuffer charBuffer = CharBuffer.allocate((int) Math.ceil(decoderForWrite.maxCharsPerByte() *
-																																			bytesWritten.remaining()));
+		final CharBuffer charBuffer = CharBuffer.allocate((int) Math.ceil(decoderForWrite.maxCharsPerByte()
+																																			* bytesWritten.remaining()));
 		CoderResult decodingResult = decoderForWrite.decode(bytesWritten, charBuffer, endOfInput);
 		if (decodingResult.isUnmappable())
 		{
@@ -943,8 +943,8 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	private static void skipWellFormedBytes(CharBuffer source, ByteBuffer malformedBytes, CharsetDecoder decoder)
 	{
 		malformedBytes.flip();
-		CharBuffer charBuffer = CharBuffer.allocate((int) Math.ceil(decoder.maxCharsPerByte() *
-																																malformedBytes.remaining()));
+		CharBuffer charBuffer = CharBuffer.allocate((int) Math.ceil(decoder.maxCharsPerByte() * malformedBytes.
+			remaining()));
 		CoderResult decodingResult = decoder.decode(malformedBytes, charBuffer, true);
 		assertCoderResult(decodingResult);
 		decodingResult = decoder.flush(charBuffer);

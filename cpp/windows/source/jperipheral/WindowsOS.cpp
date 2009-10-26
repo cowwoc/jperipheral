@@ -49,6 +49,8 @@ static void CompletionHandler(CompletionPortContext& context)
 	ULONG_PTR completionKey;
 	OVERLAPPED* overlapped;
 
+	// BUG: https://svn.boost.org/trac/boost/ticket/2739
+	boost::this_thread::at_thread_exit(boost::bind(&WindowsOS::nativeDispose, boost::ref(context.windowsOS)));
 	{
 		boost::mutex::scoped_lock lock(context.lock);
 		context.running.notify_one();
@@ -67,12 +69,14 @@ static void CompletionHandler(CompletionPortContext& context)
 				case ERROR_HANDLE_EOF:
 				{
 					bytesTransferredAsInteger = Integer::valueOf(-1);
+					jace::helper::detach();
 					break;
 				}
 				case ERROR_OPERATION_ABORTED:
 				{
 					task->listener->onCancellation();
 					delete task;
+					jace::helper::detach();
 					break;
 				}
 				default:
@@ -80,6 +84,7 @@ static void CompletionHandler(CompletionPortContext& context)
 					task->listener->onFailure(IOException(L"GetQueuedCompletionStatus() failed with error: " + 
 						getErrorMessage(errorCode)));
 					delete task;
+					jace::helper::detach();
 					break;
 				}
 			}
@@ -99,6 +104,7 @@ static void CompletionHandler(CompletionPortContext& context)
 							// Premature timeout caused by the fact that SerialPort_Channel.setReadTimeout() cannot
 							// "wait forever". Repeat the operation.
 							task->run();
+							jace::helper::detach();
 							continue;
 						}
 						try
@@ -112,6 +118,7 @@ static void CompletionHandler(CompletionPortContext& context)
 							t.printStackTrace();
 						}
 						delete task;
+						jace::helper::detach();
 						break;
 					}
 					try
@@ -126,6 +133,7 @@ static void CompletionHandler(CompletionPortContext& context)
 						t.printStackTrace();
 					}
 					delete task;
+					jace::helper::detach();
 					break;
 				}
 				case IoTask::SHUTDOWN:
@@ -140,6 +148,7 @@ static void CompletionHandler(CompletionPortContext& context)
 				{
 					task->listener->onFailure(AssertionError(String(wstring(L"completionKey==") + toWString(completionKey))));
 					delete task;
+					jace::helper::detach();
 					break;
 				}
 			}
@@ -147,7 +156,8 @@ static void CompletionHandler(CompletionPortContext& context)
 	}
 }
 
-CompletionPortContext::CompletionPortContext()
+CompletionPortContext::CompletionPortContext(jace::peer::jperipheral::WindowsOS _windowsOS):
+	windowsOS(_windowsOS)
 {
 	// Empirical tests show that handling I/O completion costs 0.3 milliseconds, making it hard to justify
 	// the use of multiple threads.
@@ -175,11 +185,11 @@ CompletionPortContext::~CompletionPortContext()
 
 JLong WindowsOS::nativeInitialize()
 {
-	return reinterpret_cast<intptr_t>(new CompletionPortContext());
+	return reinterpret_cast<intptr_t>(new CompletionPortContext(*this));
 }
 
 void WindowsOS::nativeDispose()
 {
-	CompletionPortContext* context = getCompletionPortContext();
+	CompletionPortContext* context = getCompletionPortContext(this->getJaceProxy());
 	delete context;
 }

@@ -9,7 +9,6 @@ using jace::proxy::types::JByte;
 
 #include "jperipheral/SerialPortHelper.h"
 using jperipheral::getContext;
-using jperipheral::getCompletionPortContext;
 using jperipheral::getErrorMessage;
 using jperipheral::CompletionPortContext;
 using jperipheral::IoTask;
@@ -66,7 +65,7 @@ void setReadTimeout(HANDLE port, DWORD timeout)
 	if (!GetCommTimeouts(port, &timeouts))
 		throw IOException(L"GetCommTimeouts() failed with error: " + getErrorMessage(GetLastError()));
 	timeouts.ReadIntervalTimeout = MAXDWORD;
-	timeouts.ReadTotalTimeoutMultiplier = MAXDWORD;		
+	timeouts.ReadTotalTimeoutMultiplier = MAXDWORD;
 	if (timeout == 0)
 	{
 		// The Windows API does not provide a way to "wait forever" so instead we wait as long as possible
@@ -137,7 +136,7 @@ public:
 				listener->onFailure(AssertionError(L"ByteBuffer.remaining()==" + toWString((jint) remaining)));
 				return false;
 			}
-			JNIEnv* env = jace::helper::attach();
+			JNIEnv* env = jace::helper::attach(0, 0, true);
 			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(this->nativeBuffer->getJavaJniObject()));
 			assert(nativeBuffer!=0);
 
@@ -217,7 +216,7 @@ public:
 				listener->onFailure(AssertionError(L"ByteBuffer.remaining()==" + toWString((jint) remaining)));
 				return false;
 			}
-			JNIEnv* env = jace::helper::attach();
+			JNIEnv* env = jace::helper::attach(0, 0, true);
 			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(this->nativeBuffer->getJavaJniObject()));
 			assert(nativeBuffer!=0);
 

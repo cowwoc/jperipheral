@@ -1,5 +1,7 @@
 package jperipheral;
 
+import com.google.inject.Guice;
+import com.google.inject.Injector;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.util.concurrent.TimeUnit;
@@ -12,7 +14,14 @@ import java.util.concurrent.TimeoutException;
 public class Main
 {
 	private AsynchronousByteCharChannel channel;
+	private final Peripherals peripherals;
 	private final String portName = "COM5";
+
+	public Main()
+	{
+		Injector injector = Guice.createInjector(new GuiceModule());
+		this.peripherals = injector.getInstance(Peripherals.class);
+	}
 
 	public static void main(String[] args) throws Exception
 	{
@@ -37,7 +46,7 @@ public class Main
 
 	private void flush() throws Exception
 	{
-		SerialPort port = SerialPort.getByName(portName);
+		SerialPort port = (SerialPort) peripherals.getByName(portName);
 		port.configure(9600, SerialPort.DataBits.EIGHT, SerialPort.Parity.NONE, SerialPort.StopBits.ONE,
 			SerialPort.FlowControl.NONE);
 		channel = AsynchronousByteCharChannel.open(port.getAsynchronousChannel(),
@@ -61,7 +70,7 @@ public class Main
 
 	private void send(String... lines) throws Exception
 	{
-		SerialPort port = SerialPort.getByName(portName);
+		SerialPort port = (SerialPort) peripherals.getByName(portName);
 		port.configure(9600, SerialPort.DataBits.EIGHT, SerialPort.Parity.NONE, SerialPort.StopBits.ONE,
 			SerialPort.FlowControl.NONE);
 		channel = AsynchronousByteCharChannel.open(port.getAsynchronousChannel(),

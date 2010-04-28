@@ -297,7 +297,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 	 * @type <A> the attachment type
 	 * @author Gili Tzabari
 	 */
-	private class NativeListenerToCompletionHandler<A> implements NativeListener
+	private static class NativeListenerToCompletionHandler<A> implements NativeListener
 	{
 		private final CompletionHandler<Integer, ? super A> handler;
 		private final A attachment;
@@ -389,6 +389,8 @@ public class SerialChannel extends AsynchronousSerialChannel
 				return false;
 			try
 			{
+				// TODO: Canceling an operation may result in lost data.
+				// REFERENCE: http://stackoverflow.com/questions/1238905/what-does-cancelio-do-with-bytes-that-have-already-been-read
 				nativeCancel();
 			}
 			catch (IOException e)
@@ -526,7 +528,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 	 *
 	 * @author Gili Tzbari
 	 */
-	private class NoOpFuture implements Future<Integer>
+	private static class NoOpFuture implements Future<Integer>
 	{
 		@Override
 		public boolean cancel(boolean mayInterruptIfRunning)

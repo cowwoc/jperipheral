@@ -5,8 +5,8 @@
         <data xmlns="http://www.netbeans.org/ns/j2se-project/3">
             <name>JPeripheral.Build</name>
             <source-roots>
-                <root id="src.bootstrap.dir" name="Bootstrap Packages"/>
                 <root id="src.source.dir" name="Source Packages"/>
+                <root id="src.classpath.dir" name="Classpath Bootstrap"/>
             </source-roots>
             <test-roots/>
         </data>

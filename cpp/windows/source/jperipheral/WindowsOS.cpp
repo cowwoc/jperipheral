@@ -193,3 +193,11 @@ void WindowsOS::nativeDispose()
 	CompletionPortContext* context = getCompletionPortContext(this->getJaceProxy());
 	delete context;
 }
+
+/**
+ * @see http://java.sun.com/javase/6/docs/technotes/guides/jni/spec/invocation.html#library_version
+ */
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*, void*)
+{
+	return JNI_VERSION_1_6;
+}

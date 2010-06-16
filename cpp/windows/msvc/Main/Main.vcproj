@@ -168,7 +168,6 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="xcopy &quot;$(JAVA64_HOME)\bin\msvcr71.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 		<Configuration
@@ -196,6 +195,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="/MP"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories="..\..\include;&quot;$(JACE_HOME)\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;&quot;$(BOOST_HOME)&quot;"
@@ -275,6 +275,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="/MP"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories="..\..\include;&quot;$(JACE_HOME)\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;&quot;$(BOOST_HOME)&quot;"
@@ -325,7 +326,6 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="xcopy &quot;$(JAVA64_HOME)\bin\msvcr71.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 	</Configurations>

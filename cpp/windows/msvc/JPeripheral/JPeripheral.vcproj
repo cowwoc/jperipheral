@@ -533,6 +533,14 @@
 					Name="peer"
 					>
 					<File
+						RelativePath="..\..\source\jace\peer\jperipheral\CanonicalSerialPort_peer.cpp"
+						>
+					</File>
+					<File
+						RelativePath="..\..\source\jace\peer\jperipheral\CanonicalSerialPortMappings.cpp"
+						>
+					</File>
+					<File
 						RelativePath="..\..\source\jace\peer\jperipheral\SerialChannel_peer.cpp"
 						>
 					</File>
@@ -546,14 +554,6 @@
 					</File>
 					<File
 						RelativePath="..\..\source\jace\peer\jperipheral\SerialChannelMappings.cpp"
-						>
-					</File>
-					<File
-						RelativePath="..\..\source\jace\peer\jperipheral\CanonicalSerialPort_peer.cpp"
-						>
-					</File>
-					<File
-						RelativePath="..\..\source\jace\peer\jperipheral\CanonicalSerialPortMappings.cpp"
 						>
 					</File>
 					<File
@@ -580,6 +580,10 @@
 							>
 						</File>
 						<File
+							RelativePath="..\..\source\jace\proxy\jperipheral\CanonicalSerialPort.cpp"
+							>
+						</File>
+						<File
 							RelativePath="..\..\source\jace\proxy\jperipheral\Main.cpp"
 							>
 						</File>
@@ -600,6 +604,10 @@
 							>
 						</File>
 						<File
+							RelativePath="..\..\source\jace\proxy\jperipheral\ReferenceCounted.cpp"
+							>
+						</File>
+						<File
 							RelativePath="..\..\source\jace\proxy\jperipheral\SerialChannel.cpp"
 							>
 						</File>
@@ -612,15 +620,7 @@
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\CanonicalSerialPort.cpp"
-							>
-						</File>
-						<File
 							RelativePath="..\..\source\jace\proxy\jperipheral\SerialPort.cpp"
-							>
-						</File>
-						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\ReferenceCounted.cpp"
 							>
 						</File>
 						<File

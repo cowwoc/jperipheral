@@ -36,21 +36,27 @@ int main(int argc, char* argv[])
 
 	OptionList options;
 
-	options.push_back( ClassPath( "C:/Users/Gili/Documents/jace/trunk/release/lib/jace-runtime.jar;"
-		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/joda-time/joda-time-1.6.jar;"
-		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/slf4j/slf4j-api-1.5.6.jar;"
-		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/google-collections/google-collect-1.0-rc2.jar;"
-		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/guice/guice-2.0.jar;"
-		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/logback/logback-classic-0.9.15.jar;"
-		"C:/Users/Gili/Documents/jperipheral/trunk/java/libraries/logback/logback-core-0.9.15.jar;"
 #ifdef _DEBUG
-		"C:/Users/Gili/Documents/jperipheral/trunk/dist/i386/debug/java/jperipheral.jar;" ) );
-	std::string libPath = "C:/Users/Gili/Documents/jperipheral/trunk/cpp/build/i386/debug/msvc/i386/debug";
+	#ifndef JACE_AMD64
+		std::string platform = "i386/debug";
+	#else
+		std::string platform = "amd64/debug";
+	#endif
 #else
-		"C:/Users/Gili/Documents/jperipheral/trunk/dist/i386/release/java/jperipheral.jar;" ) );
-	std::string libPath = "C:/Users/Gili/Documents/jperipheral/trunk/cpp/build/i386/release/msvc/i386/release";
+	#ifndef JACE_AMD64
+		std::string platform = "i386/release";
+	#else
+		std::string platform = "amd64/release";
+	#endif
 #endif
-	options.push_back( LibraryPath( libPath ) );
+	options.push_back(ClassPath("jace-runtime.jar;"
+		"joda-time-1.6.jar;"
+		"slf4j-api-1.5.6.jar;"
+		"google-collect-1.0-rc2.jar;"
+		"guice/guice-2.0.jar;"
+		"logback-classic-0.9.15.jar;"
+		"logback-core-0.9.15.jar;"
+		"jperipheral.jar;"));
 	//options.push_back( Verbose( Verbose::JNI ) );
 	//options.push_back( Verbose( Verbose::CLASS ) );
 	options.push_back( CustomOption( "-Xmx256M" ) );
@@ -65,9 +71,6 @@ int main(int argc, char* argv[])
   }
 	try
 	{
-		std::wstring libPathW(libPath.length(), L'');
-		std::copy(libPath.begin(), libPath.end(), libPathW.begin());
-		LoadLibrary(std::wstring(libPathW + L"\\JPeripheral.dll").c_str());
 		Main main;
 		JArray<String> args(0);
 		main.main(args);
@@ -76,6 +79,6 @@ int main(int argc, char* argv[])
 	{
 		cout << e.what() << endl;
 	}
-	jace::helper::getJavaVM()->DestroyJavaVM();
+	jace::helper::destroyVm();
 	return 0;
 }

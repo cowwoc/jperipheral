@@ -11,6 +11,151 @@
 	<description>Builds, tests, and runs the project JPeripheral.</description>
 	<import file="nbproject/build-impl.xml"/>
 
+	<target name="-post-init">
+		<!-- Convert "platform.buildType" to "platform/buildType" -->
+		<loadresource property="platform.path">
+			<propertyresource name="config" />
+			<filterchain>
+				<replacestring from="." to="/" />
+			</filterchain>
+		</loadresource>
+
+		<!-- Convert "platform.buildType" to "buildType|platform" -->
+		<loadresource property="msvc.config">
+			<propertyresource name="config" />
+			<filterchain>
+				<replaceregex pattern="(.*)\.(.*)" replace="\2|\1" />
+			</filterchain>
+		</loadresource>
+
+		<!-- Convert "platform.buildType" to "buildType" -->
+		<loadresource property="build.type">
+			<propertyresource name="config" />
+			<filterchain>
+				<replaceregex pattern="(.*)\.(.*)" replace="\2" />
+			</filterchain>
+		</loadresource>
+
+		<property name="project.path" location="${build.classes.dir}/../../../../"/>
+		<property environment="env"/>
+		<property name="native.compiler.path" value="${env.VS90COMNTOOLS}/../IDE"/>
+	</target>
+
+	<target name="-post-compile" depends="compile.native, package"/>
+
+	<target name="compile.native" depends="generate.cpp" description="Compiles native components">
+		<exec executable="${native.compiler.path}/devenv.com" failonerror="true">
+			<arg line="/build ${msvc.config}"/>
+			<arg file="${project.path}/cpp/build/${platform.path}/msvc/JPeripheral.sln"/>
+		</exec>
+	</target>
+
+	<target name="generate.cpp" depends="enhance.cpp">
+		<GenerateCppPeer file="${project.path}/java/build/${platform.path}/jperipheral/WindowsOS.class"
+									 outputHeaders="${project.path}/cpp/build/${platform.path}/include"
+									 outputSources="${project.path}/cpp/build/${platform.path}/source"
+									 userDefinedMembers="false"/>
+
+		<GenerateCppPeer file="${project.path}/java/build/${platform.path}/jperipheral/CanonicalSerialPort.class"
+									 outputHeaders="${project.path}/cpp/build/${platform.path}/include"
+									 outputSources="${project.path}/cpp/build/${platform.path}/source"
+									 userDefinedMembers="false"/>
+
+		<GenerateCppPeer file="${project.path}/java/build/${platform.path}/jperipheral/SerialChannel.class"
+									 outputHeaders="${project.path}/cpp/build/${platform.path}/include"
+									 outputSources="${project.path}/cpp/build/${platform.path}/source"
+									 userDefinedMembers="false"/>
+
+		<GenerateCppPeer file="${project.path}/java/build/${platform.path}/jperipheral/SerialChannel$SerialFuture.class"
+									 outputHeaders="${project.path}/cpp/build/${platform.path}/include"
+									 outputSources="${project.path}/cpp/build/${platform.path}/source"
+									 userDefinedMembers="false"/>
+
+		<GenerateCppProxies outputHeaders="${project.path}/cpp/build/${platform.path}/include"
+											outputSources="${project.path}/cpp/build/${platform.path}/source"
+											exportSymbols="true" accessibility="private">
+			<classpath>
+				<pathelement location="${env.JAVA_HOME}/jre/lib/rt.jar"/>
+				<pathelement location="${project.path}/java/build/${platform.path}"/>
+				<pathelement path="${javac.classpath}"/>
+			</classpath>
+			<inputHeaders dir="${project.path}/cpp/build/${platform.path}/include"/>
+			<inputSources dir="${project.path}/cpp/build/${platform.path}/source"/>
+		</GenerateCppProxies>
+	</target>
+
+	<target name="enhance.cpp" depends="-jace.task, create.build.directory">
+		<EnhanceJavaPeer inputFile="${project.path}/java/build/${platform.path}/jperipheral/WindowsOS.class"
+									 outputFile="${project.path}/java/build/${platform.path}/jperipheral/WindowsOS.class">
+			<library name="JPeripheral"/>
+		</EnhanceJavaPeer>
+
+		<EnhanceJavaPeer inputFile="${project.path}/java/build/${platform.path}/jperipheral/CanonicalSerialPort.class"
+									 outputFile="${project.path}/java/build/${platform.path}/jperipheral/CanonicalSerialPort.class"
+									 deallocationMethod="close">
+			<library name="JPeripheral"/>
+		</EnhanceJavaPeer>
+
+		<EnhanceJavaPeer inputFile="${project.path}/java/build/${platform.path}/jperipheral/SerialChannel.class"
+									 outputFile="${project.path}/java/build/${platform.path}/jperipheral/SerialChannel.class"
+									 deallocationMethod="close">
+			<library name="JPeripheral"/>
+		</EnhanceJavaPeer>
+
+		<EnhanceJavaPeer inputFile="${project.path}/java/build/${platform.path}/jperipheral/SerialChannel$SerialFuture.class"
+									 outputFile="${project.path}/java/build/${platform.path}/jperipheral/SerialChannel$SerialFuture.class">
+			<library name="JPeripheral"/>
+		</EnhanceJavaPeer>
+	</target>
+
+	<target name="-jace.task">
+		<property environment="env"/>
+		<taskdef resource="jace/ant/task.properties">
+			<classpath>
+				<!-- use logback.xml from local project -->
+				<pathelement location="${src.source.dir}"/>
+				<fileset dir="${env.JACE_HOME}/lib" includes="**/*.jar"/>
+			</classpath>
+		</taskdef>
+	</target>
+
+	<target name="create.build.directory" description="Copies compiled files into platform-specific location">
+		<copy todir="${project.path}/java/build/${platform.path}" failonerror="true">
+			<fileset dir="${build.classes.dir}"/>
+		</copy>
+		<copy todir="${project.path}/cpp/build/${platform.path}" failonerror="true">
+			<fileset dir="${project.path}/cpp/windows"/>
+		</copy>
+	</target>
+
+	<target name="package">
+		<condition property="building.debug">
+			<equals arg1="${build.type}" arg2="debug"/>
+		</condition>
+		<copy todir="${project.path}/build/${platform.path}" failonerror="true">
+			<fileset file="${env.JACE_HOME}/lib/jace-runtime.jar"/>
+			<fileset dir="${env.JACE_HOME}/lib/msvc/${platform.path}">
+				<include name="jace.pdb" if="building.debug"/>
+			</fileset>
+		</copy>
+		<copy todir="${project.path}/build/${platform.path}" failonerror="true">
+			<fileset dir="${project.path}/cpp/build/${platform.path}/msvc/${platform.path}">
+				<include name="*.dll"/>
+				<include name="*.exe"/>
+				<include name="*.pdb" if="building.debug"/>
+			</fileset>
+		</copy>
+		<jar destfile="${project.path}/build/${platform.path}/JPeripheral.jar"
+			 basedir="${project.path}/java/build/${platform.path}" excludes="dependencies.txt" />
+	</target>
+
+	<target name="-post-clean">
+		<delete quiet="true" dir="${project.path}/java/build/${platform.path}"/>
+		<delete quiet="true" dir="${project.path}/cpp/build/${platform.path}"/>
+		<delete quiet="true" dir="${project.path}/build/${platform.path}"/>
+	</target>
+
+	<!--
 	<target name="-BuildInJava">
 		<property name="buildinjava.path" value="C:/Users/Gili/Documents/buildinjava/trunk"/>
 		<property name="project.path" value="${build.classes.dir}/../../../.."/>
@@ -30,145 +175,67 @@
 	<target name="-post-clean" depends="-BuildInJava">
 		<Clean project="JPeripheral" configuration="${config}"/>
 	</target>
+-->
 
-	<!--<target name="-post-compile" depends="jace.task, check.config, enhance.proxies, generate.proxies"/>
+		<!--
 
-	<target name="check.config">
-		<condition property="generate.proxies.skip" value="true">
-			<not>
-				<equals arg1="${config}" arg2="generate.proxies"/>
-			</not>
-		</condition>
-	</target>
+		There exist several targets which are by default empty and which can be
+		used for execution of your tasks. These targets are usually executed
+		before and after some main targets. They are:
 
-	<target name="jace.task">
-		<property environment="env"/>
-		<taskdef resource="jace/ant/task.properties">
-			<classpath>
-				<fileset dir="${env.JACE_HOME}/lib" includes="**/*.jar"/>
-			</classpath>
-		</taskdef>
-	</target>
+			-pre-init:                 called before initialization of project properties
+			-post-init:                called after initialization of project properties
+			-pre-compile:              called before javac compilation
+			-post-compile:             called after javac compilation
+			-pre-compile-single:       called before javac compilation of single file
+			-post-compile-single:      called after javac compilation of single file
+			-pre-compile-test:         called before javac compilation of JUnit tests
+			-post-compile-test:        called after javac compilation of JUnit tests
+			-pre-compile-test-single:  called before javac compilation of single JUnit test
+			-post-compile-test-single: called after javac compilation of single JUunit test
+			-pre-jar:                  called before JAR building
+			-post-jar:                 called after JAR building
+			-post-clean:               called after cleaning build products
 
-	<target name="enhance.proxies" depends="jace.task">
-		<EnhanceJavaPeer inputFile="${build.classes.dir}/jperipheral/WindowsOS.class"
-			outputFile="${build.classes.dir}/jperipheral/WindowsOS.class">
-			<library name="JPeripheral"/>
-		</EnhanceJavaPeer>
+		(Targets beginning with '-' are not intended to be called on their own.)
 
-		<EnhanceJavaPeer inputFile="${build.classes.dir}/jperipheral/SerialPort.class"
-			outputFile="${build.classes.dir}/jperipheral/SerialPort.class" deallocationMethod="close">
-			<library name="JPeripheral"/>
-		</EnhanceJavaPeer>
+		Example of inserting an obfuscator after compilation could look like this:
 
-		<EnhanceJavaPeer inputFile="${build.classes.dir}/jperipheral/SerialChannel.class"
-			outputFile="${build.classes.dir}/jperipheral/SerialChannel.class"
-			deallocationMethod="close">
-			<library name="JPeripheral"/>
-		</EnhanceJavaPeer>
+				<target name="-post-compile">
+						<obfuscate>
+								<fileset dir="${build.classes.dir}"/>
+						</obfuscate>
+				</target>
 
-		<EnhanceJavaPeer inputFile="${build.classes.dir}/jperipheral/SerialChannel$SerialFuture.class"
-			outputFile="${build.classes.dir}/jperipheral/SerialChannel$SerialFuture.class">
-			<library name="JPeripheral"/>
-		</EnhanceJavaPeer>
-	</target>
-
-	<target name="generate.proxies" depends="enhance.proxies" unless="generate.proxies.skip">
-		<GenerateCppPeer file="${build.classes.dir}/jperipheral/WindowsOS.class"
-			outputHeaders="${src.source.dir}/../../cpp/windows/include"
-			outputSources="${src.source.dir}/../../cpp/windows/source"
-			userDefinedMembers="false"/>
-
-		<GenerateCppPeer file="${build.classes.dir}/jperipheral/SerialPort.class"
-			outputHeaders="${src.source.dir}/../../cpp/windows/include"
-			outputSources="${src.source.dir}/../../cpp/windows/source"
-			userDefinedMembers="false"/>
-
-		<GenerateCppPeer file="${build.classes.dir}/jperipheral/SerialChannel.class"
-			outputHeaders="${src.source.dir}/../../cpp/windows/include"
-			outputSources="${src.source.dir}/../../cpp/windows/source"
-			userDefinedMembers="false"/>
-
-		<GenerateCppPeer file="${build.classes.dir}/jperipheral/SerialChannel$SerialFuture.class"
-			outputHeaders="${src.source.dir}/../../cpp/windows/include"
-			outputSources="${src.source.dir}/../../cpp/windows/source"
-			userDefinedMembers="false"/>
-
-		<GenerateCppProxies outputHeaders="${src.source.dir}/../../cpp/windows/include"
-		outputSources="${src.source.dir}/../../cpp/windows/source"
-		exportSymbols="true" classpath="${env.JAVA_HOME}/jre/lib/rt.jar;${build.classes.dir}"
-		accessibility="private">
-			<classpath>
-				<pathelement location="${build.classes.dir}"/>
-			</classpath>
-			<inputHeaders dir="${src.source.dir}/../../cpp/windows/include"/>
-			<inputSources dir="${src.source.dir}/../../cpp/windows/source"/>
-		</GenerateCppProxies>
-	</target>
-
-	<target name="-post-clean">
-		<delete quiet="true" dir="${src.source.dir}/../../cpp/windows/source/jace"/>
-		<delete quiet="true" dir="${src.source.dir}/../../cpp/windows/include/jace"/>
-	</target>-->
-    <!--
-
-    There exist several targets which are by default empty and which can be 
-    used for execution of your tasks. These targets are usually executed 
-    before and after some main targets. They are: 
-
-      -pre-init:                 called before initialization of project properties
-      -post-init:                called after initialization of project properties
-      -pre-compile:              called before javac compilation
-      -post-compile:             called after javac compilation
-      -pre-compile-single:       called before javac compilation of single file
-      -post-compile-single:      called after javac compilation of single file
-      -pre-compile-test:         called before javac compilation of JUnit tests
-      -post-compile-test:        called after javac compilation of JUnit tests
-      -pre-compile-test-single:  called before javac compilation of single JUnit test
-      -post-compile-test-single: called after javac compilation of single JUunit test
-      -pre-jar:                  called before JAR building
-      -post-jar:                 called after JAR building
-      -post-clean:               called after cleaning build products
-
-    (Targets beginning with '-' are not intended to be called on their own.)
-
-    Example of inserting an obfuscator after compilation could look like this:
-
-        <target name="-post-compile">
-            <obfuscate>
-                <fileset dir="${build.classes.dir}"/>
-            </obfuscate>
-        </target>
-
-    For list of available properties check the imported 
-    nbproject/build-impl.xml file. 
+		For list of available properties check the imported
+		nbproject/build-impl.xml file.
 
 
-    Another way to customize the build is by overriding existing main targets.
-    The targets of interest are: 
+		Another way to customize the build is by overriding existing main targets.
+		The targets of interest are:
 
-      -init-macrodef-javac:     defines macro for javac compilation
-      -init-macrodef-junit:     defines macro for junit execution
-      -init-macrodef-debug:     defines macro for class debugging
-      -init-macrodef-java:      defines macro for class execution
-      -do-jar-with-manifest:    JAR building (if you are using a manifest)
-      -do-jar-without-manifest: JAR building (if you are not using a manifest)
-      run:                      execution of project 
-      -javadoc-build:           Javadoc generation
-      test-report:              JUnit report generation
+			-init-macrodef-javac:     defines macro for javac compilation
+			-init-macrodef-junit:     defines macro for junit execution
+			-init-macrodef-debug:     defines macro for class debugging
+			-init-macrodef-java:      defines macro for class execution
+			-do-jar-with-manifest:    JAR building (if you are using a manifest)
+			-do-jar-without-manifest: JAR building (if you are not using a manifest)
+			run:                      execution of project
+			-javadoc-build:           Javadoc generation
+			test-report:              JUnit report generation
 
-    An example of overriding the target for project execution could look like this:
+		An example of overriding the target for project execution could look like this:
 
-        <target name="run" depends="JPeripheral-impl.jar">
-            <exec dir="bin" executable="launcher.exe">
-                <arg file="${dist.jar}"/>
-            </exec>
-        </target>
+				<target name="run" depends="JPeripheral-impl.jar">
+						<exec dir="bin" executable="launcher.exe">
+								<arg file="${dist.jar}"/>
+						</exec>
+				</target>
 
-    Notice that the overridden target depends on the jar target and not only on 
-    the compile target as the regular run target does. Again, for a list of available 
-    properties which you can use, check the target you are overriding in the
-    nbproject/build-impl.xml file. 
+		Notice that the overridden target depends on the jar target and not only on
+		the compile target as the regular run target does. Again, for a list of available
+		properties which you can use, check the target you are overriding in the
+		nbproject/build-impl.xml file.
 
-    -->
+	-->
 </project>

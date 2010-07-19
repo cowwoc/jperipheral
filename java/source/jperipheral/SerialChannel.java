@@ -45,7 +45,7 @@ import org.joda.time.Duration;
  */
 public class SerialChannel extends AsynchronousSerialChannel
 {
-	private final long nativeContext;
+	private final long nativeSerialPort;
 	private boolean closed;
 	private boolean readPending;
 	private boolean writePending;
@@ -53,11 +53,11 @@ public class SerialChannel extends AsynchronousSerialChannel
 	/**
 	 * Creates a new SerialChannel.
 	 *
-	 * @param nativeContext a pointer to the native context
+	 * @param nativeSerialPort a pointer to the native serial port object
 	 */
-	public SerialChannel(long nativeContext)
+	public SerialChannel(long nativeSerialPort)
 	{
-		this.nativeContext = nativeContext;
+		this.nativeSerialPort = nativeSerialPort;
 	}
 
 	@Override
@@ -66,10 +66,14 @@ public class SerialChannel extends AsynchronousSerialChannel
 	{
 		if (target.isReadOnly())
 			throw new IllegalArgumentException("target may not be read-only");
-		if (closed)
-			return new ClosedFuture();
-		if (readPending)
-			throw new ReadPendingException();
+		synchronized (this)
+		{
+			if (closed)
+				return new ClosedFuture();
+			if (readPending)
+				throw new ReadPendingException();
+			readPending = true;
+		}
 		if (target.remaining() <= 0)
 			return new NoOpFuture();
 		SerialFuture<Integer> result = new SerialFuture<Integer>(new Runnable()
@@ -83,9 +87,19 @@ public class SerialChannel extends AsynchronousSerialChannel
 				}
 			}
 		});
-		nativeRead(target, 0L, result);
-		readPending = true;
-		return result;
+		try
+		{
+			nativeRead(target, 0L, result);
+			return result;
+		}
+		catch (RuntimeException e)
+		{
+			synchronized (this)
+			{
+				readPending = false;
+			}
+			throw e;
+		}
 	}
 
 	@Override
@@ -95,40 +109,58 @@ public class SerialChannel extends AsynchronousSerialChannel
 	{
 		if (target.isReadOnly())
 			throw new IllegalArgumentException("target may not be read-only");
-		if (closed)
+		synchronized (this)
 		{
-			handler.failed(new ClosedChannelException(), attachment);
-			return;
+			if (closed)
+			{
+				handler.failed(new ClosedChannelException(), attachment);
+				return;
+			}
+			if (readPending)
+				throw new ReadPendingException();
+			readPending = true;
 		}
-		if (readPending)
-			throw new ReadPendingException();
 		if (target.remaining() <= 0)
 		{
 			handler.completed(0, attachment);
 			return;
 		}
-		nativeRead(target, TimeUnit.MILLISECONDS.convert(timeout, unit),
-			new NativeListenerToCompletionHandler<A>(handler, attachment, new Runnable()
+		try
 		{
-			@Override
-			public void run()
+			nativeRead(target, TimeUnit.MILLISECONDS.convert(timeout, unit),
+				new NativeListenerToCompletionHandler<A>(handler, attachment, new Runnable()
 			{
-				synchronized (SerialChannel.this)
+				@Override
+				public void run()
 				{
-					readPending = false;
+					synchronized (SerialChannel.this)
+					{
+						readPending = false;
+					}
 				}
+			}));
+		}
+		catch (RuntimeException e)
+		{
+			synchronized (this)
+			{
+				readPending = false;
 			}
-		}));
-		readPending = true;
+			throw e;
+		}
 	}
 
 	@Override
 	public synchronized Future<Integer> write(ByteBuffer source) throws WritePendingException
 	{
-		if (closed)
-			return new ClosedFuture();
-		if (writePending)
-			throw new WritePendingException();
+		synchronized (this)
+		{
+			if (closed)
+				return new ClosedFuture();
+			if (writePending)
+				throw new WritePendingException();
+			writePending = true;
+		}
 		if (source.remaining() <= 0)
 			return new NoOpFuture();
 		SerialFuture<Integer> result = new SerialFuture<Integer>(new Runnable()
@@ -142,9 +174,19 @@ public class SerialChannel extends AsynchronousSerialChannel
 				}
 			}
 		});
-		nativeWrite(source, 0L, result);
-		writePending = true;
-		return result;
+		try
+		{
+			nativeWrite(source, 0L, result);
+			return result;
+		}
+		catch (RuntimeException e)
+		{
+			synchronized (this)
+			{
+				writePending = false;
+			}
+			throw e;
+		}
 	}
 
 	@Override
@@ -152,31 +194,45 @@ public class SerialChannel extends AsynchronousSerialChannel
 																		 CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, WritePendingException, ShutdownChannelGroupException
 	{
-		if (closed)
+		synchronized (this)
 		{
-			handler.failed(new ClosedChannelException(), attachment);
-			return;
+			if (closed)
+			{
+				handler.failed(new ClosedChannelException(), attachment);
+				return;
+			}
+			if (writePending)
+				throw new WritePendingException();
+			writePending = true;
 		}
-		if (writePending)
-			throw new WritePendingException();
 		if (source.remaining() <= 0)
 		{
 			handler.completed(0, attachment);
 			return;
 		}
-		nativeWrite(source, TimeUnit.MILLISECONDS.convert(timeout, unit),
-			new NativeListenerToCompletionHandler<A>(handler, attachment, new Runnable()
+		try
 		{
-			@Override
-			public void run()
+			nativeWrite(source, TimeUnit.MILLISECONDS.convert(timeout, unit),
+				new NativeListenerToCompletionHandler<A>(handler, attachment, new Runnable()
 			{
-				synchronized (SerialChannel.this)
+				@Override
+				public void run()
 				{
-					writePending = false;
+					synchronized (SerialChannel.this)
+					{
+						writePending = false;
+					}
 				}
+			}));
+		}
+		catch (RuntimeException e)
+		{
+			synchronized (this)
+			{
+				readPending = false;
 			}
-		}));
-		writePending = true;
+			throw e;
+		}
 	}
 
 	@Override
@@ -219,18 +275,18 @@ public class SerialChannel extends AsynchronousSerialChannel
 	private static interface NativeListener
 	{
 		/**
-		 * Sets the native context.
+		 * Sets the the user object associated with the listener.
 		 * 
-		 * @param context the native context
+		 * @param userObject a pointer to the user object
 		 */
-		void setNativeContext(long context);
+		void setUserObject(long userObject);
 
 		/**
-		 * Returns the native context.
+		 * Returns the user object associated with the listener.
 		 *
-		 * @return the native context
+		 * @return the pointer to the user object
 		 */
-		long getNativeContext();
+		long getUserObject();
 
 		/**
 		 * Invoked if the operation completed successfully.
@@ -310,7 +366,8 @@ public class SerialChannel extends AsynchronousSerialChannel
 		 * @param attachment the attachment associated with the CompletionHandler
 		 * @param onDone the Runnable to invoke when the operation completes
 		 */
-		public NativeListenerToCompletionHandler(CompletionHandler<Integer, ? super A> handler, A attachment,
+		public NativeListenerToCompletionHandler(CompletionHandler<Integer, ? super A> handler,
+																						 A attachment,
 																						 Runnable onDone)
 		{
 			this.handler = handler;
@@ -340,12 +397,12 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 
 		@Override
-		public void setNativeContext(long context)
+		public void setUserObject(long userObject)
 		{
 		}
 
 		@Override
-		public long getNativeContext()
+		public long getUserObject()
 		{
 			throw new AssertionError("Never used by native code");
 		}
@@ -359,7 +416,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 	 */
 	private static class SerialFuture<A> implements Future<Integer>, NativeListener
 	{
-		private long nativeContext;
+		private long userObject;
 		private Integer value;
 		private Throwable throwable;
 		private boolean done;
@@ -427,7 +484,8 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 
 		@Override
-		public synchronized Integer get() throws CancellationException, InterruptedException, ExecutionException
+		public synchronized Integer get() throws CancellationException, InterruptedException,
+																						 ExecutionException
 		{
 			while (!done)
 				wait();
@@ -441,9 +499,11 @@ public class SerialChannel extends AsynchronousSerialChannel
 		@Override
 		public synchronized Integer get(long timeout, TimeUnit unit) throws CancellationException,
 																																				InterruptedException,
-																																				ExecutionException, TimeoutException
+																																				ExecutionException,
+																																				TimeoutException
 		{
-			DateTime endTime = new DateTime().plus(new Duration(TimeUnit.MILLISECONDS.convert(timeout, unit)));
+			DateTime endTime = new DateTime().plus(new Duration(TimeUnit.MILLISECONDS.convert(timeout,
+				unit)));
 			boolean timeoutOccured = false;
 			while (!done)
 			{
@@ -504,15 +564,15 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 
 		@Override
-		public void setNativeContext(long context)
+		public void setUserObject(long userObject)
 		{
-			this.nativeContext = context;
+			this.userObject = userObject;
 		}
 
 		@Override
-		public long getNativeContext()
+		public long getUserObject()
 		{
-			return nativeContext;
+			return userObject;
 		}
 
 		/**

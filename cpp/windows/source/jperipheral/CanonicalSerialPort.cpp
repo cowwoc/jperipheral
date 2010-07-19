@@ -14,6 +14,9 @@ using jace::proxy::jperipheral::PeripheralNotFoundException;
 #include "jace/proxy/jperipheral/PeripheralInUseException.h"
 using jace::proxy::jperipheral::PeripheralInUseException;
 
+#include "jace/proxy/java/lang/Throwable.h"
+using jace::proxy::java::lang::Throwable;
+
 #include "jace/proxy/jperipheral/WindowsOS.h"
 
 #include "jace/proxy/java/lang/AssertionError.h"
@@ -25,7 +28,7 @@ using jace::proxy::java::io::IOException;
 #include "jace/proxy/java/nio/ByteBuffer.h"
 using jace::proxy::java::nio::ByteBuffer;
 
-#include "jace/javacast.h"
+#include "jace/Jace.h"
 using jace::java_cast;
 
 #include <string>
@@ -67,34 +70,46 @@ JLong CanonicalSerialPort::nativeOpen(String name, String path)
 		switch (errorCode)
 		{
 			case ERROR_FILE_NOT_FOUND:
-				throw PeripheralNotFoundException(name, 0);
+				throw PeripheralNotFoundException(jace::java_new<PeripheralNotFoundException>(name, Throwable()));
 			case ERROR_ACCESS_DENIED:
-				throw PeripheralInUseException(name, 0);
+				throw PeripheralInUseException(jace::java_new<PeripheralInUseException>(name, Throwable()));
 			default:
-				throw IOException(L"CreateFile() failed with error: " + getErrorMessage(GetLastError()));
+			{
+				throw IOException(jace::java_new<IOException>(L"CreateFile() failed with error: " + 
+					getErrorMessage(GetLastError())));
+			}
 		}
 	}
 
-	// Associate the file handle with the completion port
-	CompletionPortContext* context = getCompletionPortContext(java_cast<jace::proxy::jperipheral::WindowsOS>(os()));
-	SerialPortContext* result = new SerialPortContext(port);
+	// Associate the file handle with the existing completion port
+	CompletionPortContext* context = getCompletionPortContext(
+		java_cast<jace::proxy::jperipheral::WindowsOS>(os()));
 	HANDLE completionPort = CreateIoCompletionPort(port, context->completionPort, IoTask::COMPLETION, 0);
 	if (completionPort==0)
-		throw AssertionError(L"CreateIoCompletionPort() failed with error: " + getErrorMessage(GetLastError()));
+	{
+		throw AssertionError(jace::java_new<AssertionError>(L"CreateIoCompletionPort() failed with error: " + 
+			getErrorMessage(GetLastError())));
+	}
+
+	// Bind the native serial port to Java serial port
+	SerialPortContext* result = new SerialPortContext(port);
 	return reinterpret_cast<intptr_t>(result);
 }
 
 void CanonicalSerialPort::nativeConfigure(JInt baudRate,
-																 SerialPort_DataBits dataBits,
-																 SerialPort_Parity parity,
-																 SerialPort_StopBits stopBits,
-																 SerialPort_FlowControl flowControl)
+																					SerialPort_DataBits dataBits,
+																					SerialPort_Parity parity,
+																					SerialPort_StopBits stopBits,
+																					SerialPort_FlowControl flowControl)
 {
 	SerialPortContext* context = getContext(getJaceProxy());
 	DCB dcb = {0};
 	
 	if (!GetCommState(context->port, &dcb))
-		throw IOException(L"GetCommState() failed with error: " + getErrorMessage(GetLastError()));
+	{
+		throw IOException(jace::java_new<IOException>(L"GetCommState() failed with error: " + 
+			getErrorMessage(GetLastError())));
+	}
 	dcb.BaudRate = baudRate;
 
 	if (dataBits.equals(dataBits.FIVE()))
@@ -105,7 +120,7 @@ void CanonicalSerialPort::nativeConfigure(JInt baudRate,
 		dcb.ByteSize = 7;
 	else if (dataBits.equals(dataBits.EIGHT()))
 		dcb.ByteSize = 8;
-	else throw AssertionError(dataBits);
+	else throw AssertionError(jace::java_new<AssertionError>(dataBits));
 
 	if (parity.equals(SerialPort_Parity::EVEN()))
 	{
@@ -132,7 +147,7 @@ void CanonicalSerialPort::nativeConfigure(JInt baudRate,
 		dcb.fParity = true;
 		dcb.Parity = SPACEPARITY;
 	}
-	else throw AssertionError(parity);
+	else throw AssertionError(jace::java_new<AssertionError>(parity));
 
 	if (stopBits.equals(SerialPort_StopBits::ONE()))
 		dcb.StopBits = ONESTOPBIT;
@@ -141,7 +156,7 @@ void CanonicalSerialPort::nativeConfigure(JInt baudRate,
 	else if (stopBits.equals(SerialPort_StopBits::TWO()))
 		dcb.StopBits = TWOSTOPBITS;
 	else
-		throw AssertionError(stopBits);
+		throw AssertionError(jace::java_new<AssertionError>(stopBits));
 
 	dcb.fOutxDsrFlow = 0;
 	dcb.fDtrControl = DTR_CONTROL_ENABLE;
@@ -169,10 +184,13 @@ void CanonicalSerialPort::nativeConfigure(JInt baudRate,
 		// do nothing
 	}
 	else
-		throw AssertionError(flowControl);
+		throw AssertionError(jace::java_new<AssertionError>(flowControl));
 
 	if (!SetCommState(context->port, &dcb))
-		throw IOException(L"SetCommState() failed with error: " + getErrorMessage(GetLastError()));
+	{
+		throw IOException(jace::java_new<IOException>(L"SetCommState() failed with error: " + 
+			getErrorMessage(GetLastError())));
+	}
 }
 
 void CanonicalSerialPort::printStatus()
@@ -184,7 +202,10 @@ void CanonicalSerialPort::printStatus()
   // Get and clear current errors on the port.
 	SerialPortContext* context = getContext(getJaceProxy());
   if (!ClearCommError(context->port, &errors, &comStat))
-		throw IOException(L"ClearCommError() failed with error: " + getErrorMessage(GetLastError()));
+	{
+		throw IOException(jace::java_new<IOException>(L"ClearCommError() failed with error: " + 
+			getErrorMessage(GetLastError())));
+	}
 
   // Get error flags.
   fDNS = errors & CE_DNS;
@@ -233,5 +254,4 @@ void CanonicalSerialPort::nativeClose()
 {
 	SerialPortContext* context = getContext(getJaceProxy());
 	delete context;
-	jace::helper::detach();
 }

@@ -1,7 +1,7 @@
 #include "jace/peer/jperipheral/WindowsOS.h"
 using jace::peer::jperipheral::WindowsOS;
 using jace::proxy::types::JLong;
-using jace::helper::toWString;
+using jace::toWString;
 
 #include "jace/proxy/java/lang/AssertionError.h"
 using jace::proxy::java::lang::AssertionError;
@@ -49,8 +49,6 @@ static void CompletionHandler(CompletionPortContext& context)
 	ULONG_PTR completionKey;
 	OVERLAPPED* overlapped;
 
-	// BUG: https://svn.boost.org/trac/boost/ticket/2739
-	boost::this_thread::at_thread_exit(boost::bind(&WindowsOS::nativeDispose, boost::ref(context.windowsOS)));
 	{
 		boost::mutex::scoped_lock lock(context.lock);
 		context.running.notify_one();
@@ -62,29 +60,25 @@ static void CompletionHandler(CompletionPortContext& context)
 		{
 			DWORD errorCode = GetLastError();
 			IoTask* task = IoTask::fromOverlapped(overlapped);
-			Integer bytesTransferredAsInteger = Integer::valueOf(bytesTransfered);
 
 			switch (errorCode)
 			{
 				case ERROR_HANDLE_EOF:
-				{
-					bytesTransferredAsInteger = Integer::valueOf(-1);
-					jace::helper::detach();
 					break;
-				}
 				case ERROR_OPERATION_ABORTED:
 				{
+					// Triggered by CancelIo()
 					task->listener->onCancellation();
-					delete task;
-					jace::helper::detach();
+					task->workerThread.deleteTask(task);
+					jace::detach();
 					break;
 				}
 				default:
 				{
-					task->listener->onFailure(IOException(L"GetQueuedCompletionStatus() failed with error: " + 
-						getErrorMessage(errorCode)));
-					delete task;
-					jace::helper::detach();
+					task->listener->onFailure(IOException(jace::java_new<IOException>(
+						L"GetQueuedCompletionStatus() failed with error: " + getErrorMessage(errorCode))));
+					task->workerThread.deleteTask(task);
+					jace::detach();
 					break;
 				}
 			}
@@ -104,7 +98,6 @@ static void CompletionHandler(CompletionPortContext& context)
 							// Premature timeout caused by the fact that SerialPort_Channel.setReadTimeout() cannot
 							// "wait forever". Repeat the operation.
 							task->run();
-							jace::helper::detach();
 							continue;
 						}
 						try
@@ -117,8 +110,8 @@ static void CompletionHandler(CompletionPortContext& context)
 							cerr << __FILE__ << ":" << __LINE__ << endl;
 							t.printStackTrace();
 						}
-						delete task;
-						jace::helper::detach();
+						task->workerThread.deleteTask(task);
+						jace::detach();
 						break;
 					}
 					try
@@ -132,8 +125,8 @@ static void CompletionHandler(CompletionPortContext& context)
 						cerr << __FILE__ << ":" << __LINE__ << endl;
 						t.printStackTrace();
 					}
-					delete task;
-					jace::helper::detach();
+					task->workerThread.deleteTask(task);
+					jace::detach();
 					break;
 				}
 				case IoTask::SHUTDOWN:
@@ -141,14 +134,14 @@ static void CompletionHandler(CompletionPortContext& context)
 					//
 					// Someone used PostQueuedCompletionStatus() to post an I/O packet with a shutdown CompletionKey.
 					//
-					jace::helper::detach();
 					return;
 				}
 				default:
 				{
-					task->listener->onFailure(AssertionError(String(wstring(L"completionKey==") + toWString(completionKey))));
-					delete task;
-					jace::helper::detach();
+					task->listener->onFailure(AssertionError(jace::java_new<AssertionError>(
+						wstring(L"completionKey==") + toWString(completionKey))));
+					task->workerThread.deleteTask(task);
+					jace::detach();
 					break;
 				}
 			}
@@ -163,8 +156,8 @@ CompletionPortContext::CompletionPortContext(jace::peer::jperipheral::WindowsOS 
 	// the use of multiple threads.
 	completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
 	if (completionPort==0)
-		throw AssertionError(String(L"CreateIoCompletionPort() failed with error: " + getErrorMessage(GetLastError())));
-
+		throw AssertionError(jace::java_new<AssertionError>(L"CreateIoCompletionPort() failed with error: " + getErrorMessage(GetLastError())));
+	
 	boost::mutex::scoped_lock lock(this->lock);
 	thread = new boost::thread(boost::bind(&CompletionHandler, boost::ref(*this)));
 	running.wait(lock);
@@ -174,18 +167,22 @@ CompletionPortContext::~CompletionPortContext()
 {
 	if (!PostQueuedCompletionStatus(completionPort, 0, IoTask::SHUTDOWN, 0))
 	{
-		throw IOException(getSourceCodePosition(WIDEN(__FILE__), __LINE__) + 
-			L" PostQueuedCompletionStatus() failed with error: " + getErrorMessage(GetLastError()));
+		throw IOException(jace::java_new<IOException>(getSourceCodePosition(WIDEN(__FILE__), __LINE__) + 
+			L" PostQueuedCompletionStatus() failed with error: " + getErrorMessage(GetLastError())));
 	}
 	thread->join();
 	delete thread;
 	if (!CloseHandle(completionPort))
-		throw IOException(L"CloseHandle(completionPort) failed with error: " + getErrorMessage(GetLastError()));
+	{
+		throw IOException(jace::java_new<IOException>(L"CloseHandle(completionPort) failed with error: " + 
+			getErrorMessage(GetLastError())));
+	}
 }
 
 JLong WindowsOS::nativeInitialize()
 {
-	return reinterpret_cast<intptr_t>(new CompletionPortContext(*this));
+	CompletionPortContext* context = new CompletionPortContext(*this);
+	return reinterpret_cast<intptr_t>(context);
 }
 
 void WindowsOS::nativeDispose()

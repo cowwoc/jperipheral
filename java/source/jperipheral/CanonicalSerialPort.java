@@ -19,9 +19,9 @@ final class CanonicalSerialPort implements SerialPort, ReferenceCounted<IOExcept
 	private final String name;
 	private final OperatingSystem os;
 	/**
-	 * The native context associated with the object.
+	 * A pointer to the native object.
 	 */
-	private final long nativeContext;
+	private final long nativeObject;
 	private final SerialChannel channel;
 	private final ExecutorService executor = Executors.newSingleThreadExecutor();
 	private int baudRate;
@@ -52,18 +52,14 @@ final class CanonicalSerialPort implements SerialPort, ReferenceCounted<IOExcept
 		this.os = os;
 		try
 		{
-			this.nativeContext = nativeOpen(name, os.getPortPath(name));
-			this.channel = new SerialChannel(nativeContext);
+			this.nativeObject = nativeOpen(name, os.getPortPath(name));
+			this.channel = new SerialChannel(nativeObject);
 		}
 		catch (PeripheralNotFoundException e)
 		{
 			throw e;
 		}
 		catch (PeripheralInUseException e)
-		{
-			throw e;
-		}
-		catch (RuntimeException e)
 		{
 			throw e;
 		}
@@ -89,51 +85,31 @@ final class CanonicalSerialPort implements SerialPort, ReferenceCounted<IOExcept
 		listeners.remove(listener);
 	}
 
-	/**
-	 * Returns the baud rate being used.
-	 *
-	 * @return the baud rate being used
-	 */
+	@Override
 	public int getBaudRate()
 	{
 		return baudRate;
 	}
 
-	/**
-	 * Returns the number of data bits being used.
-	 *
-	 * @return the number of data bits being used
-	 */
+	@Override
 	public DataBits getDataBits()
 	{
 		return dataBits;
 	}
 
-	/**
-	 * Returns the number of stop bits being used.
-	 *
-	 * @return the number of stop bits being used
-	 */
+	@Override
 	public StopBits getStopBits()
 	{
 		return stopBits;
 	}
 
-	/**
-	 * Returns the parity type being used.
-	 *
-	 * @return the parity type being used
-	 */
+	@Override
 	public Parity getParity()
 	{
 		return parity;
 	}
 
-	/**
-	 * Returns the flow control mechanism being used.
-	 * 
-	 * @return the flow control mechanism being used
-	 */
+	@Override
 	public FlowControl getFlowControl()
 	{
 		return flowControl;
@@ -145,16 +121,7 @@ final class CanonicalSerialPort implements SerialPort, ReferenceCounted<IOExcept
 		return channel;
 	}
 
-	/**
-	 * Sets the port configuration.
-	 *
-	 * @param baudRate the baud rate
-	 * @param dataBits the number of data bits per word
-	 * @param parity the parity mechanism to use
-	 * @param stopBits the number of stop bits to use
-	 * @param flowControl the flow control to use
-	 * @throws IOException if an I/O error occurs
-	 */
+	@Override
 	public void configure(int baudRate, DataBits dataBits, Parity parity, StopBits stopBits,
 												FlowControl flowControl) throws IOException
 	{
@@ -212,6 +179,7 @@ final class CanonicalSerialPort implements SerialPort, ReferenceCounted<IOExcept
 		});
 	}
 
+	@Override
 	public synchronized void beforeReferenceAdded()
 	{
 		if (references == Integer.MAX_VALUE)
@@ -229,6 +197,7 @@ final class CanonicalSerialPort implements SerialPort, ReferenceCounted<IOExcept
 		}
 	}
 
+	@Override
 	public synchronized void afterReferenceRemoved() throws IOException
 	{
 		if (closed)
@@ -248,6 +217,7 @@ final class CanonicalSerialPort implements SerialPort, ReferenceCounted<IOExcept
 		}
 	}
 
+	@Override
 	public synchronized boolean isClosed()
 	{
 		return closed;
@@ -258,6 +228,7 @@ final class CanonicalSerialPort implements SerialPort, ReferenceCounted<IOExcept
 	 *
 	 * @throws IOException if an I/O error occurs
 	 */
+	@Override
 	public synchronized void close() throws IOException
 	{
 		if (closed)
@@ -277,8 +248,8 @@ final class CanonicalSerialPort implements SerialPort, ReferenceCounted<IOExcept
 	 * @throws PeripheralNotFoundException if the comport does not exist
 	 * @throws PeripheralInUseException if the comport is locked by another application
 	 */
-	public native long nativeOpen(String name, String path) throws PeripheralNotFoundException,
-																																 PeripheralInUseException;
+	private native long nativeOpen(String name, String path) throws PeripheralNotFoundException,
+																																	PeripheralInUseException;
 
 	/**
 	 * DESIGN: We can't expose this method until we verify whether it is available on other platforms.
@@ -308,6 +279,7 @@ final class CanonicalSerialPort implements SerialPort, ReferenceCounted<IOExcept
 	@Override
 	public String toString()
 	{
-		return name + "[" + baudRate + " " + dataBits + "-" + parity + "-" + stopBits + " " + flowControl + "]";
+		return name + "[" + baudRate + " " + dataBits + "-" + parity + "-" + stopBits + " "
+					 + flowControl + "]";
 	}
 }

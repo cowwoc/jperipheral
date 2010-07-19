@@ -67,7 +67,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="jace.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\msvc\i386\debug&quot;;&quot;$(BOOST_HOME)\stage32\lib&quot;"
+				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\windows\i386\$(ConfigurationName)&quot;;&quot;$(BOOST_HOME)\stage32\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				TargetMachine="1"
@@ -92,7 +92,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="xcopy &quot;$(JACE_HOME)\lib\msvc\i386\debug\*.dll&quot; &quot;$(OutDir)&quot; /y"
+				CommandLine="xcopy &quot;$(JACE_HOME)\lib\windows\i386\$(ConfigurationName)\*.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 		<Configuration
@@ -144,7 +144,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="jace.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\msvc\amd64\debug&quot;;&quot;$(BOOST_HOME)\stage64\lib&quot;"
+				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\windows\amd64\$(ConfigurationName)&quot;;&quot;$(BOOST_HOME)\stage64\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				TargetMachine="17"
@@ -169,7 +169,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="xcopy &quot;$(JACE_HOME)\lib\msvc\amd64\debug\*.dll&quot; &quot;$(OutDir)&quot; /y"
+				CommandLine="xcopy &quot;$(JACE_HOME)\lib\windows\amd64\$(ConfigurationName)\*.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 		<Configuration
@@ -222,7 +222,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="jace.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\msvc\i386\release&quot;;&quot;$(BOOST_HOME)\stage32\lib&quot;"
+				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\windows\i386\$(ConfigurationName)&quot;;&quot;$(BOOST_HOME)\stage32\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -249,7 +249,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="xcopy &quot;$(JACE_HOME)\lib\msvc\i386\release\*.dll&quot; &quot;$(OutDir)&quot; /y"
+				CommandLine="xcopy &quot;$(JACE_HOME)\lib\windows\i386\$(ConfigurationName)\*.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 		<Configuration
@@ -303,7 +303,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="jace.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\msvc\amd64\release&quot;;&quot;$(BOOST_HOME)\stage64\lib&quot;"
+				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\windows\amd64\$(ConfigurationName)&quot;;&quot;$(BOOST_HOME)\stage64\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -330,7 +330,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="xcopy &quot;$(JACE_HOME)\lib\msvc\amd64\release\*.dll&quot; &quot;$(OutDir)&quot; /y"
+				CommandLine="xcopy &quot;$(JACE_HOME)\lib\windows\amd64\$(ConfigurationName)\*.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 	</Configurations>
@@ -723,19 +723,7 @@
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\IllegalArgumentException.cpp"
-								>
-							</File>
-							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\IllegalStateException.cpp"
-								>
-							</File>
-							<File
 								RelativePath="..\..\source\jace\proxy\java\lang\Integer.cpp"
-								>
-							</File>
-							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\InterruptedException.cpp"
 								>
 							</File>
 							<File
@@ -818,14 +806,6 @@
 								Name="concurrent"
 								>
 								<File
-									RelativePath="..\..\source\jace\proxy\java\util\concurrent\CancellationException.cpp"
-									>
-								</File>
-								<File
-									RelativePath="..\..\source\jace\proxy\java\util\concurrent\ExecutionException.cpp"
-									>
-								</File>
-								<File
 									RelativePath="..\..\source\jace\proxy\java\util\concurrent\Executor.cpp"
 									>
 								</File>
@@ -835,10 +815,6 @@
 								</File>
 								<File
 									RelativePath="..\..\source\jace\proxy\java\util\concurrent\Future.cpp"
-									>
-								</File>
-								<File
-									RelativePath="..\..\source\jace\proxy\java\util\concurrent\TimeoutException.cpp"
 									>
 								</File>
 								<File

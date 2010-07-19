@@ -1,5 +1,7 @@
 package jperipheral;
 
+import com.google.inject.Singleton;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -10,6 +12,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Gili Tzabari
  */
+@Singleton
 public final class Peripherals
 {
 	private final Logger log = LoggerFactory.getLogger(Peripherals.class);

@@ -39,6 +39,8 @@
 		<property name="project.path" location="${build.classes.dir}/../../../../"/>
 		<property environment="env"/>
 		<property name="native.compiler.path" value="${env.VS90COMNTOOLS}/../IDE"/>
+		<property name="os" value="windows"/>
+		<property name="compiler" value="msvc"/>
 	</target>
 
 	<target name="-post-compile" depends="compile.native, package"/>
@@ -46,7 +48,7 @@
 	<target name="compile.native" depends="generate.cpp" description="Compiles native components">
 		<exec executable="${native.compiler.path}/devenv.com" failonerror="true">
 			<arg line="/build ${msvc.config}"/>
-			<arg file="${project.path}/cpp/build/${platform.path}/msvc/JPeripheral.sln"/>
+			<arg file="${project.path}/cpp/build/${platform.path}/${compiler}/JPeripheral.sln"/>
 		</exec>
 	</target>
 
@@ -134,15 +136,35 @@
 		</condition>
 		<copy todir="${project.path}/build/${platform.path}" failonerror="true">
 			<fileset file="${env.JACE_HOME}/lib/jace-runtime.jar"/>
-			<fileset dir="${env.JACE_HOME}/lib/msvc/${platform.path}">
+			<fileset dir="${env.JACE_HOME}/lib/${os}/${platform.path}">
 				<include name="jace.pdb" if="building.debug"/>
 			</fileset>
 		</copy>
 		<copy todir="${project.path}/build/${platform.path}" failonerror="true">
-			<fileset dir="${project.path}/cpp/build/${platform.path}/msvc/${platform.path}">
+			<fileset dir="${project.path}/cpp/build/${platform.path}/${compiler}/${platform.path}">
 				<include name="*.dll"/>
 				<include name="*.exe"/>
 				<include name="*.pdb" if="building.debug"/>
+			</fileset>
+		</copy>
+		<copy todir="${project.path}/build/${platform.path}" failonerror="true">
+			<fileset dir="${project.path}/java/libraries/google-collections" includes="google-collect-*.jar"/>
+			<fileset dir="${project.path}/java/libraries/guice">
+				<include name="aopalliance.jar"/>
+				<include name="guice-*.jar"/>
+				<exclude name="guice-*-source.jar"/>
+				<include name="guice-assistedinject-*.jar"/>
+			</fileset>
+			<fileset dir="${project.path}/java/libraries/joda-time">
+				<include name="joda-time-*.jar"/>
+				<exclude name="joda-time-*-sources.jar"/>
+			</fileset>
+			<fileset dir="${project.path}/java/libraries/slf4j" includes="slf4j-api-1.5.6.jar"/>
+			<fileset dir="${project.path}/java/libraries/logback">
+				<include name="logback-classic-*.jar"/>
+				<exclude name="logback-classic-*-sources.jar"/>
+				<include name="logback-core-*.jar"/>
+				<exclude name="logback-core-*-sources.jar"/>
 			</fileset>
 		</copy>
 		<jar destfile="${project.path}/build/${platform.path}/JPeripheral.jar"

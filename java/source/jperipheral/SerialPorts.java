@@ -44,6 +44,7 @@ public class SerialPorts implements SerialPortProvider
 		this.os = os;
 	}
 
+	@Override
 	public SerialPort getByName(final String name)
 		throws IllegalArgumentException, PeripheralNotFoundException, PeripheralInUseException
 	{

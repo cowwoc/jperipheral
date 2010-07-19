@@ -25,6 +25,10 @@ using jace::proxy::java::nio::ByteBuffer;
 #include <string>
 using std::string;
 
+#include <iostream>
+using std::cerr;
+using std::endl;
+
 #pragma warning(push)
 #pragma warning(disable: 4103 4244 4512)
 #include <boost/thread/mutex.hpp>
@@ -34,8 +38,8 @@ using std::string;
 class CancelTask: public IoTask
 {
 public:
-	CancelTask(WorkerThread& thread, HANDLE port, SerialChannel_NativeListener future): 
-		IoTask(thread, port)
+	CancelTask(WorkerThread& workerThread, HANDLE port, SerialChannel_NativeListener future): 
+		IoTask(workerThread, port)
 	{
 		setListener(new SerialChannel_NativeListener(future));
 	}
@@ -46,7 +50,10 @@ public:
 	virtual bool run()
 	{
 		if (!CancelIo(port))
-			listener->onFailure(IOException(L"CancelIo() failed with error: " + getErrorMessage(GetLastError())));
+		{
+			listener->onFailure(IOException(jace::java_new<IOException>(L"CancelIo() failed with error: " +
+			  getErrorMessage(GetLastError()))));
+		}
 		return false;
 	}
 };
@@ -55,9 +62,9 @@ void SerialChannel_SerialFuture::nativeCancel()
 {
 	IoTask* context = getContext(getJaceProxy());
 	{
-		boost::mutex::scoped_lock lock(context->thread.lock);
-		CancelTask* task = new CancelTask(context->thread, context->port, getJaceProxy());
-		task->thread.workload = task;
-		task->thread.workloadChanged.notify_one();
+		boost::mutex::scoped_lock lock(context->workerThread.mutex);
+		CancelTask* task = new CancelTask(context->workerThread, context->port, getJaceProxy());
+		task->workerThread.task = task;
+		task->workerThread.taskChanged.notify_one();
 	}
 }

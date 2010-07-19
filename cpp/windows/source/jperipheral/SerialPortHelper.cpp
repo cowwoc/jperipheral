@@ -23,6 +23,9 @@ using jace::proxy::jperipheral::SerialChannel_SerialFuture;
 #include "jace/proxy/java/lang/AssertionError.h"
 using jace::proxy::java::lang::AssertionError;
 
+#include "jace/proxy/java/lang/RuntimeException.h"
+using jace::proxy::java::lang::RuntimeException;
+
 #include "jace/proxy/java/lang/String.h"
 using jace::proxy::java::lang::String;
 
@@ -35,17 +38,18 @@ using jace::proxy::java::nio::ByteBuffer;
 #include "jace/proxy/jperipheral/OperatingSystem.h"
 using ::jace::proxy::jperipheral::OperatingSystem;
 
-#include "jace/javacast.h"
-using jace::java_cast;
-
-#include "jace/JNIHelper.h"
-using jace::helper::toWString;
+#include "jace/Jace.h"
+using jace::toWString;
 
 #include <string>
 using std::wstring;
 
 #include <sstream>
 using std::stringstream;
+
+#include <iostream>
+using std::cerr;
+using std::endl;
 
 #pragma warning(push)
 #pragma warning(disable: 4103 4244 4512)
@@ -57,26 +61,26 @@ using std::stringstream;
 
 SerialPortContext* jperipheral::getContext(CanonicalSerialPort serialPort)
 {
-	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(serialPort.nativeContext()));
+	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(serialPort.nativeObject()));
 }
 
 SerialPortContext* jperipheral::getContext(SerialChannel channel)
 {
-	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(channel.nativeContext()));
+	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(channel.nativeSerialPort()));
 }
 
 IoTask* jperipheral::getContext(SerialChannel_SerialFuture future)
 {
-	return reinterpret_cast<IoTask*>(static_cast<intptr_t>(future.getNativeContext()));
+	return reinterpret_cast<IoTask*>(static_cast<intptr_t>(future.userObject()));
 }
 
 CompletionPortContext* jperipheral::getCompletionPortContext(WindowsOS windows)
 {
-	return reinterpret_cast<CompletionPortContext*>(static_cast<intptr_t>(windows.nativeContext()));
+	return reinterpret_cast<CompletionPortContext*>(static_cast<intptr_t>(windows.nativeObject()));
 }
 
-IoTask::IoTask(WorkerThread& _thread, HANDLE _port):
-  thread(_thread), port(_port), timeout(0), nativeBuffer(0), javaBuffer(0), listener(0)
+IoTask::IoTask(WorkerThread& _workerThread, HANDLE _port):
+  workerThread(_workerThread), port(_port), timeout(0), nativeBuffer(0), javaBuffer(0), listener(0)
 {
 	memset(&overlapped, 0, sizeof(OVERLAPPED));
 }
@@ -94,7 +98,7 @@ void IoTask::setTimeout(DWORD _timeout)
 void IoTask::setListener(::jace::proxy::jperipheral::SerialChannel_NativeListener* _listener)
 {
 	listener = _listener;
-	listener->setNativeContext(reinterpret_cast<intptr_t>(this));
+	listener->setUserObject(reinterpret_cast<intptr_t>(this));
 }
 
 IoTask::~IoTask()
@@ -116,22 +120,42 @@ IoTask* IoTask::fromOverlapped(OVERLAPPED* overlapped)
 
 static void WorkHandler(WorkerThread& context)
 {
-	boost::mutex::scoped_lock lock(context.lock);
+	boost::mutex::scoped_lock lock(context.mutex);
 	context.running.notify_one();
-	while (!context.shutdownRequested)
+	try
 	{
-		context.workloadChanged.wait(lock);
-		if (!context.workload->run())
-			delete context.workload;
-		context.workload = 0;
+		while (!context.shutdownRequested)
+		{
+			context.taskChanged.wait(lock);
+			if (!context.task->run())
+			{
+				context.taskDone.notify_one();
+				context.pendingTasks.remove(context.task);
+				delete context.task;
+			}
+			context.task = 0;
+		}
+		assert (context.task == 0);
 	}
-	jace::helper::detach();
+  catch (jace::proxy::java::lang::Throwable& t)
+  {
+		JNIEnv* env = jace::attach();
+    env->Throw(static_cast<jthrowable>(env->NewLocalRef(t)));
+  }
+  catch (std::exception& e)
+  {
+    std::string msg = std::string("An unexpected JNI error has occurred: ") + e.what();
+    RuntimeException ex(jace::java_new<RuntimeException>(msg));
+		JNIEnv* env = jace::attach();
+    env->Throw(static_cast<jthrowable>(env->NewLocalRef(ex)));
+  }
+	jace::detach();
 };
 
 WorkerThread::WorkerThread():
-	workload(0), shutdownRequested(false), taskPending(false)
+	task(0), shutdownRequested(false)
 {
-	boost::mutex::scoped_lock lock(this->lock);
+	boost::mutex::scoped_lock lock(mutex);
 	thread = new boost::thread(boost::bind(&WorkHandler, boost::ref(*this)));
 	// If we don't wait, the worker thread may miss condition notification
 	running.wait(lock);
@@ -141,7 +165,15 @@ WorkerThread::~WorkerThread()
 {
 	thread->join();
 	delete thread;
-	delete workload;
+	delete task;
+}
+
+void WorkerThread::deleteTask(IoTask* task)
+{
+	boost::mutex::scoped_lock lock(mutex);
+	taskDone.notify_one();
+	pendingTasks.remove(task);
+	delete task;
 }
 
 SerialPortContext::SerialPortContext(HANDLE _port):
@@ -151,8 +183,8 @@ SerialPortContext::SerialPortContext(HANDLE _port):
 class ShutdownTask: public IoTask
 {
 public:
-	ShutdownTask(WorkerThread& _thread, HANDLE _port): 
-		IoTask(_thread, _port)
+	ShutdownTask(WorkerThread& workerThread, HANDLE _port): 
+		IoTask(workerThread, _port)
 	{}
 
 	virtual void updateJavaBuffer(int)
@@ -160,14 +192,18 @@ public:
 
 	virtual bool run()
 	{
-		// Wait for the task to complete
-		if (thread.taskPending)
+		// Wait for ongoing tasks to complete
+		if (!workerThread.pendingTasks.empty())
 		{
 			if (!CancelIo(port))
-				throw IOException(L"CancelIo() failed with error: " + getErrorMessage(GetLastError()));
-			thread.taskDone.wait(thread.lock);
+			{
+				throw IOException(jace::java_new<IOException>(L"CancelIo() failed with error: " + 
+				  getErrorMessage(GetLastError())));
+			}
+			while (!workerThread.pendingTasks.empty())
+				workerThread.taskDone.wait(workerThread.mutex);
 		}
-		thread.shutdownRequested = true;
+		workerThread.shutdownRequested = true;
 		return false;
 	}
 };
@@ -175,19 +211,21 @@ public:
 SerialPortContext::~SerialPortContext()
 {
 	{
-		boost::mutex::scoped_lock lock(readThread.lock);
+		boost::mutex::scoped_lock lock(readThread.mutex);
 		ShutdownTask* task = new ShutdownTask(readThread, port);
-		task->thread.workload = task;
-		task->thread.workloadChanged.notify_one();
+		task->workerThread.task = task;
+		task->workerThread.taskChanged.notify_one();
 	}
 	{
-		boost::mutex::scoped_lock lock(writeThread.lock);
+		boost::mutex::scoped_lock lock(writeThread.mutex);
 		ShutdownTask* task = new ShutdownTask(writeThread, port);
-		task->thread.workload = task;
-		task->thread.workloadChanged.notify_one();
+		task->workerThread.task = task;
+		task->workerThread.taskChanged.notify_one();
 	}
+	readThread.thread->join();
+	writeThread.thread->join();
 	if (!CloseHandle(port))
-		throw IOException(L"CloseHandle() failed with error: " + getErrorMessage(GetLastError()));
+		throw IOException(jace::java_new<IOException>(L"CloseHandle() failed with error: " + getErrorMessage(GetLastError())));
 }
 
 /**
@@ -209,10 +247,14 @@ wstring jperipheral::getErrorMessage(DWORD errorCode)
 	if (!FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, 
 		0, errorCode, 0, (LPWSTR) &buffer, 0, 0))
 	{
-		throw AssertionError(String(L"FormatMessage() failed with error: " + toWString(GetLastError())));
+		throw AssertionError(jace::java_new<AssertionError>(L"FormatMessage() failed with error: " + 
+			toWString(GetLastError())));
 	}
 	wstring result = buffer;
 	if (LocalFree(buffer))
-		throw AssertionError(String(L"LocalFree() failed with error: " + toWString(GetLastError())));
+	{
+		throw AssertionError(jace::java_new<AssertionError>(L"LocalFree() failed with error: " + 
+			toWString(GetLastError())));
+	}
 	return result;
 }

@@ -37,13 +37,17 @@ using jace::proxy::java::lang::Integer;
 #include "jace/proxy/java/lang/String.h"
 using jace::proxy::java::lang::String;
 
-#include "jace/JNIHelper.h"
-using jace::helper::toWString;
+#include "jace/Jace.h"
+using jace::toWString;
 
 #include <assert.h>
 
 #include <string>
 using std::string;
+
+#include <iostream>
+using std::cerr;
+using std::endl;
 
 #pragma warning(push)
 #pragma warning(disable: 4103 4244 4512)
@@ -63,7 +67,10 @@ void setReadTimeout(HANDLE port, DWORD timeout)
 {
 	COMMTIMEOUTS timeouts = {0};
 	if (!GetCommTimeouts(port, &timeouts))
-		throw IOException(L"GetCommTimeouts() failed with error: " + getErrorMessage(GetLastError()));
+	{
+		throw IOException(jace::java_new<IOException>(L"GetCommTimeouts() failed with error: " + 
+			getErrorMessage(GetLastError())));
+	}
 	timeouts.ReadIntervalTimeout = MAXDWORD;
 	timeouts.ReadTotalTimeoutMultiplier = MAXDWORD;
 	if (timeout == 0)
@@ -78,7 +85,10 @@ void setReadTimeout(HANDLE port, DWORD timeout)
 		timeouts.ReadTotalTimeoutConstant = timeout;
 	}
 	if (!SetCommTimeouts(port, &timeouts))
-		throw IOException(L"SetCommTimeouts() failed with error: " + getErrorMessage(GetLastError()));
+	{
+		throw IOException(jace::java_new<IOException>(L"SetCommTimeouts() failed with error: " + 
+			getErrorMessage(GetLastError())));
+	}
 }
 
 /**
@@ -91,20 +101,25 @@ void setWriteTimeout(HANDLE port, DWORD timeout)
 {
 	COMMTIMEOUTS timeouts = {0};
 	if (!GetCommTimeouts(port, &timeouts))
-		throw IOException(L"GetCommTimeouts() failed with error: " + getErrorMessage(GetLastError()));
+	{
+		throw IOException(jace::java_new<IOException>(L"GetCommTimeouts() failed with error: " + 
+			getErrorMessage(GetLastError())));
+	}
 	timeouts.WriteTotalTimeoutMultiplier = 0;
 	timeouts.WriteTotalTimeoutConstant = timeout;
 	if (!SetCommTimeouts(port, &timeouts))
-		throw IOException(L"SetCommTimeouts() failed with error: " + getErrorMessage(GetLastError()));
+	{
+		throw IOException(jace::java_new<IOException>(L"SetCommTimeouts() failed with error: " + 
+			getErrorMessage(GetLastError())));
+	}
 }
 
 class ReadTask: public IoTask
 {
 public:
-	ReadTask(WorkerThread& _thread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout,
-		SerialChannel_NativeListener _listener,	boost::function<void (WorkerThread&)> _onDestruction):
-			IoTask(_thread, _port),
-			onDestruction(_onDestruction)
+	ReadTask(WorkerThread& workerThread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout,
+		SerialChannel_NativeListener _listener):
+			IoTask(workerThread, _port)
 	{
 		setJavaBuffer(new ByteBuffer(_javaBuffer));
 		if (javaBuffer->isDirect())
@@ -133,11 +148,12 @@ public:
 			JInt remaining = javaBuffer->remaining();
 			if (remaining <= 0)
 			{
-				listener->onFailure(AssertionError(L"ByteBuffer.remaining()==" + toWString((jint) remaining)));
+				listener->onFailure(AssertionError(jace::java_new<AssertionError>(L"ByteBuffer.remaining()==" + 
+					toWString((jint) remaining))));
 				return false;
 			}
-			JNIEnv* env = jace::helper::attach(0, 0, true);
-			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(this->nativeBuffer->getJavaJniObject()));
+			JNIEnv* env = jace::attach(0, "ReadTask", true);
+			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(*this->nativeBuffer));
 			assert(nativeBuffer!=0);
 
 			setReadTimeout(port, timeout);
@@ -149,10 +165,12 @@ public:
 				DWORD errorCode = GetLastError();
 				if (errorCode != ERROR_IO_PENDING)
 				{
-					listener->onFailure(IOException(L"ReadFile() failed with error: " + getErrorMessage(errorCode)));
+					listener->onFailure(IOException(jace::java_new<IOException>(L"ReadFile() failed with error: " + 
+						getErrorMessage(errorCode))));
 					return false;
 				}
 			}
+			workerThread.pendingTasks.push_back(this);
 			return true;
 		}
 		catch (Throwable& t)
@@ -168,23 +186,14 @@ public:
 			return false;
 		}
 	}
-
-	virtual ~ReadTask()
-	{
-		onDestruction(thread);
-	}
-
-private:
-	boost::function<void (WorkerThread&)> onDestruction;
 };
 
 class WriteTask: public IoTask
 {
 public:
-	WriteTask(WorkerThread& _thread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout,
-		SerialChannel_NativeListener _listener, boost::function<void (WorkerThread&)> _onDestruction): 
-			IoTask(_thread, _port),
-			onDestruction(_onDestruction)
+	WriteTask(WorkerThread& workerThread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout,
+		SerialChannel_NativeListener _listener): 
+			IoTask(workerThread, _port)
 	{
 		setJavaBuffer(new ByteBuffer(_javaBuffer));
 		if (javaBuffer->isDirect())
@@ -213,11 +222,12 @@ public:
 			JInt remaining = nativeBuffer->remaining();
 			if (remaining <= 0)
 			{
-				listener->onFailure(AssertionError(L"ByteBuffer.remaining()==" + toWString((jint) remaining)));
+				listener->onFailure(AssertionError(jace::java_new<AssertionError>(L"ByteBuffer.remaining()==" + 
+					toWString((jint) remaining))));
 				return false;
 			}
-			JNIEnv* env = jace::helper::attach(0, 0, true);
-			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(this->nativeBuffer->getJavaJniObject()));
+			JNIEnv* env = jace::attach(0, "WriteTask", true);
+			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(*this->nativeBuffer));
 			assert(nativeBuffer!=0);
 
 			setWriteTimeout(port, timeout);
@@ -229,10 +239,12 @@ public:
 				DWORD errorCode = GetLastError();
 				if (errorCode != ERROR_IO_PENDING)
 				{
-					listener->onFailure(IOException(L"WriteFile() failed with error: " + getErrorMessage(errorCode)));
+					listener->onFailure(IOException(jace::java_new<IOException>(L"WriteFile() failed with error: " +
+						getErrorMessage(errorCode))));
 					return false;
 				}
 			}
+			workerThread.pendingTasks.push_back(this);
 			return true;
 		}
 		catch (Throwable& t)
@@ -248,34 +260,17 @@ public:
 			return false;
 		}
 	}
-
-	virtual ~WriteTask()
-	{
-		onDestruction(thread);
-	}
-private:
-	boost::function<void (WorkerThread&)> onDestruction;
 };
-
-/**
- * Invoked when the task is deleted.
- */
-static void onTaskDestruction(WorkerThread& thread)
-{
-	boost::mutex::scoped_lock lock(thread.lock);
-	thread.taskPending = false;
-	thread.taskDone.notify_one();
-}
 
 void SerialChannel::nativeRead(ByteBuffer target, JLong timeout, SerialChannel_NativeListener listener)
 {
 	SerialPortContext* context = getContext(getJaceProxy());
 	{
-		boost::mutex::scoped_lock lock(context->readThread.lock);
+		boost::mutex::scoped_lock lock(context->readThread.mutex);
 		ReadTask* task = new ReadTask(context->readThread, context->port, target, (DWORD) min(timeout, MAXDWORD), 
-			listener, onTaskDestruction);
-		task->thread.workload = task;
-		task->thread.workloadChanged.notify_one();
+			listener);
+		task->workerThread.task = task;
+		task->workerThread.taskChanged.notify_one();
 	}
 }
 
@@ -283,10 +278,10 @@ void SerialChannel::nativeWrite(ByteBuffer source, JLong timeout, SerialChannel_
 {
 	SerialPortContext* context = getContext(getJaceProxy());
 	{
-		boost::mutex::scoped_lock lock(context->writeThread.lock);
+		boost::mutex::scoped_lock lock(context->writeThread.mutex);
 		WriteTask* task = new WriteTask(context->writeThread, context->port, source, (DWORD) min(timeout, MAXDWORD),
-			listener, onTaskDestruction);
-		task->thread.workload = task;
-		task->thread.workloadChanged.notify_one();
+			listener);
+		task->workerThread.task = task;
+		task->workerThread.taskChanged.notify_one();
 	}
 }

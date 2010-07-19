@@ -33,7 +33,7 @@ package jperipheral.nio.channels;
 /**
  * Unchecked exception thrown when an attempt is made to construct a channel in
  * a group that is shutdown or the completion handler for an I/O operation
- * cannot be invoked because the channel group is shutdown.
+ * cannot be invoked because the channel group has terminated.
  *
  * @since 1.7
  */

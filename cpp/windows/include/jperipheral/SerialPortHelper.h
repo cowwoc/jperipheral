@@ -39,12 +39,14 @@
 #include <boost/thread/condition.hpp>
 #pragma warning(pop)
 
+#include <list>
+
+
 BEGIN_NAMESPACE_1( jperipheral )
 
 #define WIDEN2(x) L ## x
 #define WIDEN(x) WIDEN2(x)
 #define L__FILE__ WIDEN(__FILE__)
-
 
 class WorkerThread;
 
@@ -144,13 +146,13 @@ public:
 	/**
 	 * The worker thread associated with the operation.
 	 */
-	WorkerThread& thread;
+	WorkerThread& workerThread;
 
 private:
 	/**
 	 * Prevent assignment.
 	 */
-	IoTask& operator=(IoTask&);
+	IoTask& operator=(const IoTask&);
 };
 
 /**
@@ -161,17 +163,21 @@ class WorkerThread
 public:
 	WorkerThread();
 	~WorkerThread();
+	/**
+	 * Destroys a task.
+	 */
+	void deleteTask(IoTask* task);
 
 	boost::thread* thread;
 	bool shutdownRequested;
-	IoTask* workload;
-	boost::mutex lock;
+	IoTask* task;
+	boost::mutex mutex;
 	/**
-	 * Indicates if a read or write operation is pending. Cancel operations do not affect this variable.
+	 * A list of pending asynchronous tasks.
 	 */
-	bool taskPending;
+	std::list<IoTask*> pendingTasks;
 	boost::condition running;
-	boost::condition workloadChanged;
+	boost::condition taskChanged;
 	boost::condition taskDone;
 };
 

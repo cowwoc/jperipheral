@@ -1,4 +1,4 @@
-#include "jace/JNIHelper.h"
+#include "jace/Jace.h"
 
 #include "jace/OptionList.h"
 using jace::OptionList;
@@ -12,7 +12,7 @@ using jace::CustomOption;
 using jace::Win32VmLoader;
 
 #include <iostream>
-using std::cout;
+using std::cerr;
 using std::endl;
 
 #include <vector>
@@ -27,10 +27,13 @@ using jace::JArray;
 #include "jace/proxy/java/lang/String.h"
 using jace::proxy::java::lang::String;
 
+#include "jace/proxy/java/lang/Throwable.h"
+using jace::proxy::java::lang::Throwable;
+
 
 int main(int argc, char* argv[])
 {
-	Win32VmLoader loader( Win32VmLoader::JVMV_SUN, Win32VmLoader::JVMT_DEFAULT, "", JNI_VERSION_1_4 );
+	Win32VmLoader loader(Win32VmLoader::JVMV_SUN, Win32VmLoader::JVMT_DEFAULT, "", JNI_VERSION_1_6);
 	argc = 0;
 	argv = 0;
 
@@ -49,24 +52,28 @@ int main(int argc, char* argv[])
 		std::string platform = "amd64/release";
 	#endif
 #endif
-	options.push_back(ClassPath("jace-runtime.jar;"
+	options.push_back(ClassPath("jperipheral.jar;"
 		"joda-time-1.6.jar;"
 		"slf4j-api-1.5.6.jar;"
 		"google-collect-1.0-rc2.jar;"
-		"guice/guice-2.0.jar;"
+		"aopalliance.jar;"
+		"guice-2.0.jar;"
+		"guice-assistedinject-2.0;"
+		"jace-runtime.jar;"
 		"logback-classic-0.9.15.jar;"
 		"logback-core-0.9.15.jar;"
-		"jperipheral.jar;"));
-	//options.push_back( Verbose( Verbose::JNI ) );
-	//options.push_back( Verbose( Verbose::CLASS ) );
-	options.push_back( CustomOption( "-Xmx256M" ) );
+		));
+	//options.push_back(Verbose(Verbose::JNI));
+	//options.push_back(Verbose(Verbose::CLASS));
+	options.push_back(CustomOption("-Xmx256M"));
 	try
 	{
-    jace::helper::createVm( loader, options, false );
+    jace::createVm(loader, options, false);
   }
-  catch ( std::exception& e ) {
-    cout << "Unable to create the virtual machine: " << endl;
-    cout << e.what() << endl;
+  catch (std::exception& e)
+	{
+    cerr << "Unable to create the virtual machine: " << endl;
+    cerr << e.what() << endl;
     return -2;
   }
 	try
@@ -75,10 +82,14 @@ int main(int argc, char* argv[])
 		JArray<String> args(0);
 		main.main(args);
 	}
+	catch (Throwable& t)
+	{
+		t.printStackTrace();
+	}
 	catch (std::exception& e)
 	{
-		cout << e.what() << endl;
+		cerr << e.what() << endl;
 	}
-	jace::helper::destroyVm();
+	jace::destroyVm();
 	return 0;
 }

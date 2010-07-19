@@ -1,5 +1,6 @@
 package jperipheral;
 
+import edu.umd.cs.findbugs.annotations.SuppressWarnings;
 import java.io.File;
 import java.io.IOException;
 import org.slf4j.Logger;
@@ -18,18 +19,19 @@ final class WindowsOS implements OperatingSystem
 	private final Logger log = LoggerFactory.getLogger(WindowsOS.class);
 	private final File peripheralPath = new File("//./");
 	/**
-	 * The native context associated with the object.
+	 * A pointer to the native object.
 	 */
-	private long nativeContext;
+	private long nativeObject;
 
 	/**
 	 * Creates a new WindowsOS object.
 	 */
+	@SuppressWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
 	WindowsOS()
 	{
 		try
 		{
-			this.nativeContext = nativeInitialize();
+			this.nativeObject = nativeInitialize();
 		}
 		catch (IOException e)
 		{
@@ -49,9 +51,8 @@ final class WindowsOS implements OperatingSystem
 	{
 		try
 		{
-			System.err.println("finalizer!");
 			nativeDispose();
-			nativeContext = 0;
+			nativeObject = 0;
 		}
 		catch (IOException e)
 		{
@@ -63,7 +64,7 @@ final class WindowsOS implements OperatingSystem
 	/**
 	 * Initializes shared I/O structures.
 	 *
-	 * @return a pointer to the native context
+	 * @return a pointer to the native WindowsOS object
 	 * @throws IOException if an I/O error occurs
 	 */
 	private native long nativeInitialize() throws IOException;

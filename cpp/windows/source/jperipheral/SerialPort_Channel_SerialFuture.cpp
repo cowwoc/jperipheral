@@ -11,7 +11,6 @@ using jace::proxy::jperipheral::SerialChannel_NativeListener;
 using jperipheral::getContext;
 using jperipheral::getErrorMessage;
 using jperipheral::IoTask;
-using jperipheral::CompletionPortContext;
 using jperipheral::getSourceCodePosition;
 using jperipheral::SerialPortContext;
 using jperipheral::WorkerThread;

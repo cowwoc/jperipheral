@@ -46,14 +46,14 @@ public class Main
 
 	private void flush() throws Exception
 	{
-		SerialPort port = (SerialPort) peripherals.getByName(portName);
-		port.configure(9600, SerialPort.DataBits.EIGHT, SerialPort.Parity.NONE, SerialPort.StopBits.ONE,
-			SerialPort.FlowControl.NONE);
-		channel = AsynchronousByteCharChannel.open(port.getAsynchronousChannel(),
-			Charset.forName("UTF-8"));
-		System.out.println("Flushing...");
+		SerialPort port = new SerialPort(portName);
+		SerialChannel byteChannel = port.newAsynchronousChannel();
 		try
 		{
+			byteChannel.configure(9600, SerialPort.DataBits.EIGHT, SerialPort.Parity.NONE,
+				SerialPort.StopBits.ONE, SerialPort.FlowControl.NONE);
+			channel = AsynchronousByteCharChannel.open(byteChannel, Charset.forName("UTF-8"));
+			System.out.println("Flushing...");
 			while (true)
 				System.out.println("got : " + channel.readLine().get(1, TimeUnit.SECONDS));
 		}
@@ -64,19 +64,19 @@ public class Main
 		finally
 		{
 			//System.out.println("Closing\n\n");
-			port.close();
+			byteChannel.close();
 		}
 	}
 
 	private void send(String... lines) throws Exception
 	{
-		SerialPort port = (SerialPort) peripherals.getByName(portName);
-		port.configure(9600, SerialPort.DataBits.EIGHT, SerialPort.Parity.NONE, SerialPort.StopBits.ONE,
-			SerialPort.FlowControl.NONE);
-		channel = AsynchronousByteCharChannel.open(port.getAsynchronousChannel(),
-			Charset.forName("UTF-8"));
+		SerialPort port = new SerialPort(portName);
+		SerialChannel byteChannel = port.newAsynchronousChannel();
 		try
 		{
+			byteChannel.configure(9600, SerialPort.DataBits.EIGHT, SerialPort.Parity.NONE,
+				SerialPort.StopBits.ONE, SerialPort.FlowControl.NONE);
+			channel = AsynchronousByteCharChannel.open(byteChannel, Charset.forName("UTF-8"));
 			for (String line: lines)
 			{
 				System.out.println("sending: " + line);
@@ -87,7 +87,7 @@ public class Main
 		finally
 		{
 //			System.out.println("Closing\n\n");
-			port.close();
+			byteChannel.close();
 		}
 	}
 }

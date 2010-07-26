@@ -1,13 +1,11 @@
 package jperipheral;
 
-import java.io.IOException;
 import jperipheral.nio.channels.AsynchronousByteChannel;
 
 /**
  * A peripheral.
  *
  * @author Gili Tzabari
- * @see #submit(java.util.concurrent.Callable)
  */
 public interface Peripheral
 {
@@ -19,17 +17,12 @@ public interface Peripheral
 	String getName();
 
 	/**
-	 * Returns the AsynchronousChannel used to communicate with the peripheral. This method will always
-	 * return the same AsynchronousChannel for the same peripheral.
+	 * Returns a new AsynchronousChannel for communicating with the peripheral.
 	 *
-	 * @return an AsynchronousChannel used to communicate with the peripheral
+	 * @return a AsynchronousChannel for communicating with the peripheral
+	 * @throws PeripheralNotFoundException if the comport does not exist
+	 * @throws PeripheralInUseException if the peripheral is locked by another application
 	 */
-	AsynchronousByteChannel getAsynchronousChannel();
-
-	/**
-	 * Closes the peripheral.
-	 *
-	 * @throws IOException if an I/O error occurs
-	 */
-	void close() throws IOException;
+	AsynchronousByteChannel newAsynchronousChannel()
+		throws PeripheralNotFoundException, PeripheralInUseException;
 }

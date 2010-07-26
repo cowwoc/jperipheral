@@ -12,6 +12,11 @@
 	<import file="nbproject/build-impl.xml"/>
 
 	<target name="-post-init">
+		<condition property="config.exists">
+			<isset property="config"/>
+		</condition>
+		<fail unless="${config.exists}" message="${config} must be defined"/>
+
 		<!-- Convert "platform.buildType" to "platform/buildType" -->
 		<loadresource property="platform.path">
 			<propertyresource name="config" />
@@ -53,16 +58,6 @@
 	</target>
 
 	<target name="generate.cpp" depends="enhance.cpp">
-		<GenerateCppPeer file="${project.path}/java/build/${platform.path}/jperipheral/WindowsOS.class"
-									 outputHeaders="${project.path}/cpp/build/${platform.path}/include"
-									 outputSources="${project.path}/cpp/build/${platform.path}/source"
-									 userDefinedMembers="false"/>
-
-		<GenerateCppPeer file="${project.path}/java/build/${platform.path}/jperipheral/CanonicalSerialPort.class"
-									 outputHeaders="${project.path}/cpp/build/${platform.path}/include"
-									 outputSources="${project.path}/cpp/build/${platform.path}/source"
-									 userDefinedMembers="false"/>
-
 		<GenerateCppPeer file="${project.path}/java/build/${platform.path}/jperipheral/SerialChannel.class"
 									 outputHeaders="${project.path}/cpp/build/${platform.path}/include"
 									 outputSources="${project.path}/cpp/build/${platform.path}/source"
@@ -87,17 +82,6 @@
 	</target>
 
 	<target name="enhance.cpp" depends="-jace.task, create.build.directory">
-		<EnhanceJavaPeer inputFile="${project.path}/java/build/${platform.path}/jperipheral/WindowsOS.class"
-									 outputFile="${project.path}/java/build/${platform.path}/jperipheral/WindowsOS.class">
-			<library name="JPeripheral"/>
-		</EnhanceJavaPeer>
-
-		<EnhanceJavaPeer inputFile="${project.path}/java/build/${platform.path}/jperipheral/CanonicalSerialPort.class"
-									 outputFile="${project.path}/java/build/${platform.path}/jperipheral/CanonicalSerialPort.class"
-									 deallocationMethod="close">
-			<library name="JPeripheral"/>
-		</EnhanceJavaPeer>
-
 		<EnhanceJavaPeer inputFile="${project.path}/java/build/${platform.path}/jperipheral/SerialChannel.class"
 									 outputFile="${project.path}/java/build/${platform.path}/jperipheral/SerialChannel.class"
 									 deallocationMethod="close">
@@ -116,7 +100,7 @@
 			<classpath>
 				<!-- use logback.xml from local project -->
 				<pathelement location="${src.source.dir}"/>
-				<fileset dir="${env.JACE_HOME}/lib" includes="**/*.jar"/>
+				<fileset dir="${env.JACE_HOME}/release/lib" includes="**/*.jar"/>
 			</classpath>
 		</taskdef>
 	</target>
@@ -135,8 +119,8 @@
 			<equals arg1="${build.type}" arg2="debug"/>
 		</condition>
 		<copy todir="${project.path}/build/${platform.path}" failonerror="true">
-			<fileset file="${env.JACE_HOME}/lib/jace-runtime.jar"/>
-			<fileset dir="${env.JACE_HOME}/lib/${os}/${platform.path}">
+			<fileset file="${env.JACE_HOME}/release/lib/jace-runtime.jar"/>
+			<fileset dir="${env.JACE_HOME}/release/lib/${os}/${platform.path}">
 				<include name="jace.pdb" if="building.debug"/>
 			</fileset>
 		</copy>

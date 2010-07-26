@@ -44,7 +44,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(TargetDir)\..\..\..\include&quot;;&quot;$(JACE_HOME)\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
+				AdditionalIncludeDirectories="&quot;$(TargetDir)\..\..\..\include&quot;;&quot;$(JACE_HOME)\release\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;JPERIPHERAL_EXPORTS;JACE_PROXY_EXPORTS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -67,7 +67,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="jace.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\windows\i386\$(ConfigurationName)&quot;;&quot;$(BOOST_HOME)\stage32\lib&quot;"
+				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\release\lib\windows\i386\$(ConfigurationName)&quot;;&quot;$(BOOST_HOME)\stage32\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				TargetMachine="1"
@@ -92,7 +92,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="xcopy &quot;$(JACE_HOME)\lib\windows\i386\$(ConfigurationName)\*.dll&quot; &quot;$(OutDir)&quot; /y"
+				CommandLine="xcopy &quot;$(JACE_HOME)\release\lib\windows\i386\$(ConfigurationName)\*.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 		<Configuration
@@ -121,7 +121,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(TargetDir)\..\..\..\include&quot;;&quot;$(JACE_HOME)\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
+				AdditionalIncludeDirectories="&quot;$(TargetDir)\..\..\..\include&quot;;&quot;$(JACE_HOME)\release\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;&quot;$(BOOST_HOME)&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;JPERIPHERAL_EXPORTS;JACE_PROXY_EXPORTS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -144,7 +144,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="jace.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\windows\amd64\$(ConfigurationName)&quot;;&quot;$(BOOST_HOME)\stage64\lib&quot;"
+				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\release\lib\windows\amd64\$(ConfigurationName)&quot;;&quot;$(BOOST_HOME)\stage64\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				TargetMachine="17"
@@ -169,7 +169,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="xcopy &quot;$(JACE_HOME)\lib\windows\amd64\$(ConfigurationName)\*.dll&quot; &quot;$(OutDir)&quot; /y"
+				CommandLine="xcopy &quot;$(JACE_HOME)\release\lib\windows\amd64\$(ConfigurationName)\*.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 		<Configuration
@@ -200,7 +200,7 @@
 				AdditionalOptions="/MP"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;$(TargetDir)\..\..\..\include&quot;;&quot;$(JACE_HOME)\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
+				AdditionalIncludeDirectories="&quot;$(TargetDir)\..\..\..\include&quot;;&quot;$(JACE_HOME)\release\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;JPERIPHERAL_EXPORTS;JACE_PROXY_EXPORTS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -222,7 +222,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="jace.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\windows\i386\$(ConfigurationName)&quot;;&quot;$(BOOST_HOME)\stage32\lib&quot;"
+				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\release\lib\windows\i386\$(ConfigurationName)&quot;;&quot;$(BOOST_HOME)\stage32\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -249,7 +249,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="xcopy &quot;$(JACE_HOME)\lib\windows\i386\$(ConfigurationName)\*.dll&quot; &quot;$(OutDir)&quot; /y"
+				CommandLine="xcopy &quot;$(JACE_HOME)\release\lib\windows\i386\$(ConfigurationName)\*.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 		<Configuration
@@ -281,7 +281,7 @@
 				AdditionalOptions="/MP"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;$(TargetDir)\..\..\..\include&quot;;&quot;$(JACE_HOME)\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
+				AdditionalIncludeDirectories="&quot;$(TargetDir)\..\..\..\include&quot;;&quot;$(JACE_HOME)\release\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;JPERIPHERAL_EXPORTS;JACE_PROXY_EXPORTS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -303,7 +303,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="jace.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\lib\windows\amd64\$(ConfigurationName)&quot;;&quot;$(BOOST_HOME)\stage64\lib&quot;"
+				AdditionalLibraryDirectories="&quot;$(JACE_HOME)\release\lib\windows\amd64\$(ConfigurationName)&quot;;&quot;$(BOOST_HOME)\stage64\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -330,7 +330,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="xcopy &quot;$(JACE_HOME)\lib\windows\amd64\$(ConfigurationName)\*.dll&quot; &quot;$(OutDir)&quot; /y"
+				CommandLine="xcopy &quot;$(JACE_HOME)\release\lib\windows\amd64\$(ConfigurationName)\*.dll&quot; &quot;$(OutDir)&quot; /y"
 			/>
 		</Configuration>
 	</Configurations>
@@ -345,42 +345,6 @@
 			<Filter
 				Name="jperipheral"
 				>
-				<File
-					RelativePath="..\..\source\jperipheral\CanonicalSerialPort.cpp"
-					>
-					<FileConfiguration
-						Name="Debug|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							ObjectFile="$(IntDir)\jperipheral\$(InputName).obj"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Debug|x64"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							ObjectFile="$(IntDir)\jperipheral\$(InputName).obj"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							ObjectFile="$(IntDir)\jperipheral\$(InputName).obj"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|x64"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							ObjectFile="$(IntDir)\jperipheral\$(InputName).obj"
-						/>
-					</FileConfiguration>
-				</File>
 				<File
 					RelativePath="..\..\source\jperipheral\SerialPort_Channel.cpp"
 					>
@@ -490,7 +454,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\source\jperipheral\WindowsOS.cpp"
+					RelativePath="..\..\source\jperipheral\Worker.cpp"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
@@ -533,14 +497,6 @@
 					Name="peer"
 					>
 					<File
-						RelativePath="..\..\source\jace\peer\jperipheral\CanonicalSerialPort_peer.cpp"
-						>
-					</File>
-					<File
-						RelativePath="..\..\source\jace\peer\jperipheral\CanonicalSerialPortMappings.cpp"
-						>
-					</File>
-					<File
 						RelativePath="..\..\source\jace\peer\jperipheral\SerialChannel_peer.cpp"
 						>
 					</File>
@@ -554,14 +510,6 @@
 					</File>
 					<File
 						RelativePath="..\..\source\jace\peer\jperipheral\SerialChannelMappings.cpp"
-						>
-					</File>
-					<File
-						RelativePath="..\..\source\jace\peer\jperipheral\WindowsOS_peer.cpp"
-						>
-					</File>
-					<File
-						RelativePath="..\..\source\jace\peer\jperipheral\WindowsOSMappings.cpp"
 						>
 					</File>
 				</Filter>
@@ -580,15 +528,7 @@
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\CanonicalSerialPort.cpp"
-							>
-						</File>
-						<File
 							RelativePath="..\..\source\jace\proxy\jperipheral\Main.cpp"
-							>
-						</File>
-						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\OperatingSystem.cpp"
 							>
 						</File>
 						<File
@@ -601,10 +541,6 @@
 						</File>
 						<File
 							RelativePath="..\..\source\jace\proxy\jperipheral\PeripheralNotFoundException.cpp"
-							>
-						</File>
-						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\ReferenceCounted.cpp"
 							>
 						</File>
 						<File
@@ -637,10 +573,6 @@
 						</File>
 						<File
 							RelativePath="..\..\source\jace\proxy\jperipheral\SerialPort_StopBits.cpp"
-							>
-						</File>
-						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\WindowsOS.cpp"
 							>
 						</File>
 						<Filter
@@ -676,10 +608,6 @@
 							>
 							<File
 								RelativePath="..\..\source\jace\proxy\java\io\Closeable.cpp"
-								>
-							</File>
-							<File
-								RelativePath="..\..\source\jace\proxy\java\io\File.cpp"
 								>
 							</File>
 							<File
@@ -724,10 +652,6 @@
 							</File>
 							<File
 								RelativePath="..\..\source\jace\proxy\java\lang\Integer.cpp"
-								>
-							</File>
-							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\Iterable.cpp"
 								>
 							</File>
 							<File
@@ -794,25 +718,9 @@
 						<Filter
 							Name="util"
 							>
-							<File
-								RelativePath="..\..\source\jace\proxy\java\util\Collection.cpp"
-								>
-							</File>
-							<File
-								RelativePath="..\..\source\jace\proxy\java\util\List.cpp"
-								>
-							</File>
 							<Filter
 								Name="concurrent"
 								>
-								<File
-									RelativePath="..\..\source\jace\proxy\java\util\concurrent\Executor.cpp"
-									>
-								</File>
-								<File
-									RelativePath="..\..\source\jace\proxy\java\util\concurrent\ExecutorService.cpp"
-									>
-								</File>
 								<File
 									RelativePath="..\..\source\jace\proxy\java\util\concurrent\Future.cpp"
 									>
@@ -854,7 +762,7 @@
 						Name="jperipheral"
 						>
 						<File
-							RelativePath="..\..\include\jace\peer\jperipheral\CanonicalSerialPort.h"
+							RelativePath="..\..\include\jace\peer\jperipheral\SerialPort.h"
 							>
 						</File>
 						<File
@@ -865,10 +773,6 @@
 							RelativePath="..\..\include\jace\peer\jperipheral\SerialPort_Channel_SerialFuture.h"
 							>
 						</File>
-						<File
-							RelativePath="..\..\include\jace\peer\jperipheral\WindowsOS.h"
-							>
-						</File>
 					</Filter>
 				</Filter>
 			</Filter>
@@ -877,6 +781,10 @@
 				>
 				<File
 					RelativePath="..\..\include\jperipheral\SerialPortHelper.h"
+					>
+				</File>
+				<File
+					RelativePath="..\..\include\jperipheral\Worker.h"
 					>
 				</File>
 			</Filter>

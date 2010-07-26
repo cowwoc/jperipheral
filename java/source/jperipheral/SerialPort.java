@@ -2,6 +2,8 @@ package jperipheral;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import jperipheral.nio.channels.CompletionHandler;
 
 /**
@@ -10,81 +12,8 @@ import jperipheral.nio.channels.CompletionHandler;
  * @author Gili Tzabari
  * @see http://www.lammertbies.nl/comm/info/RS-232_specs.html
  */
-public interface SerialPort extends Peripheral
+public final class SerialPort implements Peripheral
 {
-	/**
-	 * Returns the baud rate being used.
-	 *
-	 * @return the baud rate being used
-	 */
-	int getBaudRate();
-
-	/**
-	 * Returns the number of data bits being used.
-	 *
-	 * @return the number of data bits being used
-	 */
-	DataBits getDataBits();
-
-	/**
-	 * Returns the number of stop bits being used.
-	 *
-	 * @return the number of stop bits being used
-	 */
-	StopBits getStopBits();
-
-	/**
-	 * Returns the parity type being used.
-	 *
-	 * @return the parity type being used
-	 */
-	Parity getParity();
-
-	/**
-	 * Returns the flow control mechanism being used.
-	 * 
-	 * @return the flow control mechanism being used
-	 */
-	FlowControl getFlowControl();
-
-	/**
-	 * Configures the serial port connection.
-	 *
-	 * @param baudRate the baud rate
-	 * @param dataBits the number of data bits per word
-	 * @param parity the parity mechanism to use
-	 * @param stopBits the number of stop bits to use
-	 * @param flowControl the flow control to use
-	 * @throws IOException if an I/O error occurs
-	 */
-	void configure(int baudRate, DataBits dataBits, Parity parity, StopBits stopBits, FlowControl flowControl)
-		throws IOException;
-
-	/**
-	 * Invokes a task on the comport dispatch thread.
-	 *
-	 * @param <V> The result type returned by the completion handler
-	 * @param <A> The user object to pass to the completion handler
-	 * @param callable the operation to execute
-	 * @param attachment The object to attach to the I/O operation; can be {@code null}
-	 * @param handler The completion handler
-	 */
-	<V, A> void execute(Callable<V> callable, A attachment, CompletionHandler<V, A> handler);
-
-	/**
-	 * Indicates if the peripheral is closed.
-	 *
-	 * @return true if the peripheral is closed
-	 */
-	boolean isClosed();
-
-	/**
-	 * Closes the serial port.
-	 *
-	 * @throws IOException if an I/O error occurs
-	 */
-	void close() throws IOException;
-
 	/**
 	 * The number of data bits in a word.
 	 */
@@ -276,5 +205,98 @@ public interface SerialPort extends Peripheral
 				return "S";
 			}
 		}
+	}
+
+	private final String name;
+	private final ExecutorService executor = Executors.newSingleThreadExecutor();
+
+	/**
+	 * Creates a new SerialPort.
+	 *
+	 * @param name the port name
+	 * @throws PeripheralNotFoundException if the comport does not exist
+	 * @throws IllegalArgumentException if name is null
+	 */
+	public SerialPort(String name)
+		throws PeripheralNotFoundException
+	{
+		if (name == null)
+			throw new IllegalArgumentException("name may not be null");
+		this.name = name;
+		try
+		{
+			SerialChannel channel = new SerialChannel(this);
+			channel.close();
+		}
+		catch (PeripheralInUseException e)
+		{
+			// the serial port exists, but is in use
+		}
+		catch (PeripheralNotFoundException e)
+		{
+			throw e;
+		}
+		catch (IOException e)
+		{
+			// We didn't write anything so close() shouldn't fail
+			throw new AssertionError(e);
+		}
+	}
+
+	@Override
+	public SerialChannel newAsynchronousChannel()
+		throws PeripheralNotFoundException, PeripheralInUseException
+	{
+		return new SerialChannel(this);
+	}
+
+	@Override
+	public String getName()
+	{
+		return name;
+	}
+
+	/**
+	 * Invokes a task on the comport dispatch thread.
+	 *
+	 * @param <V> The result type returned by the completion handler
+	 * @param <A> The user object to pass to the completion handler
+	 * @param callable the operation to execute
+	 * @param attachment The object to attach to the I/O operation; can be {@code null}
+	 * @param handler The completion handler
+	 */
+	public <V, A> void execute(final Callable<V> callable, final A attachment,
+														 final CompletionHandler<V, A> handler)
+	{
+		executor.execute(new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				try
+				{
+					V result = callable.call();
+					handler.completed(result, attachment);
+				}
+				catch (RuntimeException e)
+				{
+					handler.failed(e, attachment);
+				}
+				catch (Exception e)
+				{
+					handler.failed(e, attachment);
+				}
+				catch (Error e)
+				{
+					handler.failed(e, attachment);
+				}
+			}
+		});
+	}
+
+	@Override
+	public String toString()
+	{
+		return name;
 	}
 }

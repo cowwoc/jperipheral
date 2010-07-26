@@ -9,6 +9,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import jperipheral.SerialPort.DataBits;
+import jperipheral.SerialPort.FlowControl;
+import jperipheral.SerialPort.Parity;
+import jperipheral.SerialPort.StopBits;
 import jperipheral.nio.channels.CompletionHandler;
 import jperipheral.nio.channels.InterruptedByTimeoutException;
 import jperipheral.nio.channels.ReadPendingException;
@@ -16,6 +20,8 @@ import jperipheral.nio.channels.ShutdownChannelGroupException;
 import jperipheral.nio.channels.WritePendingException;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An asynchronous channel for serial ports.
@@ -45,7 +51,16 @@ import org.joda.time.Duration;
  */
 public class SerialChannel extends AsynchronousSerialChannel
 {
-	private final long nativeSerialPort;
+	/**
+	 * A pointer to the native object.
+	 */
+	private final long nativeObject;
+	private final SerialPort port;
+	private int baudRate;
+	private DataBits dataBits;
+	private StopBits stopBits;
+	private Parity parity;
+	private FlowControl flowControl;
 	private boolean closed;
 	private boolean readPending;
 	private boolean writePending;
@@ -53,11 +68,65 @@ public class SerialChannel extends AsynchronousSerialChannel
 	/**
 	 * Creates a new SerialChannel.
 	 *
-	 * @param nativeSerialPort a pointer to the native serial port object
+	 * @param port the serial port
+	 * @throws PeripheralNotFoundException if the comport does not exist
+	 * @throws PeripheralInUseException if the peripheral is locked by another application
 	 */
-	public SerialChannel(long nativeSerialPort)
+	public SerialChannel(SerialPort port)
+		throws PeripheralNotFoundException, PeripheralInUseException
 	{
-		this.nativeSerialPort = nativeSerialPort;
+		this.port = port;
+		this.nativeObject = nativeOpen(port.getName());
+	}
+
+	/**
+	 * Returns the baud rate being used.
+	 *
+	 * @return the baud rate being used
+	 */
+	public int getBaudRate()
+	{
+		return baudRate;
+	}
+
+	/**
+	 * Returns the number of data bits being used.
+	 *
+	 * @return the number of data bits being used
+	 */
+	public DataBits getDataBits()
+	{
+		return dataBits;
+	}
+
+	/**
+	 * Returns the number of stop bits being used.
+	 *
+	 * @return the number of stop bits being used
+	 */
+	public StopBits getStopBits()
+	{
+		return stopBits;
+	}
+
+	/**
+	 * Returns the parity type being used.
+	 *
+	 * @return the parity type being used
+	 */
+	public Parity getParity()
+	{
+		return parity;
+	}
+
+	/**
+	 * Returns the flow control mechanism being used.
+	 *
+	 * @return the flow control mechanism being used
+	 */
+	public FlowControl getFlowControl()
+	{
+		return flowControl;
 	}
 
 	@Override
@@ -94,10 +163,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 		catch (RuntimeException e)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			throw e;
 		}
 	}
@@ -142,10 +208,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 		catch (RuntimeException e)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			throw e;
 		}
 	}
@@ -181,10 +244,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 		catch (RuntimeException e)
 		{
-			synchronized (this)
-			{
-				writePending = false;
-			}
+			writePending = false;
 			throw e;
 		}
 	}
@@ -227,17 +287,39 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 		catch (RuntimeException e)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			throw e;
 		}
+	}
+
+	/**
+	 * Configures the serial port channel.
+	 *
+	 * @param baudRate the baud rate
+	 * @param dataBits the number of data bits per word
+	 * @param parity the parity mechanism to use
+	 * @param stopBits the number of stop bits to use
+	 * @param flowControl the flow control to use
+	 * @throws IOException if an I/O error occurs while configuring the channel
+	 */
+	public void configure(int baudRate, DataBits dataBits, Parity parity,
+												StopBits stopBits, FlowControl flowControl)
+		throws IOException
+	{
+		nativeConfigure(baudRate, dataBits, parity, stopBits, flowControl);
+		this.baudRate = baudRate;
+		this.dataBits = dataBits;
+		this.parity = parity;
+		this.stopBits = stopBits;
+		this.flowControl = flowControl;
 	}
 
 	@Override
 	public synchronized void close() throws IOException
 	{
+		if (closed)
+			return;
+		nativeClose();
 		closed = true;
 	}
 
@@ -246,6 +328,54 @@ public class SerialChannel extends AsynchronousSerialChannel
 	{
 		return !closed;
 	}
+
+	/**
+	 * Returns the serial port associated with the channel.
+	 *
+	 * @return the serial port associated with the channel
+	 */
+	public SerialPort getPort()
+	{
+		return port;
+	}
+
+	@Override
+	public String toString()
+	{
+		return port.getName() + "[" + baudRate + " " + dataBits + "-" + parity + "-" + stopBits + " "
+					 + flowControl + "]";
+	}
+
+	/**
+	 * Opens the port.
+	 *
+	 * @param name the port name
+	 * @return the native context associated with the port
+	 * @throws PeripheralNotFoundException if the comport does not exist
+	 * @throws PeripheralInUseException if the comport is locked by another application
+	 */
+	private native long nativeOpen(String name) throws PeripheralNotFoundException,
+																										 PeripheralInUseException;
+
+	/**
+	 * Sets the port configuration.
+	 *
+	 * @param baudRate the baud rate
+	 * @param dataBits the number of data bits per word
+	 * @param parity the parity mechanism to use
+	 * @param stopBits the number of stop bits to use
+	 * @param flowControl the flow control to use
+	 * @throws IOException if an I/O error occurs while configuring the channel
+	 */
+	private native void nativeConfigure(int baudRate, DataBits dataBits, Parity parity,
+																			StopBits stopBits, FlowControl flowControl) throws IOException;
+
+	/**
+	 * Closes the port.
+	 *
+	 * @throws IOException if an I/O error occurs
+	 */
+	private native void nativeClose() throws IOException;
 
 	/**
 	 * Reads data from the port.
@@ -423,6 +553,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 		private boolean cancelled;
 		private boolean cancelRequested;
 		private final Runnable onDone;
+		private final Logger log = LoggerFactory.getLogger(SerialFuture.class);
 
 		/**
 		 * Creates a new SerialFuture.
@@ -446,13 +577,13 @@ public class SerialChannel extends AsynchronousSerialChannel
 				return false;
 			try
 			{
-				// TODO: Canceling an operation may result in lost data.
+				// TODO: Canceling an operation may result in data loss.
 				// REFERENCE: http://stackoverflow.com/questions/1238905/what-does-cancelio-do-with-bytes-that-have-already-been-read
 				nativeCancel();
 			}
 			catch (IOException e)
 			{
-				e.printStackTrace();
+				log.error("", e);
 				return false;
 			}
 			while (!done)
@@ -621,4 +752,5 @@ public class SerialChannel extends AsynchronousSerialChannel
 			return get();
 		}
 	}
+
 }

@@ -1,7 +1,5 @@
-#include "jace/peer/jperipheral/WindowsOS.h"
-using jace::peer::jperipheral::WindowsOS;
-using jace::proxy::types::JLong;
-using jace::toWString;
+#include "jperipheral/Worker.h"
+using jperipheral::Worker;
 
 #include "jace/proxy/java/lang/AssertionError.h"
 using jace::proxy::java::lang::AssertionError;
@@ -10,14 +8,19 @@ using jace::proxy::java::lang::AssertionError;
 using std::wstring;
 
 #include "jperipheral/SerialPortHelper.h"
-using jperipheral::getCompletionPortContext;
 using jperipheral::getErrorMessage;
-using jperipheral::CompletionPortContext;
 using jperipheral::IoTask;
 using jperipheral::getSourceCodePosition;
 
+#include "jace/Jace.h"
+using jace::toWString;
+
+#include "jace/proxy/types/JLong.h"
+using jace::proxy::types::JLong;
+
 #include "jace/proxy/java/lang/Integer.h"
 using jace::proxy::java::lang::Integer;
+
 
 #include "jace/proxy/java/lang/String.h"
 using jace::proxy::java::lang::String;
@@ -39,19 +42,21 @@ using std::cerr;
 using std::endl;
 
 
+Worker* jperipheral::worker;
+
 /**
- * Thread used carry out all I/O operations.
+ * Executes any pending tasks.
  */
-static void CompletionHandler(CompletionPortContext& context)
+void jperipheral::RunTasks(Worker& worker)
 {
-	HANDLE completionPort = context.completionPort;
+	HANDLE completionPort = worker.completionPort;
 	DWORD bytesTransfered;
 	ULONG_PTR completionKey;
 	OVERLAPPED* overlapped;
 
 	{
-		boost::mutex::scoped_lock lock(context.lock);
-		context.running.notify_one();
+		boost::mutex::scoped_lock lock(worker.lock);
+		worker.running.notify_one();
 	}
 	while (true)
 	{
@@ -149,8 +154,7 @@ static void CompletionHandler(CompletionPortContext& context)
 	}
 }
 
-CompletionPortContext::CompletionPortContext(jace::peer::jperipheral::WindowsOS _windowsOS):
-	windowsOS(_windowsOS)
+Worker::Worker()
 {
 	// Empirical tests show that handling I/O completion costs 0.3 milliseconds, making it hard to justify
 	// the use of multiple threads.
@@ -159,11 +163,11 @@ CompletionPortContext::CompletionPortContext(jace::peer::jperipheral::WindowsOS 
 		throw AssertionError(jace::java_new<AssertionError>(L"CreateIoCompletionPort() failed with error: " + getErrorMessage(GetLastError())));
 	
 	boost::mutex::scoped_lock lock(this->lock);
-	thread = new boost::thread(boost::bind(&CompletionHandler, boost::ref(*this)));
+	thread = new boost::thread(boost::bind(&RunTasks, boost::ref(*this)));
 	running.wait(lock);
 }
 
-CompletionPortContext::~CompletionPortContext()
+Worker::~Worker()
 {
 	if (!PostQueuedCompletionStatus(completionPort, 0, IoTask::SHUTDOWN, 0))
 	{
@@ -179,22 +183,20 @@ CompletionPortContext::~CompletionPortContext()
 	}
 }
 
-JLong WindowsOS::nativeInitialize()
-{
-	CompletionPortContext* context = new CompletionPortContext(*this);
-	return reinterpret_cast<intptr_t>(context);
-}
-
-void WindowsOS::nativeDispose()
-{
-	CompletionPortContext* context = getCompletionPortContext(this->getJaceProxy());
-	delete context;
-}
-
 /**
  * @see http://java.sun.com/javase/6/docs/technotes/guides/jni/spec/invocation.html#library_version
  */
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*, void*)
 {
+	jperipheral::worker = new Worker();
 	return JNI_VERSION_1_6;
+}
+
+/**
+ * @see http://java.sun.com/javase/6/docs/technotes/guides/jni/spec/invocation.html#library_version
+ */
+extern "C" JNIEXPORT void JNICALL JNI_OnUnload(JavaVM*, void*)
+{
+	delete jperipheral::worker;
+	jperipheral::worker = 0;
 }

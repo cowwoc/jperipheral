@@ -1,18 +1,14 @@
 #include "jperipheral/SerialPortHelper.h"
 using jperipheral::IoTask;
-using jperipheral::CompletionPortContext;
 using jperipheral::SerialPortContext;
 using jperipheral::WorkerThread;
 using jperipheral::getErrorMessage;
 
-#include "jace/proxy/jperipheral/CanonicalSerialPort.h"
-using jace::proxy::jperipheral::CanonicalSerialPort;
+#include "jace/proxy/jperipheral/SerialPort.h"
+using jace::proxy::jperipheral::SerialPort;
 
 #include "jace/proxy/jperipheral/SerialChannel.h"
 using jace::proxy::jperipheral::SerialChannel;
-
-#include "jace/proxy/jperipheral/WindowsOS.h"
-using jace::proxy::jperipheral::WindowsOS;
 
 #include "jace/proxy/jperipheral/SerialChannel_NativeListener.h"
 using jace::proxy::jperipheral::SerialChannel_NativeListener;
@@ -35,9 +31,6 @@ using jace::proxy::java::io::IOException;
 #include "jace/proxy/java/nio/ByteBuffer.h"
 using jace::proxy::java::nio::ByteBuffer;
 
-#include "jace/proxy/jperipheral/OperatingSystem.h"
-using ::jace::proxy::jperipheral::OperatingSystem;
-
 #include "jace/Jace.h"
 using jace::toWString;
 
@@ -59,24 +52,14 @@ using std::endl;
 #pragma warning(pop)
 
 
-SerialPortContext* jperipheral::getContext(CanonicalSerialPort serialPort)
-{
-	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(serialPort.nativeObject()));
-}
-
 SerialPortContext* jperipheral::getContext(SerialChannel channel)
 {
-	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(channel.nativeSerialPort()));
+	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(channel.nativeObject()));
 }
 
 IoTask* jperipheral::getContext(SerialChannel_SerialFuture future)
 {
 	return reinterpret_cast<IoTask*>(static_cast<intptr_t>(future.userObject()));
-}
-
-CompletionPortContext* jperipheral::getCompletionPortContext(WindowsOS windows)
-{
-	return reinterpret_cast<CompletionPortContext*>(static_cast<intptr_t>(windows.nativeObject()));
 }
 
 IoTask::IoTask(WorkerThread& _workerThread, HANDLE _port):
@@ -118,7 +101,7 @@ IoTask* IoTask::fromOverlapped(OVERLAPPED* overlapped)
 	return reinterpret_cast<IoTask*>((char*) overlapped - offsetof(IoTask, overlapped));
 }
 
-static void WorkHandler(WorkerThread& context)
+static void ScheduleTasks(WorkerThread& context)
 {
 	boost::mutex::scoped_lock lock(context.mutex);
 	context.running.notify_one();
@@ -156,7 +139,7 @@ WorkerThread::WorkerThread():
 	task(0), shutdownRequested(false)
 {
 	boost::mutex::scoped_lock lock(mutex);
-	thread = new boost::thread(boost::bind(&WorkHandler, boost::ref(*this)));
+	thread = new boost::thread(boost::bind(&ScheduleTasks, boost::ref(*this)));
 	// If we don't wait, the worker thread may miss condition notification
 	running.wait(lock);
 }

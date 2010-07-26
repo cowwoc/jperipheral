@@ -1,33 +1,12 @@
 #ifndef JPERIPHERAL_SERIALPORTHELPER_H
 #define JPERIPHERAL_SERIALPORTHELPER_H
 
-#ifndef JACE_NAMESPACE_H
 #include "jace/namespace.h"
-#endif
 
-#ifndef JACE_PEER_JPERIPHERAL_CANONICALSERIALPORT_H
-#include "jace/peer/jperipheral/CanonicalSerialPort.h"
-#endif
-
-#ifndef JACE_PEER_JPERIPHERAL_SERIALCHANNEL_H
 #include "jace/peer/jperipheral/SerialChannel.h"
-#endif
-
-#ifndef JACE_PEER_JPERIPHERAL_SERIALPORT_WINDOWSOS_H
-#include "jace/peer/jperipheral/WindowsOS.h"
-#endif
-
-#ifndef JACE_PROXY_JPERIPHERAL_SERIALCHANNEL_NATIVELISTENER_H
+#include "jace/proxy/jperipheral/SerialPort.h"
 #include "jace/proxy/jperipheral/SerialChannel_NativeListener.h"
-#endif
-
-#ifndef JACE_PROXY_JPERIPHERAL_SERIALCHANNEL_SERIALFUTURE_H
 #include "jace/proxy/jperipheral/SerialChannel_SerialFuture.h"
-#endif
-
-#ifndef JACE_PROXY_JPERIPHERAL_SERIALPORT_WINDOWSOS_H
-#include "jace/proxy/jperipheral/WindowsOS.h"
-#endif
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -42,7 +21,7 @@
 #include <list>
 
 
-BEGIN_NAMESPACE_1( jperipheral )
+BEGIN_NAMESPACE_1(jperipheral)
 
 #define WIDEN2(x) L ## x
 #define WIDEN(x) WIDEN2(x)
@@ -207,7 +186,7 @@ public:
 /**
  * Returns the SerialPort handle.
  */
-SerialPortContext* getContext(::jace::proxy::jperipheral::CanonicalSerialPort port);
+SerialPortContext* getContext(::jace::proxy::jperipheral::SerialPort port);
 /**
  * Returns the SerialPort handle.
  */
@@ -216,37 +195,6 @@ SerialPortContext* getContext(::jace::proxy::jperipheral::SerialChannel channel)
  * Returns the SerialPort handle.
  */
 IoTask* getContext(::jace::proxy::jperipheral::SerialChannel_SerialFuture future);
-
-/**
- * Data associated with the completion port.
- */
-class CompletionPortContext
-{
-public:
-	/**
-	 * Creates a new CompletionPortContext.
-	 */
-	CompletionPortContext(jace::peer::jperipheral::WindowsOS windowsOS);
-
-	/**
-	 * Creates a new ~CompletionPortContext.
-	 */
-	~CompletionPortContext();
-
-
-	boost::thread* thread;
-	boost::mutex lock;
-	boost::condition running;
-	HANDLE completionPort;
-	jace::peer::jperipheral::WindowsOS windowsOS;
-};
-
-/**
- * Returns the CompletionPort handle.
- *
- * @param os the operating system
- */
-CompletionPortContext* getCompletionPortContext(jace::proxy::jperipheral::WindowsOS os);
 
 /**
  * Returns the String representation of the current source-code position.
@@ -258,6 +206,6 @@ std::wstring getSourceCodePosition(wchar_t* file, int line);
  */
 std::wstring getErrorMessage(DWORD errorCode);
 
-END_NAMESPACE_1( jperipheral )
+END_NAMESPACE_1(jperipheral)
 
 #endif

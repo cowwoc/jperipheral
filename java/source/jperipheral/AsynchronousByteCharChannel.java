@@ -109,20 +109,18 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	}
 
 	@Override
-	public <A> void read(CharBuffer target, A attachment,
-											 CompletionHandler<Integer, ? super A> handler)
+	public synchronized <A> void read(CharBuffer target, A attachment,
+																		CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
 		if (target.isReadOnly())
 			throw new IllegalArgumentException("target may not be read-only");
-		synchronized (this)
-		{
-			if (readPending)
-				throw new ReadPendingException();
-			readPending = true;
-		}
+		if (readPending)
+			throw new ReadPendingException();
+		readPending = true;
 		if (target.remaining() <= 0)
 		{
+			readPending = false;
 			handler.completed(0, attachment);
 			return;
 		}
@@ -132,26 +130,17 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		}
 		catch (ReadPendingException e)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			throw new AssertionError(e);
 		}
 		catch (ShutdownChannelGroupException e)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			throw e;
 		}
 		catch (RuntimeException e)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			throw e;
 		}
 	}
@@ -166,14 +155,12 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	{
 		if (target.isReadOnly())
 			throw new IllegalArgumentException("target may not be read-only");
-		synchronized (this)
-		{
-			if (readPending)
-				throw new ReadPendingException();
-			readPending = true;
-		}
+		if (readPending)
+			throw new ReadPendingException();
+		readPending = true;
 		if (target.remaining() <= 0)
 		{
+			readPending = false;
 			handler.completed(0, attachment);
 			return;
 		}
@@ -183,34 +170,22 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		}
 		catch (ReadPendingException e)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			throw new AssertionError(e);
 		}
 		catch (ShutdownChannelGroupException e)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			throw e;
 		}
 		catch (UnsupportedOperationException e)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			throw e;
 		}
 		catch (RuntimeException e)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			throw e;
 		}
 	}
@@ -225,10 +200,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		CompletionHandler<Integer, ByteBuffer> readHandler = getReadHandler(target, attachment, handler);
 		if (readHandler == null)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			return;
 		}
 		channel.read(readBytes, readBytes, readHandler);
@@ -247,10 +219,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		CompletionHandler<Integer, ByteBuffer> readHandler = getReadHandler(target, attachment, handler);
 		if (readHandler == null)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			return;
 		}
 		channelTimeouts.read(readBytes, timeout, unit, readBytes, readHandler);
@@ -312,12 +281,9 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	private synchronized Future<Integer> read(CharSequenceWriter target)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
-		synchronized (this)
-		{
-			if (readPending)
-				throw new ReadPendingException();
-			readPending = true;
-		}
+		if (readPending)
+			throw new ReadPendingException();
+		readPending = true;
 		if (readString.length() > 0)
 		{
 			// Try satisfying the request using the buffer
@@ -327,10 +293,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 				if (charactersTransferred > 0)
 				{
 					readString.delete(0, charactersTransferred);
-					synchronized (this)
-					{
-						readPending = false;
-					}
+					readPending = false;
 					return new CompletedFuture(charactersTransferred);
 				}
 			}
@@ -346,10 +309,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		}
 		catch (RuntimeException e)
 		{
-			synchronized (this)
-			{
-				readPending = false;
-			}
+			readPending = false;
 			throw e;
 		}
 	}
@@ -376,19 +336,13 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 																		 boolean endOfInput)
 		throws WritePendingException, ShutdownChannelGroupException
 	{
-		synchronized (this)
-		{
-			if (writePending)
-				throw new WritePendingException();
-			writePending = true;
-		}
+		if (writePending)
+			throw new WritePendingException();
+		writePending = true;
 		ByteBuffer sourceBytes = getBytes(source, attachment, handler, endOfInput);
 		if (sourceBytes == null)
 		{
-			synchronized (this)
-			{
-				writePending = false;
-			}
+			writePending = false;
 			return;
 		}
 		CompletionHandler<Integer, ByteBuffer> writeHandler = new WriteHandler<A>(attachment, handler,
@@ -400,39 +354,30 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		}
 		catch (RuntimeException e)
 		{
-			synchronized (this)
-			{
-				writePending = false;
-			}
+			writePending = false;
 			throw e;
 		}
 	}
 
 	@Override
-	public <A> void write(CharBuffer source,
-												final long timeout,
-												final TimeUnit unit,
-												A attachment,
-												CompletionHandler<Integer, ? super A> handler,
-												boolean endOfInput)
+	public synchronized <A> void write(CharBuffer source,
+																		 final long timeout,
+																		 final TimeUnit unit,
+																		 A attachment,
+																		 CompletionHandler<Integer, ? super A> handler,
+																		 boolean endOfInput)
 		throws IllegalArgumentException, WritePendingException, ShutdownChannelGroupException,
 					 UnsupportedOperationException
 	{
 		if (channelTimeouts == null)
 			throw new UnsupportedOperationException();
-		synchronized (this)
-		{
-			if (writePending)
-				throw new WritePendingException();
-			writePending = true;
-		}
+		if (writePending)
+			throw new WritePendingException();
+		writePending = true;
 		ByteBuffer sourceBytes = getBytes(source, attachment, handler, endOfInput);
 		if (sourceBytes == null)
 		{
-			synchronized (this)
-			{
-				writePending = false;
-			}
+			writePending = false;
 			return;
 		}
 		CompletionHandler<Integer, ByteBuffer> writeHandler = new WriteHandler<A>(attachment, handler,
@@ -444,48 +389,33 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		}
 		catch (WritePendingException e)
 		{
-			synchronized (this)
-			{
-				writePending = false;
-			}
+			writePending = false;
 			throw new AssertionError(e);
 		}
 		catch (ShutdownChannelGroupException e)
 		{
-			synchronized (this)
-			{
-				writePending = false;
-			}
+			writePending = false;
 			throw e;
 		}
 		catch (RuntimeException e)
 		{
-			synchronized (this)
-			{
-				writePending = false;
-			}
+			writePending = false;
 			throw e;
 		}
 	}
 
 	@Override
-	public Future<Integer> write(CharBuffer source, boolean endOfInput)
+	public synchronized Future<Integer> write(CharBuffer source, boolean endOfInput)
 		throws WritePendingException, ShutdownChannelGroupException
 	{
-		synchronized (this)
-		{
-			if (writePending)
-				throw new WritePendingException();
-			writePending = true;
-		}
+		if (writePending)
+			throw new WritePendingException();
+		writePending = true;
 		PollableCompletionHandler handler = new PollableCompletionHandler();
 		ByteBuffer sourceBytes = getBytes(source, null, handler, endOfInput);
 		if (sourceBytes == null)
 		{
-			synchronized (this)
-			{
-				writePending = false;
-			}
+			writePending = false;
 			return new CompletedFuture(handler.throwable);
 		}
 		try
@@ -494,10 +424,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		}
 		catch (RuntimeException e)
 		{
-			synchronized (this)
-			{
-				writePending = false;
-			}
+			writePending = false;
 			throw e;
 		}
 	}
@@ -729,6 +656,12 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 			target.append(temp.toString());
 		}
 		while (!decodingResult.isUnderflow());
+	}
+
+	@Override
+	public String toString()
+	{
+		return getClass().getName() + "[" + channel + "]";
 	}
 
 	/**
@@ -1583,4 +1516,5 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 			}
 		}
 	}
+
 }

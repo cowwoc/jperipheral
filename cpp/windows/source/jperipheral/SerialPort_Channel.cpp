@@ -18,10 +18,14 @@ using jace::proxy::jperipheral::SerialPort_FlowControl;
 #include "jperipheral/SerialPortHelper.h"
 using jperipheral::getContext;
 using jperipheral::getErrorMessage;
-using jperipheral::IoTask;
+using jperipheral::OverlappedContainer;
+using jperipheral::Task;
 using jperipheral::getSourceCodePosition;
+using jperipheral::SingleThreadExecutor;
 using jperipheral::SerialPortContext;
-using jperipheral::WorkerThread;
+
+#include "jace/proxy/java/lang/Long.h"
+using jace::proxy::java::lang::Long;
 
 #include "jace/proxy/jperipheral/PeripheralNotFoundException.h"
 using jace::proxy::jperipheral::PeripheralNotFoundException;
@@ -50,6 +54,9 @@ using jace::proxy::java::lang::Integer;
 #include "jace/proxy/java/lang/String.h"
 using jace::proxy::java::lang::String;
 
+#include "jace/proxy/jperipheral/nio/channels/InterruptedByTimeoutException.h"
+using jace::proxy::jperipheral::nio::channels::InterruptedByTimeoutException;
+
 #include "jace/Jace.h"
 using jace::toWString;
 
@@ -63,21 +70,13 @@ using std::string;
 using std::cerr;
 using std::endl;
 
-#pragma warning(push)
-#pragma warning(disable: 4103 4244 4512)
-#include <boost/thread/thread.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/condition.hpp>
-#include <boost/function.hpp>
-#pragma warning(pop)
-
 /**
  * Sets the port read timeout.
  *
  * @param port the comport
- * @param timeout the timeout, where 0 means "wait forever"
+ * @param timeout the timeout, where 0 means "return immediately" and MAXDWORD means "wait forever"
  */
-void setReadTimeout(HANDLE port, DWORD timeout)
+void setReadTimeout(HANDLE port, JLong timeout)
 {
 	COMMTIMEOUTS timeouts = {0};
 	if (!GetCommTimeouts(port, &timeouts))
@@ -87,16 +86,27 @@ void setReadTimeout(HANDLE port, DWORD timeout)
 	}
 	timeouts.ReadIntervalTimeout = MAXDWORD;
 	timeouts.ReadTotalTimeoutMultiplier = MAXDWORD;
-	if (timeout == 0)
+	if (timeout == Long::MAX_VALUE())
 	{
 		// The Windows API does not provide a way to "wait forever" so instead we wait as long as possible
-		// and have WindowsOS.WorkerThread() repeat the operation if needed.
+		// and have Worker::run() repeat the operation as needed.
+		timeouts.ReadTotalTimeoutConstant = MAXDWORD - 1;
+	}
+	else if (timeout == static_cast<jlong>(0))
+	{
+		// return immediately
+		timeouts.ReadTotalTimeoutConstant = 0;
+	}
+	else if (timeout >= MAXDWORD)
+	{
+		// Java supports longer timeouts than Windows (long vs int).
+		// Wait as long as possible.
 		timeouts.ReadTotalTimeoutConstant = MAXDWORD - 1;
 	}
 	else
 	{
 		// wait for at least one byte or time out
-		timeouts.ReadTotalTimeoutConstant = timeout;
+		timeouts.ReadTotalTimeoutConstant = static_cast<DWORD>(timeout);
 	}
 	if (!SetCommTimeouts(port, &timeouts))
 	{
@@ -109,9 +119,9 @@ void setReadTimeout(HANDLE port, DWORD timeout)
  * Sets the port write timeout.
  *
  * @param port the comport
- * @param timeout the timeout, where 0 means "wait forever"
+ * @param timeout the timeout, where 0 means "return immediately" and MAXDWORD means "wait forever"
  */
-void setWriteTimeout(HANDLE port, DWORD timeout)
+void setWriteTimeout(HANDLE port, JLong timeout)
 {
 	COMMTIMEOUTS timeouts = {0};
 	if (!GetCommTimeouts(port, &timeouts))
@@ -120,7 +130,27 @@ void setWriteTimeout(HANDLE port, DWORD timeout)
 			getErrorMessage(GetLastError())));
 	}
 	timeouts.WriteTotalTimeoutMultiplier = 0;
-	timeouts.WriteTotalTimeoutConstant = timeout;
+	if (timeout == Long::MAX_VALUE())
+	{
+		// wait forever
+		timeouts.WriteTotalTimeoutConstant = 0;
+	}
+	else if (timeout == static_cast<jlong>(0))
+	{
+		// return immediately
+		timeouts.WriteTotalTimeoutConstant = 1;
+	}
+	else if (timeout >= MAXDWORD)
+	{
+		// Java supports longer timeouts than Windows (long vs int).
+		// Wait as long as possible.
+		timeouts.WriteTotalTimeoutConstant = MAXDWORD - 1;
+	}
+	else
+	{
+		// write as many bytes as possible before a timeout
+		timeouts.WriteTotalTimeoutConstant = static_cast<DWORD>(timeout);
+	}
 	if (!SetCommTimeouts(port, &timeouts))
 	{
 		throw IOException(jace::java_new<IOException>(L"SetCommTimeouts() failed with error: " + 
@@ -128,12 +158,40 @@ void setWriteTimeout(HANDLE port, DWORD timeout)
 	}
 }
 
-class ReadTask: public IoTask
+static void onTimeout(boost::shared_ptr<Task> task)
+{
+	if (task->getTimeout() == Long::MAX_VALUE())
+	{
+		// Premature timeout caused by the fact that SerialPort_Channel.setReadTimeout() cannot
+		// "wait forever". Repeat the operation.
+		task->getWorkerThread().execute(task);
+		return;
+	}
+	else if (task->getTimeout() > MAXDWORD)
+	{
+		// Java supports longer timeouts than Windows (long vs int).
+		// We repeat the operation as many times as necessary to statisfy the Java timeout.
+		long timeElapsed = task->getTimeElapsed();
+		task->setTimeout(task->getTimeout() - timeElapsed);
+		task->getWorkerThread().execute(task);
+		return;
+	}
+	try
+	{
+		task->getListener()->onFailure(jace::java_new<InterruptedByTimeoutException>());
+	}
+	catch (Throwable& t)
+	{
+		cerr << __FILE__ << ":" << __LINE__ << endl;
+		t.printStackTrace();
+	}
+}
+
+class ReadTask: public Task
 {
 public:
-	ReadTask(WorkerThread& workerThread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout,
-		SerialChannel_NativeListener _listener):
-			IoTask(workerThread, _port)
+	ReadTask(SingleThreadExecutor& workerThread, HANDLE& _port, ByteBuffer _javaBuffer, JLong _timeout):
+			Task(workerThread, _port)
 	{
 		setJavaBuffer(new ByteBuffer(_javaBuffer));
 		if (javaBuffer->isDirect())
@@ -141,11 +199,17 @@ public:
 		else
 			nativeBuffer = new ByteBuffer(ByteBuffer::allocateDirect(javaBuffer->remaining()));
 		setTimeout(_timeout);
-		setListener(new SerialChannel_NativeListener(_listener));
 	}
 
-	virtual void updateJavaBuffer(int bytesTransfered)
+	virtual void onSuccess(int bytesTransfered)
 	{
+		if (bytesTransfered < 1)
+		{
+			onTimeout(shared_from_this());
+			return;
+		}
+
+		// Update the Java read buffer
 		if (nativeBuffer==javaBuffer)
 			javaBuffer->position(javaBuffer->position() + bytesTransfered);
 		else
@@ -153,18 +217,30 @@ public:
 			nativeBuffer->limit(bytesTransfered);
 			javaBuffer->put(*nativeBuffer);
 		}
+
+		try
+		{
+			Integer bytesTransferredAsInteger = Integer::valueOf(bytesTransfered);
+			listener->onSuccess(bytesTransferredAsInteger);
+		}
+		catch (Throwable& t)
+		{
+			cerr << __FILE__ << ":" << __LINE__ << endl;
+			t.printStackTrace();
+		}
 	}
 
-	virtual bool run()
+	virtual void run()
 	{
 		try
 		{
+			timer = boost::timer();
 			JInt remaining = javaBuffer->remaining();
 			if (remaining <= 0)
 			{
 				listener->onFailure(AssertionError(jace::java_new<AssertionError>(L"ByteBuffer.remaining()==" + 
 					toWString((jint) remaining))));
-				return false;
+				return;
 			}
 			JNIEnv* env = jace::attach(0, "ReadTask", true);
 			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(*this->nativeBuffer));
@@ -172,20 +248,25 @@ public:
 
 			setReadTimeout(port, timeout);
 
+			OverlappedContainer<Task>* userData = 
+				new OverlappedContainer<Task>(shared_from_this());
+
 			DWORD bytesTransferred;
 			if (!ReadFile(port, nativeBuffer + this->nativeBuffer->position(), remaining, &bytesTransferred, 
-				&overlapped))
+				&userData->getOverlapped()))
 			{
 				DWORD errorCode = GetLastError();
 				if (errorCode != ERROR_IO_PENDING)
 				{
 					listener->onFailure(IOException(jace::java_new<IOException>(L"ReadFile() failed with error: " + 
 						getErrorMessage(errorCode))));
-					return false;
+					return;
 				}
 			}
-			workerThread.pendingTasks.push_back(this);
-			return true;
+			// ReadFile() may return synchronously in spite of the fact that we requested an asynchronous
+			// operation. The completion port gets notified in either case.
+			//
+			// REFERENCE: http://support.microsoft.com/kb/156932
 		}
 		catch (Throwable& t)
 		{
@@ -197,17 +278,15 @@ public:
 			{
 				t.printStackTrace();
 			}
-			return false;
 		}
 	}
 };
 
-class WriteTask: public IoTask
+class WriteTask: public Task
 {
 public:
-	WriteTask(WorkerThread& workerThread, HANDLE _port, ByteBuffer _javaBuffer, DWORD _timeout,
-		SerialChannel_NativeListener _listener): 
-			IoTask(workerThread, _port)
+	WriteTask(SingleThreadExecutor& workerThread, HANDLE& _port, ByteBuffer _javaBuffer, JLong _timeout): 
+			Task(workerThread, _port)
 	{
 		setJavaBuffer(new ByteBuffer(_javaBuffer));
 		if (javaBuffer->isDirect())
@@ -221,24 +300,42 @@ public:
 			javaBuffer->position(oldPosition);
 		}
 		setTimeout(_timeout);
-		setListener(new SerialChannel_NativeListener(_listener));
 	}
 
-	virtual void updateJavaBuffer(int bytesTransfered)
+	virtual void onSuccess(int bytesTransfered)
 	{
+		if (bytesTransfered < 1)
+		{
+			onTimeout(shared_from_this());
+			return;
+		}
+
+		// Update the Java write buffer
 		javaBuffer->position(javaBuffer->position() + bytesTransfered);
+
+		try
+		{
+			Integer bytesTransferredAsInteger = Integer::valueOf(bytesTransfered);
+			listener->onSuccess(bytesTransferredAsInteger);
+		}
+		catch (Throwable& t)
+		{
+			cerr << __FILE__ << ":" << __LINE__ << endl;
+			t.printStackTrace();
+		}
 	}
 
-	virtual bool run()
+	virtual void run()
 	{
 		try
 		{
+			timer = boost::timer();
 			JInt remaining = nativeBuffer->remaining();
 			if (remaining <= 0)
 			{
 				listener->onFailure(AssertionError(jace::java_new<AssertionError>(L"ByteBuffer.remaining()==" + 
 					toWString((jint) remaining))));
-				return false;
+				return;
 			}
 			JNIEnv* env = jace::attach(0, "WriteTask", true);
 			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(*this->nativeBuffer));
@@ -246,20 +343,24 @@ public:
 
 			setWriteTimeout(port, timeout);
 
+			OverlappedContainer<Task>* userData = 
+				new OverlappedContainer<Task>(shared_from_this());
 			DWORD bytesTransferred;
 			if (!WriteFile(port, nativeBuffer + this->nativeBuffer->position(), remaining, &bytesTransferred, 
-				&overlapped))
+				&userData->getOverlapped()))
 			{
 				DWORD errorCode = GetLastError();
 				if (errorCode != ERROR_IO_PENDING)
 				{
 					listener->onFailure(IOException(jace::java_new<IOException>(L"WriteFile() failed with error: " +
 						getErrorMessage(errorCode))));
-					return false;
+					return;
 				}
 			}
-			workerThread.pendingTasks.push_back(this);
-			return true;
+			// WriteFile() may return synchronously in spite of the fact that we requested an asynchronous
+			// operation. The completion port gets notified in either case.
+			//
+			// REFERENCE: http://support.microsoft.com/kb/156932
 		}
 		catch (Throwable& t)
 		{
@@ -271,7 +372,6 @@ public:
 			{
 				t.printStackTrace();
 			}
-			return false;
 		}
 	}
 };
@@ -305,7 +405,7 @@ JLong SerialChannel::nativeOpen(String name)
 	}
 
 	// Associate the file handle with the existing completion port
-	HANDLE completionPort = CreateIoCompletionPort(port, ::jperipheral::worker->completionPort, IoTask::COMPLETION, 0);
+	HANDLE completionPort = CreateIoCompletionPort(port, ::jperipheral::worker->completionPort, Task::COMPLETION, 0);
 	if (completionPort==0)
 	{
 		throw AssertionError(jace::java_new<AssertionError>(L"CreateIoCompletionPort() failed with error: " + 
@@ -326,7 +426,7 @@ void SerialChannel::nativeConfigure(JInt baudRate,
 	SerialPortContext* context = getContext(getJaceProxy());
 	DCB dcb = {0};
 	
-	if (!GetCommState(context->port, &dcb))
+	if (!GetCommState(context->getPort(), &dcb))
 	{
 		throw IOException(jace::java_new<IOException>(L"GetCommState() failed with error: " + 
 			getErrorMessage(GetLastError())));
@@ -407,7 +507,7 @@ void SerialChannel::nativeConfigure(JInt baudRate,
 	else
 		throw AssertionError(jace::java_new<AssertionError>(flowControl));
 
-	if (!SetCommState(context->port, &dcb))
+	if (!SetCommState(context->getPort(), &dcb))
 	{
 		throw IOException(jace::java_new<IOException>(L"SetCommState() failed with error: " + 
 			getErrorMessage(GetLastError())));
@@ -480,23 +580,21 @@ void SerialChannel::nativeClose()
 void SerialChannel::nativeRead(ByteBuffer target, JLong timeout, SerialChannel_NativeListener listener)
 {
 	SerialPortContext* context = getContext(getJaceProxy());
-	{
-		boost::mutex::scoped_lock lock(context->readThread.mutex);
-		ReadTask* task = new ReadTask(context->readThread, context->port, target, (DWORD) min(timeout, MAXDWORD), 
-			listener);
-		task->workerThread.task = task;
-		task->workerThread.taskChanged.notify_one();
-	}
+	SingleThreadExecutor& readThread = context->getReadThread();
+
+	boost::shared_ptr<Task> task(new ReadTask(readThread, context->getPort(), target, 
+		timeout));
+	task->setListener(listener);
+	readThread.execute(task);
 }
 
 void SerialChannel::nativeWrite(ByteBuffer source, JLong timeout, SerialChannel_NativeListener listener)
 {
 	SerialPortContext* context = getContext(getJaceProxy());
-	{
-		boost::mutex::scoped_lock lock(context->writeThread.mutex);
-		WriteTask* task = new WriteTask(context->writeThread, context->port, source, (DWORD) min(timeout, MAXDWORD),
-			listener);
-		task->workerThread.task = task;
-		task->workerThread.taskChanged.notify_one();
-	}
+	SingleThreadExecutor& writeThread = context->getWriteThread();
+
+	boost::shared_ptr<Task> task(new WriteTask(writeThread, context->getPort(), source, 
+		timeout));
+	task->setListener(listener);
+	writeThread.execute(task);
 }

@@ -39,33 +39,20 @@ int main(int argc, char* argv[])
 
 	OptionList options;
 
-#ifdef _DEBUG
-	#ifndef JACE_AMD64
-		std::string platform = "i386/debug";
-	#else
-		std::string platform = "amd64/debug";
-	#endif
-#else
-	#ifndef JACE_AMD64
-		std::string platform = "i386/release";
-	#else
-		std::string platform = "amd64/release";
-	#endif
-#endif
 	options.push_back(ClassPath("jperipheral.jar;"
 		"joda-time-1.6.jar;"
-		"slf4j-api-1.5.6.jar;"
+		"slf4j-api-1.6.1.jar;"
 		"google-collect-1.0-rc2.jar;"
 		"aopalliance.jar;"
 		"guice-2.0.jar;"
 		"guice-assistedinject-2.0;"
 		"jace-runtime.jar;"
-		"logback-classic-0.9.15.jar;"
-		"logback-core-0.9.15.jar;"
+		"logback-classic-0.9.24.jar;"
+		"logback-core-0.9.24.jar;"
 		));
 	//options.push_back(Verbose(Verbose::JNI));
 	//options.push_back(Verbose(Verbose::CLASS));
-	options.push_back(CustomOption("-Xmx256M"));
+	options.push_back(CustomOption("-ea"));
 	try
 	{
     jace::createVm(loader, options, false);

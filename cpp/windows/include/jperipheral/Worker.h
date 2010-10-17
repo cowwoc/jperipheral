@@ -40,15 +40,18 @@ public:
 
 private:
 	/**
+	 * The function executed by the thread.
+	 */
+	void run();
+	/**
 	 * Prevent copying.
 	 */
 	Worker& operator=(const Worker&);
 
-	friend void RunTasks(Worker&);
 	friend class ::jace::peer::jperipheral::SerialChannel;
 
 	boost::thread* thread;
-	boost::mutex lock;
+	boost::mutex mutex;
 	boost::condition running;
 	HANDLE completionPort;
 };

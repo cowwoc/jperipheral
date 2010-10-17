@@ -10,10 +10,10 @@ using jace::proxy::jperipheral::SerialChannel_NativeListener;
 #include "jperipheral/SerialPortHelper.h"
 using jperipheral::getContext;
 using jperipheral::getErrorMessage;
-using jperipheral::IoTask;
+using jperipheral::Task;
 using jperipheral::getSourceCodePosition;
 using jperipheral::SerialPortContext;
-using jperipheral::WorkerThread;
+using jperipheral::SingleThreadExecutor;
 
 #include "jace/proxy/java/io/IOException.h"
 using jace::proxy::java::io::IOException;
@@ -28,42 +28,51 @@ using std::string;
 using std::cerr;
 using std::endl;
 
-#pragma warning(push)
-#pragma warning(disable: 4103 4244 4512)
-#include <boost/thread/mutex.hpp>
-#pragma warning(pop)
 
-
-class CancelTask: public IoTask
+class CancelTask: public Task
 {
 public:
-	CancelTask(WorkerThread& workerThread, HANDLE port, SerialChannel_NativeListener future): 
-		IoTask(workerThread, port)
-	{
-		setListener(new SerialChannel_NativeListener(future));
-	}
-
-	virtual void updateJavaBuffer(int)
+	CancelTask(SingleThreadExecutor& workerThread, HANDLE& port): 
+		Task(workerThread, port)
 	{}
 
-	virtual bool run()
+	virtual void onSuccess(int)
+	{}
+
+	virtual void run()
 	{
+		timer = boost::timer();
 		if (!CancelIo(port))
 		{
-			listener->onFailure(IOException(jace::java_new<IOException>(L"CancelIo() failed with error: " +
-			  getErrorMessage(GetLastError()))));
+			listener->onFailure(jace::java_new<IOException>(L"CancelIo() failed with error: " +
+			  getErrorMessage(GetLastError())));
 		}
-		return false;
 	}
 };
 
 void SerialChannel_SerialFuture::nativeCancel()
 {
-	IoTask* context = getContext(getJaceProxy());
+	// Java peer ensures that nativeCancel() and nativeDispose() are not invoked at the same time
+	boost::shared_ptr<Task>* context(getContext(getJaceProxy()));
+	if (!context)
 	{
-		boost::mutex::scoped_lock lock(context->workerThread.mutex);
-		CancelTask* task = new CancelTask(context->workerThread, context->port, getJaceProxy());
-		task->workerThread.task = task;
-		task->workerThread.taskChanged.notify_one();
+		// onSuccess() or onFailure() must have invoked nativeDispose()
+		return;
 	}
+	boost::shared_ptr<Task> task(*context);
+	boost::shared_ptr<Task> cancelTask(new CancelTask(task->getWorkerThread(), task->getPort()));
+	cancelTask->getWorkerThread().execute(cancelTask);
+}
+
+void SerialChannel_SerialFuture::nativeDispose()
+{
+	// Java peer ensures that nativeCancel() and nativeDispose() are not invoked at the same time
+	boost::shared_ptr<Task>* context(getContext(getJaceProxy()));
+	assert(context);
+	boost::shared_ptr<Task> task(*context);
+
+	// Prevent future calls to cancel() in case this method was invoked by onSuccess() or onFuture()
+	setUserObject(0);
+
+	delete context;
 }

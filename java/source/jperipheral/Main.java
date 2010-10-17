@@ -29,19 +29,31 @@ public class Main
 		main.run();
 	}
 
-	private int unsigned(int signed)
-	{
-		return signed + 128;
-	}
-
 	private void run() throws Exception
 	{
-		flush();
-		send("version");
-		send("get 0");
-		send("get state", "select 1");
-		send("select 1");
-		send("select a", "get state");
+//		flush();
+//		send("version");
+//		flush();
+//		send("get 0");
+//		flush();
+//		send("get state", "select 1");
+//		flush();
+//		send("select 1");
+//		flush();
+//		send("select a", "get state");
+//		flush();
+		while (true)
+		{
+			flush();
+			try
+			{
+				send("request" + Math.random());
+			}
+			catch (TimeoutException e)
+			{
+				// do nothing
+			}
+		}
 	}
 
 	private void flush() throws Exception
@@ -55,7 +67,7 @@ public class Main
 			channel = AsynchronousByteCharChannel.open(byteChannel, Charset.forName("UTF-8"));
 			System.out.println("Flushing...");
 			while (true)
-				System.out.println("got : " + channel.readLine().get(1, TimeUnit.SECONDS));
+				System.out.println("got: " + channel.readLine().get(0, TimeUnit.SECONDS));
 		}
 		catch (TimeoutException e)
 		{
@@ -63,7 +75,6 @@ public class Main
 		}
 		finally
 		{
-			//System.out.println("Closing\n\n");
 			byteChannel.close();
 		}
 	}
@@ -80,13 +91,12 @@ public class Main
 			for (String line: lines)
 			{
 				System.out.println("sending: " + line);
-				channel.write(CharBuffer.wrap(line + "\r"), false).get(1, TimeUnit.SECONDS);
-				System.out.println("got : " + channel.readLine().get(1000, TimeUnit.SECONDS));
+				channel.write(CharBuffer.wrap(line + "\r"), false).get(30, TimeUnit.SECONDS);
+				System.out.println("got : " + channel.readLine().get(30, TimeUnit.SECONDS));
 			}
 		}
 		finally
 		{
-//			System.out.println("Closing\n\n");
 			byteChannel.close();
 		}
 	}

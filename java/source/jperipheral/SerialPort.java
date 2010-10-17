@@ -1,10 +1,6 @@
 package jperipheral;
 
 import java.io.IOException;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import jperipheral.nio.channels.CompletionHandler;
 
 /**
  * A serial port.
@@ -208,7 +204,6 @@ public final class SerialPort implements Peripheral
 	}
 
 	private final String name;
-	private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
 	/**
 	 * Creates a new SerialPort.
@@ -254,44 +249,6 @@ public final class SerialPort implements Peripheral
 	public String getName()
 	{
 		return name;
-	}
-
-	/**
-	 * Invokes a task on the comport dispatch thread.
-	 *
-	 * @param <V> The result type returned by the completion handler
-	 * @param <A> The user object to pass to the completion handler
-	 * @param callable the operation to execute
-	 * @param attachment The object to attach to the I/O operation; can be {@code null}
-	 * @param handler The completion handler
-	 */
-	public <V, A> void execute(final Callable<V> callable, final A attachment,
-														 final CompletionHandler<V, A> handler)
-	{
-		executor.execute(new Runnable()
-		{
-			@Override
-			public void run()
-			{
-				try
-				{
-					V result = callable.call();
-					handler.completed(result, attachment);
-				}
-				catch (RuntimeException e)
-				{
-					handler.failed(e, attachment);
-				}
-				catch (Exception e)
-				{
-					handler.failed(e, attachment);
-				}
-				catch (Error e)
-				{
-					handler.failed(e, attachment);
-				}
-			}
-		});
 	}
 
 	@Override

@@ -1,7 +1,7 @@
 #include "jperipheral/SerialPortHelper.h"
-using jperipheral::IoTask;
+using jperipheral::Task;
 using jperipheral::SerialPortContext;
-using jperipheral::WorkerThread;
+using jperipheral::SingleThreadExecutor;
 using jperipheral::getErrorMessage;
 
 #include "jace/proxy/jperipheral/SerialPort.h"
@@ -21,6 +21,12 @@ using jace::proxy::java::lang::AssertionError;
 
 #include "jace/proxy/java/lang/RuntimeException.h"
 using jace::proxy::java::lang::RuntimeException;
+
+#include "jace/proxy/java/lang/IllegalStateException.h"
+using jace::proxy::java::lang::IllegalStateException;
+
+#include "jace/proxy/types/JLong.h"
+using jace::proxy::types::JLong;
 
 #include "jace/proxy/java/lang/String.h"
 using jace::proxy::java::lang::String;
@@ -49,6 +55,7 @@ using std::endl;
 #include <boost/bind.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/mutex.hpp>
+#include "boost/timer.hpp"
 #pragma warning(pop)
 
 
@@ -57,34 +64,73 @@ SerialPortContext* jperipheral::getContext(SerialChannel channel)
 	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(channel.nativeObject()));
 }
 
-IoTask* jperipheral::getContext(SerialChannel_SerialFuture future)
+boost::shared_ptr<Task>* jperipheral::getContext(SerialChannel_SerialFuture future)
 {
-	return reinterpret_cast<IoTask*>(static_cast<intptr_t>(future.userObject()));
+	return reinterpret_cast<boost::shared_ptr<Task>*>(static_cast<intptr_t>(
+		future.getUserObject()));
 }
 
-IoTask::IoTask(WorkerThread& _workerThread, HANDLE _port):
-  workerThread(_workerThread), port(_port), timeout(0), nativeBuffer(0), javaBuffer(0), listener(0)
+Task::Task(SingleThreadExecutor& _workerThread, HANDLE& _port):
+  workerThread(_workerThread), port(_port), timeout(0), nativeBuffer(0), 
+	javaBuffer(0), listener(0)
+{}
+
+Task::Task(const Task& other):
+  workerThread(other.workerThread), port(other.port), timeout(other.timeout), nativeBuffer(other.nativeBuffer), 
+	javaBuffer(other.javaBuffer), listener(other.listener)
 {
-	memset(&overlapped, 0, sizeof(OVERLAPPED));
 }
 
-void IoTask::setJavaBuffer(::jace::proxy::java::nio::ByteBuffer* _javaBuffer)
+void Task::setJavaBuffer(::jace::proxy::java::nio::ByteBuffer* _javaBuffer)
 {
 	javaBuffer = _javaBuffer;
 }
 
-void IoTask::setTimeout(DWORD _timeout)
+void Task::setTimeout(JLong _timeout)
 {
 	timeout = _timeout;
 }
 
-void IoTask::setListener(::jace::proxy::jperipheral::SerialChannel_NativeListener* _listener)
+long Task::getTimeElapsed() const
 {
-	listener = _listener;
-	listener->setUserObject(reinterpret_cast<intptr_t>(this));
+	return static_cast<long>(timer.elapsed() * 1000);
 }
 
-IoTask::~IoTask()
+void Task::setListener(::jace::proxy::jperipheral::SerialChannel_NativeListener _listener)
+{
+	if (listener != 0)
+	{
+		// Clean up existing listener
+		boost::shared_ptr<Task>* context(reinterpret_cast<boost::shared_ptr<Task>*>(static_cast<intptr_t>(
+			listener->getUserObject())));
+		delete context;
+		listener->setUserObject(0);
+	}
+	listener = new SerialChannel_NativeListener(_listener);
+	listener->setUserObject(reinterpret_cast<intptr_t>(new boost::shared_ptr<Task>(shared_from_this())));
+}
+
+::jace::proxy::jperipheral::SerialChannel_NativeListener* Task::getListener()
+{
+	return listener;
+}
+
+JLong Task::getTimeout() const
+{
+	return timeout;
+}
+
+HANDLE& Task::getPort()
+{
+	return port;
+}
+
+SingleThreadExecutor& Task::getWorkerThread()
+{
+	return workerThread;
+}
+
+Task::~Task()
 {
 	delete listener;
 	if (nativeBuffer!=javaBuffer)
@@ -96,29 +142,40 @@ IoTask::~IoTask()
 		delete nativeBuffer;
 }
 
-IoTask* IoTask::fromOverlapped(OVERLAPPED* overlapped)
+void SingleThreadExecutor::run()
 {
-	return reinterpret_cast<IoTask*>((char*) overlapped - offsetof(IoTask, overlapped));
-}
-
-static void ScheduleTasks(WorkerThread& context)
-{
-	boost::mutex::scoped_lock lock(context.mutex);
-	context.running.notify_one();
+	{
+		boost::mutex::scoped_lock lock(mutex);
+		onRunning.notify_all();
+		running = true;
+		onStateChanged.wait(lock);
+	}
 	try
 	{
-		while (!context.shutdownRequested)
+		boost::shared_ptr<Task> task;
+		while (true)
 		{
-			context.taskChanged.wait(lock);
-			if (!context.task->run())
 			{
-				context.taskDone.notify_one();
-				context.pendingTasks.remove(context.task);
-				delete context.task;
+				boost::mutex::scoped_lock lock(mutex);
+				if (shutdownRequested && tasks.empty())
+					break;
+				task = tasks.front();
+				tasks.pop_front();
 			}
-			context.task = 0;
+			// DESIGN: We must ensure that the listener is never used while the SingleThreadExecutor
+			//         mutex is locked, otherwise we risk the following deadlock:
+			//
+			//         1) Lock SingleThreadExecutor mutex -> ReadTask -> error occurs ->
+			//            listener->onFailure() -> Waiting on Future mutex
+			//         2) Lock Future mutex -> Future.cancel() -> CancelTask ->
+			//            Waiting on SingleThreadExecutor mutex
+			task->run();
+			{
+				boost::mutex::scoped_lock lock(mutex);
+				if (!shutdownRequested && tasks.empty())
+					onStateChanged.wait(lock);
+			}
 		}
-		assert (context.task == 0);
 	}
   catch (jace::proxy::java::lang::Throwable& t)
   {
@@ -132,83 +189,95 @@ static void ScheduleTasks(WorkerThread& context)
 		JNIEnv* env = jace::attach();
     env->Throw(static_cast<jthrowable>(env->NewLocalRef(ex)));
   }
-	jace::detach();
+	{
+		boost::mutex::scoped_lock lock(mutex);
+		running = false;
+		jace::detach();
+	}
 };
 
-WorkerThread::WorkerThread():
-	task(0), shutdownRequested(false)
+SingleThreadExecutor::SingleThreadExecutor():
+	thread(0), shutdownRequested(false), running(false)
 {
 	boost::mutex::scoped_lock lock(mutex);
-	thread = new boost::thread(boost::bind(&ScheduleTasks, boost::ref(*this)));
-	// If we don't wait, the worker thread may miss condition notification
-	running.wait(lock);
+	thread = new boost::thread(boost::bind(&SingleThreadExecutor::run, 
+		this));
+	// If we don't wait, the worker thread may miss conditions notified past this point
+	onRunning.wait(lock);
 }
 
-WorkerThread::~WorkerThread()
+SingleThreadExecutor::~SingleThreadExecutor()
 {
-	thread->join();
+	shutdown();
+	awaitTermination();
 	delete thread;
-	delete task;
 }
 
-void WorkerThread::deleteTask(IoTask* task)
+void SingleThreadExecutor::execute(boost::shared_ptr<Task> task)
 {
 	boost::mutex::scoped_lock lock(mutex);
-	taskDone.notify_one();
-	pendingTasks.remove(task);
-	delete task;
+	if (!running)
+	{
+		throw IllegalStateException(jace::java_new<IllegalStateException>(
+			std::wstring(L"SingleThreadExecutor has shut down")));
+	}
+	if (shutdownRequested)
+	{
+		throw IllegalStateException(jace::java_new<IllegalStateException>(
+	  	std::wstring(L"SingleThreadExecutor is in the process of shutting "
+			L"down and cannot accept any new tasks")));
+	}
+	tasks.push_back(task);
+	onStateChanged.notify_all();
+}
+
+void SingleThreadExecutor::shutdown()
+{
+	boost::mutex::scoped_lock lock(mutex);
+	shutdownRequested = true;
+	onStateChanged.notify_all();
+}
+
+void SingleThreadExecutor::awaitTermination()
+{
+	{
+		boost::mutex::scoped_lock lock(mutex);
+		if (!running)
+			return;
+	}
+	thread->join();
 }
 
 SerialPortContext::SerialPortContext(HANDLE _port):
 	port(_port)
 {}
 
-class ShutdownTask: public IoTask
-{
-public:
-	ShutdownTask(WorkerThread& workerThread, HANDLE _port): 
-		IoTask(workerThread, _port)
-	{}
-
-	virtual void updateJavaBuffer(int)
-	{}
-
-	virtual bool run()
-	{
-		// Wait for ongoing tasks to complete
-		if (!workerThread.pendingTasks.empty())
-		{
-			if (!CancelIo(port))
-			{
-				throw IOException(jace::java_new<IOException>(L"CancelIo() failed with error: " + 
-				  getErrorMessage(GetLastError())));
-			}
-			while (!workerThread.pendingTasks.empty())
-				workerThread.taskDone.wait(workerThread.mutex);
-		}
-		workerThread.shutdownRequested = true;
-		return false;
-	}
-};
-
 SerialPortContext::~SerialPortContext()
 {
-	{
-		boost::mutex::scoped_lock lock(readThread.mutex);
-		ShutdownTask* task = new ShutdownTask(readThread, port);
-		task->workerThread.task = task;
-		task->workerThread.taskChanged.notify_one();
-	}
-	{
-		boost::mutex::scoped_lock lock(writeThread.mutex);
-		ShutdownTask* task = new ShutdownTask(writeThread, port);
-		task->workerThread.task = task;
-		task->workerThread.taskChanged.notify_one();
-	}
-	readThread.thread->join();
-	writeThread.thread->join();
+	readThread.shutdown();
+	readThread.awaitTermination();
+	writeThread.shutdown();
+	writeThread.awaitTermination();
 	if (!CloseHandle(port))
-		throw IOException(jace::java_new<IOException>(L"CloseHandle() failed with error: " + getErrorMessage(GetLastError())));
+	{
+		throw IOException(jace::java_new<IOException>(L"CloseHandle() failed with error: " + 
+		  getErrorMessage(GetLastError())));
+	}
+}
+
+HANDLE& SerialPortContext::getPort()
+{
+	return port;
+}
+
+SingleThreadExecutor& SerialPortContext::getReadThread()
+{
+	return readThread;
+}
+
+SingleThreadExecutor& SerialPortContext::getWriteThread()
+{
+	return writeThread;
 }
 
 /**

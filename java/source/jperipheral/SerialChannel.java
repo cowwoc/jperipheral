@@ -52,18 +52,23 @@ import org.slf4j.LoggerFactory;
 public class SerialChannel extends AsynchronousSerialChannel
 {
 	/**
-	 * A pointer to the native object.
+	 * A pointer to the native object, accessed by the native code.
 	 */
-	private final long nativeObject;
-	private final SerialPort port;
-	private int baudRate;
-	private DataBits dataBits;
-	private StopBits stopBits;
-	private Parity parity;
-	private FlowControl flowControl;
-	private boolean closed;
-	private boolean readPending;
-	private boolean writePending;
+	@SuppressWarnings(
+	{
+		"PMD.UnusedPrivateField",
+		"PMD.SingularField"
+	})
+	private transient final long nativeObject;
+	private transient final SerialPort port;
+	private transient int baudRate;
+	private transient DataBits dataBits;
+	private transient StopBits stopBits;
+	private transient Parity parity;
+	private transient FlowControl flowControl;
+	private transient boolean closed;
+	private transient boolean readPending;
+	private transient boolean writePending;
 
 	/**
 	 * Creates a new SerialChannel.
@@ -72,7 +77,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 	 * @throws PeripheralNotFoundException if the comport does not exist
 	 * @throws PeripheralInUseException if the peripheral is locked by another application
 	 */
-	public SerialChannel(SerialPort port)
+	public SerialChannel(final SerialPort port)
 		throws PeripheralNotFoundException, PeripheralInUseException
 	{
 		this.port = port;
@@ -130,7 +135,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 	}
 
 	@Override
-	public synchronized Future<Integer> read(ByteBuffer target)
+	public synchronized Future<Integer> read(final ByteBuffer target)
 		throws IllegalArgumentException, ReadPendingException
 	{
 		if (target.isReadOnly())
@@ -145,7 +150,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 		if (target.remaining() <= 0)
 			return new NoOpFuture();
-		SerialFuture<Integer> result = new SerialFuture<Integer>(new Runnable()
+		final SerialFuture<Integer> result = new SerialFuture<Integer>(new Runnable()
 		{
 			@Override
 			public void run()
@@ -158,7 +163,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 		});
 		try
 		{
-			nativeRead(target, 0L, result);
+			nativeRead(target, Long.MAX_VALUE, result);
 			return result;
 		}
 		catch (RuntimeException e)
@@ -169,8 +174,9 @@ public class SerialChannel extends AsynchronousSerialChannel
 	}
 
 	@Override
-	public synchronized <A> void read(ByteBuffer target, long timeout, TimeUnit unit, A attachment,
-																		CompletionHandler<Integer, ? super A> handler)
+	public synchronized <A> void read(final ByteBuffer target, final long timeout,
+																		final TimeUnit unit, final A attachment,
+																		final CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
 		if (target.isReadOnly())
@@ -214,7 +220,8 @@ public class SerialChannel extends AsynchronousSerialChannel
 	}
 
 	@Override
-	public synchronized Future<Integer> write(ByteBuffer source) throws WritePendingException
+	public synchronized Future<Integer> write(final ByteBuffer source)
+		throws WritePendingException
 	{
 		synchronized (this)
 		{
@@ -226,7 +233,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 		if (source.remaining() <= 0)
 			return new NoOpFuture();
-		SerialFuture<Integer> result = new SerialFuture<Integer>(new Runnable()
+		final SerialFuture<Integer> result = new SerialFuture<Integer>(new Runnable()
 		{
 			@Override
 			public void run()
@@ -239,7 +246,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 		});
 		try
 		{
-			nativeWrite(source, 0L, result);
+			nativeWrite(source, Long.MAX_VALUE, result);
 			return result;
 		}
 		catch (RuntimeException e)
@@ -250,8 +257,9 @@ public class SerialChannel extends AsynchronousSerialChannel
 	}
 
 	@Override
-	public synchronized <A> void write(ByteBuffer source, long timeout, TimeUnit unit, A attachment,
-																		 CompletionHandler<Integer, ? super A> handler)
+	public synchronized <A> void write(final ByteBuffer source, final long timeout,
+																		 final TimeUnit unit, final A attachment,
+																		 final CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, WritePendingException, ShutdownChannelGroupException
 	{
 		synchronized (this)
@@ -302,8 +310,8 @@ public class SerialChannel extends AsynchronousSerialChannel
 	 * @param flowControl the flow control to use
 	 * @throws IOException if an I/O error occurs while configuring the channel
 	 */
-	public void configure(int baudRate, DataBits dataBits, Parity parity,
-												StopBits stopBits, FlowControl flowControl)
+	public void configure(final int baudRate, final DataBits dataBits, final Parity parity,
+												final StopBits stopBits, final FlowControl flowControl)
 		throws IOException
 	{
 		nativeConfigure(baudRate, dataBits, parity, stopBits, flowControl);
@@ -382,7 +390,9 @@ public class SerialChannel extends AsynchronousSerialChannel
 	 *
 	 * @param <A> the attachment type
 	 * @param target the buffer to write into
-	 * @param timeout the number of milliseconds to wait before throwing InterruptedByTimeoutException
+	 * @param timeout the number of milliseconds to wait before throwing
+	 *                InterruptedByTimeoutException. 0 means "return right away".
+	 *                Long.MAX_VALUE means "wait forever"
 	 * @param listener listens for native events
 	 */
 	private native <A> void nativeRead(ByteBuffer target, long timeout, NativeListener listener);
@@ -392,7 +402,9 @@ public class SerialChannel extends AsynchronousSerialChannel
 	 *
 	 * @param <A> the attachment type
 	 * @param source the buffer to read from
-	 * @param timeout the number of milliseconds to wait before throwing InterruptedByTimeoutException
+	 * @param timeout the number of milliseconds to wait before throwing
+	 *                InterruptedByTimeoutException. 0 means "return right away".
+	 *                Long.MAX_VALUE means "wait forever"
 	 * @param listener listens for native events
 	 */
 	private native <A> void nativeWrite(ByteBuffer source, long timeout, NativeListener listener);
@@ -402,11 +414,11 @@ public class SerialChannel extends AsynchronousSerialChannel
 	 *
 	 * @author Gili Tzabari
 	 */
-	private static interface NativeListener
+	private interface NativeListener
 	{
 		/**
 		 * Sets the the user object associated with the listener.
-		 * 
+		 *
 		 * @param userObject a pointer to the user object
 		 */
 		void setUserObject(long userObject);
@@ -446,7 +458,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 	private static class ClosedFuture implements Future<Integer>
 	{
 		@Override
-		public boolean cancel(boolean mayInterruptIfRunning)
+		public boolean cancel(final boolean mayInterruptIfRunning)
 		{
 			return false;
 		}
@@ -470,8 +482,8 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 
 		@Override
-		public Integer get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
-																													 TimeoutException
+		public Integer get(final long timeout, final TimeUnit unit)
+			throws InterruptedException, ExecutionException, TimeoutException
 		{
 			throw new ExecutionException(new ClosedChannelException());
 		}
@@ -485,9 +497,9 @@ public class SerialChannel extends AsynchronousSerialChannel
 	 */
 	private static class NativeListenerToCompletionHandler<A> implements NativeListener
 	{
-		private final CompletionHandler<Integer, ? super A> handler;
-		private final A attachment;
-		private final Runnable onDone;
+		private transient final CompletionHandler<Integer, ? super A> handler;
+		private transient final A attachment;
+		private transient final Runnable onDone;
 
 		/**
 		 * Creates a new CompletionHandlerAdapter.
@@ -496,9 +508,9 @@ public class SerialChannel extends AsynchronousSerialChannel
 		 * @param attachment the attachment associated with the CompletionHandler
 		 * @param onDone the Runnable to invoke when the operation completes
 		 */
-		public NativeListenerToCompletionHandler(CompletionHandler<Integer, ? super A> handler,
-																						 A attachment,
-																						 Runnable onDone)
+		public NativeListenerToCompletionHandler(final CompletionHandler<Integer, ? super A> handler,
+																						 final A attachment,
+																						 final Runnable onDone)
 		{
 			this.handler = handler;
 			this.attachment = attachment;
@@ -506,14 +518,14 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 
 		@Override
-		public void onSuccess(Integer value)
+		public void onSuccess(final Integer value)
 		{
 			handler.completed(value, attachment);
 			onDone.run();
 		}
 
 		@Override
-		public void onFailure(Throwable throwable)
+		public void onFailure(final Throwable throwable)
 		{
 			handler.failed(throwable, attachment);
 			onDone.run();
@@ -527,8 +539,9 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 
 		@Override
-		public void setUserObject(long userObject)
+		public void setUserObject(final long userObject)
 		{
+			throw new AssertionError("Never used by native code");
 		}
 
 		@Override
@@ -546,27 +559,27 @@ public class SerialChannel extends AsynchronousSerialChannel
 	 */
 	private static class SerialFuture<A> implements Future<Integer>, NativeListener
 	{
-		private long userObject;
-		private Integer value;
-		private Throwable throwable;
-		private boolean done;
-		private boolean cancelled;
-		private boolean cancelRequested;
-		private final Runnable onDone;
-		private final Logger log = LoggerFactory.getLogger(SerialFuture.class);
+		private transient long userObject;
+		private transient Integer value;
+		private transient Throwable throwable;
+		private transient boolean done;
+		private transient boolean cancelled;
+		private transient boolean cancelRequested;
+		private transient final Runnable onDone;
+		private transient final Logger log = LoggerFactory.getLogger(SerialFuture.class);
 
 		/**
 		 * Creates a new SerialFuture.
 		 *
 		 * @param onDone the Runnable to invoke when the operation completes
 		 */
-		public SerialFuture(Runnable onDone)
+		public SerialFuture(final Runnable onDone)
 		{
 			this.onDone = onDone;
 		}
 
 		@Override
-		public synchronized boolean cancel(boolean mayInterruptIfRunning)
+		public synchronized boolean cancel(final boolean mayInterruptIfRunning)
 		{
 			if (!mayInterruptIfRunning)
 			{
@@ -575,9 +588,10 @@ public class SerialChannel extends AsynchronousSerialChannel
 			}
 			if (done)
 				return false;
+			cancelRequested = true;
 			try
 			{
-				// TODO: Canceling an operation may result in data loss.
+				// NOTE: Canceling an operation may result in data loss.
 				// REFERENCE: http://stackoverflow.com/questions/1238905/what-does-cancelio-do-with-bytes-that-have-already-been-read
 				nativeCancel();
 			}
@@ -591,12 +605,11 @@ public class SerialChannel extends AsynchronousSerialChannel
 				try
 				{
 					// wait for onSuccess(), onFailure() or onCancellation() to get invoked
-					cancelRequested = true;
 					wait();
 				}
 				catch (InterruptedException e)
 				{
-					throw new RuntimeException(e);
+					return false;
 				}
 			}
 			return cancelled;
@@ -615,8 +628,8 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 
 		@Override
-		public synchronized Integer get() throws CancellationException, InterruptedException,
-																						 ExecutionException
+		public synchronized Integer get()
+			throws CancellationException, InterruptedException, ExecutionException
 		{
 			while (!done)
 				wait();
@@ -628,10 +641,8 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 
 		@Override
-		public synchronized Integer get(long timeout, TimeUnit unit) throws CancellationException,
-																																				InterruptedException,
-																																				ExecutionException,
-																																				TimeoutException
+		public synchronized Integer get(final long timeout, final TimeUnit unit)
+			throws CancellationException, InterruptedException, ExecutionException, TimeoutException
 		{
 			DateTime endTime = new DateTime().plus(new Duration(TimeUnit.MILLISECONDS.convert(timeout,
 				unit)));
@@ -659,21 +670,17 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 
 		@Override
-		public synchronized void onSuccess(Integer value)
+		public synchronized void onSuccess(final Integer value)
 		{
 			this.value = value;
-			done = true;
-			notifyAll();
-			onDone.run();
+			onDone();
 		}
 
 		@Override
-		public synchronized void onFailure(Throwable throwable)
+		public synchronized void onFailure(final Throwable throwable)
 		{
 			this.throwable = throwable;
-			done = true;
-			notifyAll();
-			onDone.run();
+			onDone();
 		}
 
 		@Override
@@ -686,32 +693,52 @@ public class SerialChannel extends AsynchronousSerialChannel
 			}
 			else
 			{
-				// Caused by AsynchronousChannel.close()
+				// Otherwise, assume it was caused by AsynchronousChannel.close()
 				this.throwable = new AsynchronousCloseException();
 			}
+			onDone();
+		}
+
+		/**
+		 * Invoked when the operation completes.
+		 */
+		private synchronized void onDone()
+		{
 			done = true;
 			notifyAll();
 			onDone.run();
+			nativeDispose();
 		}
 
 		@Override
-		public void setUserObject(long userObject)
+		public synchronized void setUserObject(final long userObject)
 		{
+			// invoked by native code
 			this.userObject = userObject;
 		}
 
 		@Override
-		public long getUserObject()
+		public synchronized long getUserObject()
 		{
+			// invoked by native code
 			return userObject;
 		}
 
 		/**
 		 * Cancels an ongoing operation.
 		 *
+		 * Implementation must ensure that nativeDispose() is not invoked at the same time.
+		 *
 		 * @throws IOException if the operation fails
 		 */
 		private native void nativeCancel() throws IOException;
+
+		/**
+		 * Disposes the resources associated with the native listener.
+		 *
+		 * Implementation must ensure that nativeCancel() is not invoked at the same time.
+		 */
+		private native void nativeDispose();
 	}
 
 	/**
@@ -722,7 +749,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 	private static class NoOpFuture implements Future<Integer>
 	{
 		@Override
-		public boolean cancel(boolean mayInterruptIfRunning)
+		public boolean cancel(final boolean mayInterruptIfRunning)
 		{
 			return false;
 		}
@@ -746,11 +773,10 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 
 		@Override
-		public Integer get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
-																													 TimeoutException
+		public Integer get(final long timeout, final TimeUnit unit)
+			throws InterruptedException, ExecutionException, TimeoutException
 		{
 			return get();
 		}
 	}
-
 }

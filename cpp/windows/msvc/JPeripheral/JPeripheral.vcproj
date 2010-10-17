@@ -44,7 +44,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(TargetDir)\..\..\..\include&quot;;&quot;$(JACE_HOME)\release\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
+				AdditionalIncludeDirectories="..\..\..\common\include;..\..\include;&quot;$(JACE_HOME)\release\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;JPERIPHERAL_EXPORTS;JACE_PROXY_EXPORTS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -121,7 +121,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(TargetDir)\..\..\..\include&quot;;&quot;$(JACE_HOME)\release\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;&quot;$(BOOST_HOME)&quot;"
+				AdditionalIncludeDirectories="..\..\..\common\include;..\..\include;&quot;$(JACE_HOME)\release\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;&quot;$(BOOST_HOME)&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;JPERIPHERAL_EXPORTS;JACE_PROXY_EXPORTS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -200,7 +200,7 @@
 				AdditionalOptions="/MP"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;$(TargetDir)\..\..\..\include&quot;;&quot;$(JACE_HOME)\release\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
+				AdditionalIncludeDirectories="..\..\..\common\include;..\..\include;&quot;$(JACE_HOME)\release\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;JPERIPHERAL_EXPORTS;JACE_PROXY_EXPORTS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -281,7 +281,7 @@
 				AdditionalOptions="/MP"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;$(TargetDir)\..\..\..\include&quot;;&quot;$(JACE_HOME)\release\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
+				AdditionalIncludeDirectories="..\..\..\common\include;..\..\include;&quot;$(JACE_HOME)\release\include&quot;;&quot;$(JAVA_HOME)\include&quot;;&quot;$(JAVA_HOME)\include\win32&quot;;$(BOOST_HOME)"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;JPERIPHERAL_EXPORTS;JACE_PROXY_EXPORTS"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -497,19 +497,19 @@
 					Name="peer"
 					>
 					<File
-						RelativePath="..\..\source\jace\peer\jperipheral\SerialChannel_peer.cpp"
+						RelativePath="..\..\..\common\source\jace\peer\jperipheral\SerialChannel_peer.cpp"
 						>
 					</File>
 					<File
-						RelativePath="..\..\source\jace\peer\jperipheral\SerialChannel_SerialFuture_peer.cpp"
+						RelativePath="..\..\..\common\source\jace\peer\jperipheral\SerialChannel_SerialFuture_peer.cpp"
 						>
 					</File>
 					<File
-						RelativePath="..\..\source\jace\peer\jperipheral\SerialChannel_SerialFutureMappings.cpp"
+						RelativePath="..\..\..\common\source\jace\peer\jperipheral\SerialChannel_SerialFutureMappings.cpp"
 						>
 					</File>
 					<File
-						RelativePath="..\..\source\jace\peer\jperipheral\SerialChannelMappings.cpp"
+						RelativePath="..\..\..\common\source\jace\peer\jperipheral\SerialChannelMappings.cpp"
 						>
 					</File>
 				</Filter>
@@ -520,59 +520,59 @@
 						Name="jperipheral"
 						>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\AsynchronousByteChannelTimeouts.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\AsynchronousByteChannelTimeouts.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\AsynchronousSerialChannel.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\AsynchronousSerialChannel.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\Main.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\Main.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\Peripheral.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\Peripheral.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\PeripheralInUseException.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\PeripheralInUseException.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\PeripheralNotFoundException.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\PeripheralNotFoundException.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\SerialChannel.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\SerialChannel.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\SerialChannel_NativeListener.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\SerialChannel_NativeListener.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\SerialChannel_SerialFuture.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\SerialChannel_SerialFuture.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\SerialPort.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\SerialPort.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\SerialPort_DataBits.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\SerialPort_DataBits.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\SerialPort_FlowControl.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\SerialPort_FlowControl.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\SerialPort_Parity.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\SerialPort_Parity.cpp"
 							>
 						</File>
 						<File
-							RelativePath="..\..\source\jace\proxy\jperipheral\SerialPort_StopBits.cpp"
+							RelativePath="..\..\..\common\source\jace\proxy\jperipheral\SerialPort_StopBits.cpp"
 							>
 						</File>
 						<Filter
@@ -582,19 +582,19 @@
 								Name="channels"
 								>
 								<File
-									RelativePath="..\..\source\jace\proxy\jperipheral\nio\channels\AsynchronousByteChannel.cpp"
+									RelativePath="..\..\..\common\source\jace\proxy\jperipheral\nio\channels\AsynchronousByteChannel.cpp"
 									>
 								</File>
 								<File
-									RelativePath="..\..\source\jace\proxy\jperipheral\nio\channels\AsynchronousChannel.cpp"
+									RelativePath="..\..\..\common\source\jace\proxy\jperipheral\nio\channels\AsynchronousChannel.cpp"
 									>
 								</File>
 								<File
-									RelativePath="..\..\source\jace\proxy\jperipheral\nio\channels\CompletionHandler.cpp"
+									RelativePath="..\..\..\common\source\jace\proxy\jperipheral\nio\channels\CompletionHandler.cpp"
 									>
 								</File>
 								<File
-									RelativePath="..\..\source\jace\proxy\jperipheral\nio\channels\InterruptedByTimeoutException.cpp"
+									RelativePath="..\..\..\common\source\jace\proxy\jperipheral\nio\channels\InterruptedByTimeoutException.cpp"
 									>
 								</File>
 							</Filter>
@@ -607,15 +607,15 @@
 							Name="io"
 							>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\io\Closeable.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\io\Closeable.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\io\IOException.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\io\IOException.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\io\Serializable.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\io\Serializable.cpp"
 								>
 							</File>
 						</Filter>
@@ -623,74 +623,94 @@
 							Name="lang"
 							>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\AssertionError.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\AssertionError.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\CharSequence.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\AutoCloseable.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\Class.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\CharSequence.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\Comparable.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\Class.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\Enum.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\Comparable.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\Error.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\Enum.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\Exception.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\Error.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\Integer.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\Exception.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\Number.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\IllegalArgumentException.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\Object.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\IllegalStateException.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\Runnable.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\Integer.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\RuntimeException.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\InterruptedException.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\String.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\Long.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\lang\Throwable.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\Number.cpp"
+								>
+							</File>
+							<File
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\Object.cpp"
+								>
+							</File>
+							<File
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\Runnable.cpp"
+								>
+							</File>
+							<File
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\RuntimeException.cpp"
+								>
+							</File>
+							<File
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\String.cpp"
+								>
+							</File>
+							<File
+								RelativePath="..\..\..\common\source\jace\proxy\java\lang\Throwable.cpp"
 								>
 							</File>
 							<Filter
 								Name="reflect"
 								>
 								<File
-									RelativePath="..\..\source\jace\proxy\java\lang\reflect\AnnotatedElement.cpp"
+									RelativePath="..\..\..\common\source\jace\proxy\java\lang\reflect\AnnotatedElement.cpp"
 									>
 								</File>
 								<File
-									RelativePath="..\..\source\jace\proxy\java\lang\reflect\GenericDeclaration.cpp"
+									RelativePath="..\..\..\common\source\jace\proxy\java\lang\reflect\GenericDeclaration.cpp"
 									>
 								</File>
 								<File
-									RelativePath="..\..\source\jace\proxy\java\lang\reflect\Type.cpp"
+									RelativePath="..\..\..\common\source\jace\proxy\java\lang\reflect\Type.cpp"
 									>
 								</File>
 							</Filter>
@@ -699,18 +719,18 @@
 							Name="nio"
 							>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\nio\Buffer.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\nio\Buffer.cpp"
 								>
 							</File>
 							<File
-								RelativePath="..\..\source\jace\proxy\java\nio\ByteBuffer.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\java\nio\ByteBuffer.cpp"
 								>
 							</File>
 							<Filter
 								Name="channels"
 								>
 								<File
-									RelativePath="..\..\source\jace\proxy\java\nio\channels\Channel.cpp"
+									RelativePath="..\..\..\common\source\jace\proxy\java\nio\channels\Channel.cpp"
 									>
 								</File>
 							</Filter>
@@ -722,11 +742,11 @@
 								Name="concurrent"
 								>
 								<File
-									RelativePath="..\..\source\jace\proxy\java\util\concurrent\Future.cpp"
+									RelativePath="..\..\..\common\source\jace\proxy\java\util\concurrent\Future.cpp"
 									>
 								</File>
 								<File
-									RelativePath="..\..\source\jace\proxy\java\util\concurrent\TimeUnit.cpp"
+									RelativePath="..\..\..\common\source\jace\proxy\java\util\concurrent\TimeUnit.cpp"
 									>
 								</File>
 							</Filter>
@@ -739,7 +759,7 @@
 							Name="slf4j"
 							>
 							<File
-								RelativePath="..\..\source\jace\proxy\org\slf4j\Logger.cpp"
+								RelativePath="..\..\..\common\source\jace\proxy\org\slf4j\Logger.cpp"
 								>
 							</File>
 						</Filter>
@@ -762,15 +782,11 @@
 						Name="jperipheral"
 						>
 						<File
-							RelativePath="..\..\include\jace\peer\jperipheral\SerialPort.h"
+							RelativePath="..\..\..\..\common\include\jace\peer\jperipheral\SerialChannel.h"
 							>
 						</File>
 						<File
-							RelativePath="..\..\include\jace\peer\jperipheral\SerialPort_Channel.h"
-							>
-						</File>
-						<File
-							RelativePath="..\..\include\jace\peer\jperipheral\SerialPort_Channel_SerialFuture.h"
+							RelativePath="..\..\..\..\common\include\jace\peer\jperipheral\SerialChannel_SerialFuture.h"
 							>
 						</File>
 					</Filter>

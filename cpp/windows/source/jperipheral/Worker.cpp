@@ -9,14 +9,14 @@ using std::wstring;
 
 #include "jperipheral/SerialPortHelper.h"
 using jperipheral::getErrorMessage;
-using jperipheral::IoTask;
+using jperipheral::Task;
 using jperipheral::getSourceCodePosition;
 
 #include "jace/Jace.h"
 using jace::toWString;
 
-#include "jace/proxy/types/JLong.h"
-using jace::proxy::types::JLong;
+#include "jace/proxy/java/lang/Long.h"
+using jace::proxy::java::lang::Long;
 
 #include "jace/proxy/java/lang/Integer.h"
 using jace::proxy::java::lang::Integer;
@@ -31,9 +31,6 @@ using jace::proxy::java::io::IOException;
 #include "jace/proxy/java/lang/Throwable.h"
 using jace::proxy::java::lang::Throwable;
 
-#include "jace/proxy/jperipheral/nio/channels/InterruptedByTimeoutException.h"
-using jace::proxy::jperipheral::nio::channels::InterruptedByTimeoutException;
-
 #include "jace/proxy/java/nio/ByteBuffer.h"
 using jace::proxy::java::nio::ByteBuffer;
 
@@ -41,22 +38,26 @@ using jace::proxy::java::nio::ByteBuffer;
 using std::cerr;
 using std::endl;
 
+#pragma warning(push)
+#pragma warning(disable: 4103 4244 4512)
+#include "boost/timer.hpp"
+#pragma warning(pop)
+
 
 Worker* jperipheral::worker;
 
 /**
  * Executes any pending tasks.
  */
-void jperipheral::RunTasks(Worker& worker)
+void Worker::run()
 {
-	HANDLE completionPort = worker.completionPort;
 	DWORD bytesTransfered;
 	ULONG_PTR completionKey;
 	OVERLAPPED* overlapped;
 
 	{
-		boost::mutex::scoped_lock lock(worker.lock);
-		worker.running.notify_one();
+		boost::mutex::scoped_lock lock(mutex);
+		running.notify_all();
 	}
 	while (true)
 	{
@@ -64,8 +65,9 @@ void jperipheral::RunTasks(Worker& worker)
 			&overlapped, INFINITE))
 		{
 			DWORD errorCode = GetLastError();
-			IoTask* task = IoTask::fromOverlapped(overlapped);
-
+			OverlappedContainer<Task>* overlappedContainer = OverlappedContainer<Task>::fromOverlapped(overlapped);
+			boost::shared_ptr<Task> task(overlappedContainer->getData());
+			
 			switch (errorCode)
 			{
 				case ERROR_HANDLE_EOF:
@@ -73,16 +75,16 @@ void jperipheral::RunTasks(Worker& worker)
 				case ERROR_OPERATION_ABORTED:
 				{
 					// Triggered by CancelIo()
-					task->listener->onCancellation();
-					task->workerThread.deleteTask(task);
+					task->getListener()->onCancellation();
+					delete overlappedContainer;
 					jace::detach();
 					break;
 				}
 				default:
 				{
-					task->listener->onFailure(IOException(jace::java_new<IOException>(
+					task->getListener()->onFailure(IOException(jace::java_new<IOException>(
 						L"GetQueuedCompletionStatus() failed with error: " + getErrorMessage(errorCode))));
-					task->workerThread.deleteTask(task);
+					delete overlappedContainer;
 					jace::detach();
 					break;
 				}
@@ -90,51 +92,18 @@ void jperipheral::RunTasks(Worker& worker)
 		}
 		else
 		{
-			IoTask* task = IoTask::fromOverlapped(overlapped);
+			OverlappedContainer<Task>* overlappedContainer = OverlappedContainer<Task>::fromOverlapped(overlapped);
+			boost::shared_ptr<Task> task(overlappedContainer->getData());
 			switch (completionKey)
 			{
-				case IoTask::COMPLETION:
+				case Task::COMPLETION:
 				{
-					if (bytesTransfered < 1)
-					{
-						// timeout occurred
-						if (task->timeout == 0)
-						{
-							// Premature timeout caused by the fact that SerialPort_Channel.setReadTimeout() cannot
-							// "wait forever". Repeat the operation.
-							task->run();
-							continue;
-						}
-						try
-						{
-							task->updateJavaBuffer(bytesTransfered);
-							task->listener->onFailure(InterruptedByTimeoutException());
-						}
-						catch (Throwable& t)
-						{
-							cerr << __FILE__ << ":" << __LINE__ << endl;
-							t.printStackTrace();
-						}
-						task->workerThread.deleteTask(task);
-						jace::detach();
-						break;
-					}
-					try
-					{
-						task->updateJavaBuffer(bytesTransfered);
-						Integer bytesTransferredAsInteger = Integer::valueOf(bytesTransfered);
-						task->listener->onSuccess(bytesTransferredAsInteger);
-					}
-					catch (Throwable& t)
-					{
-						cerr << __FILE__ << ":" << __LINE__ << endl;
-						t.printStackTrace();
-					}
-					task->workerThread.deleteTask(task);
+					task->onSuccess(bytesTransfered);
+					delete overlappedContainer;
 					jace::detach();
 					break;
 				}
-				case IoTask::SHUTDOWN:
+				case Task::SHUTDOWN:
 				{
 					//
 					// Someone used PostQueuedCompletionStatus() to post an I/O packet with a shutdown CompletionKey.
@@ -143,9 +112,9 @@ void jperipheral::RunTasks(Worker& worker)
 				}
 				default:
 				{
-					task->listener->onFailure(AssertionError(jace::java_new<AssertionError>(
+					task->getListener()->onFailure(AssertionError(jace::java_new<AssertionError>(
 						wstring(L"completionKey==") + toWString(completionKey))));
-					task->workerThread.deleteTask(task);
+					delete overlappedContainer;
 					jace::detach();
 					break;
 				}
@@ -162,14 +131,14 @@ Worker::Worker()
 	if (completionPort==0)
 		throw AssertionError(jace::java_new<AssertionError>(L"CreateIoCompletionPort() failed with error: " + getErrorMessage(GetLastError())));
 	
-	boost::mutex::scoped_lock lock(this->lock);
-	thread = new boost::thread(boost::bind(&RunTasks, boost::ref(*this)));
+	boost::mutex::scoped_lock lock(mutex);
+	thread = new boost::thread(boost::bind(&Worker::run, this));
 	running.wait(lock);
 }
 
 Worker::~Worker()
 {
-	if (!PostQueuedCompletionStatus(completionPort, 0, IoTask::SHUTDOWN, 0))
+	if (!PostQueuedCompletionStatus(completionPort, 0, Task::SHUTDOWN, 0))
 	{
 		throw IOException(jace::java_new<IOException>(getSourceCodePosition(WIDEN(__FILE__), __LINE__) + 
 			L" PostQueuedCompletionStatus() failed with error: " + getErrorMessage(GetLastError())));

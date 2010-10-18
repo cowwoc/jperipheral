@@ -627,10 +627,6 @@
 								>
 							</File>
 							<File
-								RelativePath="..\..\..\common\source\jace\proxy\java\lang\AutoCloseable.cpp"
-								>
-							</File>
-							<File
 								RelativePath="..\..\..\common\source\jace\proxy\java\lang\CharSequence.cpp"
 								>
 							</File>

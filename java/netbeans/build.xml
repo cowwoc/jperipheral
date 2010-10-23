@@ -66,12 +66,12 @@
 	</target>
 
 	<target name="generate.cpp" depends="enhance.cpp">
-		<GenerateCppPeer file="${project.path}/java/build/jperipheral/SerialChannel.class"
+		<GenerateCppPeer file="${build.classes.dir}/jperipheral/SerialChannel.class"
 									 outputHeaders="${project.path}/cpp/common/include"
 									 outputSources="${project.path}/cpp/common/source"
 									 userDefinedMembers="false"/>
 
-		<GenerateCppPeer file="${project.path}/java/build/jperipheral/SerialChannel$SerialFuture.class"
+		<GenerateCppPeer file="${build.classes.dir}/jperipheral/SerialChannel$SerialFuture.class"
 									 outputHeaders="${project.path}/cpp/common/include"
 									 outputSources="${project.path}/cpp/common/source"
 									 userDefinedMembers="false"/>
@@ -81,7 +81,7 @@
 											exportSymbols="true" accessibility="private">
 			<classpath>
 				<pathelement location="${env.JAVA_HOME}/jre/lib/rt.jar"/>
-				<pathelement location="${project.path}/java/build"/>
+				<pathelement location="${build.classes.dir}"/>
 				<pathelement path="${javac.classpath}"/>
 			</classpath>
 			<inputHeaders dir="${project.path}/cpp">
@@ -95,15 +95,15 @@
 		</GenerateCppProxies>
 	</target>
 
-	<target name="enhance.cpp" depends="-jace.task, create.build.directory">
-		<EnhanceJavaPeer inputFile="${project.path}/java/build/jperipheral/SerialChannel.class"
-									 outputFile="${project.path}/java/build/jperipheral/SerialChannel.class"
+	<target name="enhance.cpp" depends="-jace.task">
+		<EnhanceJavaPeer inputFile="${build.classes.dir}/jperipheral/SerialChannel.class"
+									 outputFile="${build.classes.dir}/jperipheral/SerialChannel.class"
 									 deallocationMethod="close">
 			<library name="JPeripheral"/>
 		</EnhanceJavaPeer>
 
-		<EnhanceJavaPeer inputFile="${project.path}/java/build/jperipheral/SerialChannel$SerialFuture.class"
-									 outputFile="${project.path}/java/build/jperipheral/SerialChannel$SerialFuture.class">
+		<EnhanceJavaPeer inputFile="${build.classes.dir}/jperipheral/SerialChannel$SerialFuture.class"
+									 outputFile="${build.classes.dir}/jperipheral/SerialChannel$SerialFuture.class">
 			<library name="JPeripheral"/>
 		</EnhanceJavaPeer>
 	</target>
@@ -117,12 +117,6 @@
 				<fileset dir="${env.JACE_HOME}/release/lib" includes="**/*.jar"/>
 			</classpath>
 		</taskdef>
-	</target>
-
-	<target name="create.build.directory" description="Copies compiled files into platform-specific location">
-		<copy todir="${project.path}/java/build" failonerror="true">
-			<fileset dir="${build.classes.dir}"/>
-		</copy>
 	</target>
 
 	<target name="package">
@@ -164,11 +158,11 @@
 			</fileset>
 		</copy>
 		<jar destfile="${project.path}/build/${platform.path}/JPeripheral.jar"
-			 basedir="${project.path}/java/build" excludes="dependencies.txt" />
+			 basedir="${build.classes.dir}" excludes="dependencies.txt" />
 	</target>
 
 	<target name="-post-clean" depends="clean.native">
-		<delete quiet="true" dir="${project.path}/java/build"/>
+		<delete quiet="true" dir="${build.classes.dir}"/>
 		<delete quiet="true" dir="${project.path}/cpp/common"/>
 		<delete quiet="true" dir="${project.path}/build/${platform.path}"/>
 	</target>

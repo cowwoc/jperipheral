@@ -433,51 +433,88 @@ void SerialChannel::nativeConfigure(JInt baudRate,
 	}
 	dcb.BaudRate = baudRate;
 
-	if (dataBits.equals(dataBits.FIVE()))
-		dcb.ByteSize = 5;
-	else if (dataBits.equals(dataBits.SIX()))
-		dcb.ByteSize = 6;
-	else if (dataBits.equals(dataBits.SEVEN()))
-		dcb.ByteSize = 7;
-	else if (dataBits.equals(dataBits.EIGHT()))
-		dcb.ByteSize = 8;
-	else throw AssertionError(jace::java_new<AssertionError>(dataBits));
+	switch (dataBits.ordinal())
+	{
+		case SerialPort_DataBits::Ordinals::FIVE:
+		{
+			dcb.ByteSize = 5;
+			break;
+		}
+		case SerialPort_DataBits::Ordinals::SIX:
+		{
+		  dcb.ByteSize = 6;
+			break;
+		}
+		case SerialPort_DataBits::Ordinals::SEVEN:
+		{
+			dcb.ByteSize = 7;
+			break;
+		}
+		case SerialPort_DataBits::Ordinals::EIGHT:
+		{
+			dcb.ByteSize = 8;
+			break;
+		}
+		default:
+			throw AssertionError(jace::java_new<AssertionError>(dataBits));
+	}
 
-	if (parity.equals(SerialPort_Parity::EVEN()))
+	switch (parity.ordinal())
 	{
-		dcb.fParity = true;
-		dcb.Parity = EVENPARITY;
+		case SerialPort_Parity::Ordinals::EVEN:
+		{
+			dcb.fParity = true;
+			dcb.Parity = EVENPARITY;
+			break;
+		}
+		case SerialPort_Parity::Ordinals::MARK:
+		{
+			dcb.fParity = true;
+			dcb.Parity = MARKPARITY;
+			break;
+		}
+		case SerialPort_Parity::Ordinals::NONE:
+		{
+			dcb.fParity = false;
+			dcb.Parity = NOPARITY;
+			break;
+		}
+		case SerialPort_Parity::Ordinals::ODD:
+		{
+			dcb.fParity = true;
+			dcb.Parity = ODDPARITY;
+			break;
+		}
+		case SerialPort_Parity::Ordinals::SPACE:
+		{
+			dcb.fParity = true;
+			dcb.Parity = SPACEPARITY;
+			break;
+		}
+		default:
+			throw AssertionError(jace::java_new<AssertionError>(parity));
 	}
-	else if (parity.equals(SerialPort_Parity::MARK()))
-	{
-		dcb.fParity = true;
-		dcb.Parity = MARKPARITY;
-	}
-	else if (parity.equals(SerialPort_Parity::NONE()))
-	{
-		dcb.fParity = false;
-		dcb.Parity = NOPARITY;
-	}
-	else if (parity.equals(SerialPort_Parity::ODD()))
-	{
-		dcb.fParity = true;
-		dcb.Parity = ODDPARITY;
-	}
-	else if (parity.equals(SerialPort_Parity::SPACE()))
-	{
-		dcb.fParity = true;
-		dcb.Parity = SPACEPARITY;
-	}
-	else throw AssertionError(jace::java_new<AssertionError>(parity));
 
-	if (stopBits.equals(SerialPort_StopBits::ONE()))
-		dcb.StopBits = ONESTOPBIT;
-	else if (stopBits.equals(SerialPort_StopBits::ONE_POINT_FIVE()))
-		dcb.StopBits = ONE5STOPBITS;
-	else if (stopBits.equals(SerialPort_StopBits::TWO()))
-		dcb.StopBits = TWOSTOPBITS;
-	else
-		throw AssertionError(jace::java_new<AssertionError>(stopBits));
+	switch (stopBits.ordinal())
+	{
+		case SerialPort_StopBits::Ordinals::ONE:
+		{
+			dcb.StopBits = ONESTOPBIT;
+			break;
+		}
+		case SerialPort_StopBits::Ordinals::ONE_POINT_FIVE:
+		{
+			dcb.StopBits = ONE5STOPBITS;
+			break;
+		}
+		case SerialPort_StopBits::Ordinals::TWO:
+		{
+			dcb.StopBits = TWOSTOPBITS;
+			break;
+		}
+		default:
+			throw AssertionError(jace::java_new<AssertionError>(stopBits));
+	}
 
 	dcb.fOutxDsrFlow = 0;
 	dcb.fDtrControl = DTR_CONTROL_ENABLE;
@@ -490,22 +527,29 @@ void SerialChannel::nativeConfigure(JInt baudRate,
 	dcb.fOutxCtsFlow = false;
 	dcb.fOutX = false;
 	dcb.fInX = false;
-	if (flowControl.equals(SerialPort_FlowControl::RTS_CTS()))
+
+	switch (flowControl.ordinal())
 	{
-		dcb.fOutxCtsFlow = true;
-		dcb.fRtsControl = RTS_CONTROL_HANDSHAKE;
+		case SerialPort_FlowControl::Ordinals::RTS_CTS:
+		{
+			dcb.fOutxCtsFlow = true;
+			dcb.fRtsControl = RTS_CONTROL_HANDSHAKE;
+			break;
+		}
+		case SerialPort_FlowControl::Ordinals::XON_XOFF:
+		{
+			dcb.fOutX = true;
+			dcb.fInX = true;
+			break;
+		}
+		case SerialPort_FlowControl::Ordinals::NONE:
+		{
+			// do nothing
+			break;
+		}
+		default:
+			throw AssertionError(jace::java_new<AssertionError>(flowControl));
 	}
-	else if (flowControl.equals(SerialPort_FlowControl::XON_XOFF()))
-	{
-		dcb.fOutX = true;
-		dcb.fInX = true;
-	}
-	else if (flowControl.equals(SerialPort_FlowControl::NONE()))
-	{
-		// do nothing
-	}
-	else
-		throw AssertionError(jace::java_new<AssertionError>(flowControl));
 
 	if (!SetCommState(context->getPort(), &dcb))
 	{

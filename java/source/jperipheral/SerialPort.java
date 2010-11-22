@@ -202,7 +202,6 @@ public final class SerialPort implements Peripheral
 			}
 		}
 	}
-
 	private final String name;
 
 	/**

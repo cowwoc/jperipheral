@@ -67,7 +67,7 @@ void Worker::run()
 			DWORD errorCode = GetLastError();
 			OverlappedContainer<Task>* overlappedContainer = OverlappedContainer<Task>::fromOverlapped(overlapped);
 			boost::shared_ptr<Task> task(overlappedContainer->getData());
-			
+				
 			switch (errorCode)
 			{
 				case ERROR_HANDLE_EOF:
@@ -77,7 +77,6 @@ void Worker::run()
 					// Triggered by CancelIo()
 					task->getListener()->onCancellation();
 					delete overlappedContainer;
-					jace::detach();
 					break;
 				}
 				default:
@@ -85,7 +84,6 @@ void Worker::run()
 					task->getListener()->onFailure(IOException(jace::java_new<IOException>(
 						L"GetQueuedCompletionStatus() failed with error: " + getErrorMessage(errorCode))));
 					delete overlappedContainer;
-					jace::detach();
 					break;
 				}
 			}
@@ -100,7 +98,6 @@ void Worker::run()
 				{
 					task->onSuccess(bytesTransfered);
 					delete overlappedContainer;
-					jace::detach();
 					break;
 				}
 				case Task::SHUTDOWN:
@@ -115,11 +112,12 @@ void Worker::run()
 					task->getListener()->onFailure(AssertionError(jace::java_new<AssertionError>(
 						wstring(L"completionKey==") + toWString(completionKey))));
 					delete overlappedContainer;
-					jace::detach();
 					break;
 				}
 			}
 		}
+		// Task destructors invoke jace::attach()
+		jace::detach();
 	}
 }
 

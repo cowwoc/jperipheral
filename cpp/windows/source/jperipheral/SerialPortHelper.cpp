@@ -4,17 +4,17 @@ using jperipheral::SerialPortContext;
 using jperipheral::SingleThreadExecutor;
 using jperipheral::getErrorMessage;
 
-#include "jace/proxy/jperipheral/SerialPort.h"
-using jace::proxy::jperipheral::SerialPort;
+#include "jace/proxy/org/jperipheral/SerialPort.h"
+using jace::proxy::org::jperipheral::SerialPort;
 
-#include "jace/proxy/jperipheral/SerialChannel.h"
-using jace::proxy::jperipheral::SerialChannel;
+#include "jace/proxy/org/jperipheral/SerialChannel.h"
+using jace::proxy::org::jperipheral::SerialChannel;
 
-#include "jace/proxy/jperipheral/SerialChannel_NativeListener.h"
-using jace::proxy::jperipheral::SerialChannel_NativeListener;
+#include "jace/proxy/org/jperipheral/SerialChannel_NativeListener.h"
+using jace::proxy::org::jperipheral::SerialChannel_NativeListener;
 
-#include "jace/proxy/jperipheral/SerialChannel_SerialFuture.h"
-using jace::proxy::jperipheral::SerialChannel_SerialFuture;
+#include "jace/proxy/org/jperipheral/SerialChannel_SerialFuture.h"
+using jace::proxy::org::jperipheral::SerialChannel_SerialFuture;
 
 #include "jace/proxy/java/lang/AssertionError.h"
 using jace::proxy::java::lang::AssertionError;
@@ -96,7 +96,7 @@ long Task::getTimeElapsed() const
 	return static_cast<long>(timer.elapsed() * 1000);
 }
 
-void Task::setListener(::jace::proxy::jperipheral::SerialChannel_NativeListener _listener)
+void Task::setListener(::jace::proxy::org::jperipheral::SerialChannel_NativeListener _listener)
 {
 	if (listener != 0)
 	{
@@ -110,7 +110,7 @@ void Task::setListener(::jace::proxy::jperipheral::SerialChannel_NativeListener 
 	listener->setUserObject(reinterpret_cast<intptr_t>(new boost::shared_ptr<Task>(shared_from_this())));
 }
 
-::jace::proxy::jperipheral::SerialChannel_NativeListener* Task::getListener()
+::jace::proxy::org::jperipheral::SerialChannel_NativeListener* Task::getListener()
 {
 	return listener;
 }

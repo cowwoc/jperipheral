@@ -13,11 +13,11 @@
 #include <boost/thread/condition.hpp>
 #pragma warning(pop)
 
-BEGIN_NAMESPACE_3(jace, peer, jperipheral)
+BEGIN_NAMESPACE_4(jace, peer, org, jperipheral)
 
 class SerialChannel;
 
-END_NAMESPACE_3(jace, peer, jperipheral)
+END_NAMESPACE_4(jace, peer, org, jperipheral)
 
 
 BEGIN_NAMESPACE_1(jperipheral)
@@ -48,7 +48,7 @@ private:
 	 */
 	Worker& operator=(const Worker&);
 
-	friend class ::jace::peer::jperipheral::SerialChannel;
+	friend class ::jace::peer::org::jperipheral::SerialChannel;
 
 	boost::thread* thread;
 	boost::mutex mutex;

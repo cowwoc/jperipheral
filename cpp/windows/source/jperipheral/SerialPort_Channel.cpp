@@ -1,5 +1,5 @@
-#include "jace/peer/jperipheral/SerialChannel.h"
-using jace::peer::jperipheral::SerialChannel;
+#include "jace/peer/org/jperipheral/SerialChannel.h"
+using jace::peer::org::jperipheral::SerialChannel;
 using jace::JArray;
 using jace::proxy::java::lang::Object;
 using jace::proxy::java::util::concurrent::Future;
@@ -7,11 +7,20 @@ using jace::proxy::types::JLong;
 using jace::proxy::types::JInt;
 using jace::proxy::types::JByte;
 
-#include "jace/proxy/jperipheral/SerialPort.h"
-using jace::proxy::jperipheral::SerialPort_StopBits;
-using jace::proxy::jperipheral::SerialPort_Parity;
-using jace::proxy::jperipheral::SerialPort_DataBits;
-using jace::proxy::jperipheral::SerialPort_FlowControl;
+#include "jace/proxy/org/jperipheral/SerialPort_StopBits.h"
+using jace::proxy::org::jperipheral::SerialPort_StopBits;
+
+#include "jace/proxy/org/jperipheral/SerialPort_Parity.h"
+using jace::proxy::org::jperipheral::SerialPort_Parity;
+
+#include "jace/proxy/org/jperipheral/SerialPort_DataBits.h"
+using jace::proxy::org::jperipheral::SerialPort_DataBits;
+
+#include "jace/proxy/org/jperipheral/SerialPort_FlowControl.h"
+using jace::proxy::org::jperipheral::SerialPort_FlowControl;
+
+#include "jace/proxy/org/jperipheral/SerialPort_WithString.h"
+using jace::proxy::org::jperipheral::SerialPort_WithString;
 
 #include "jperipheral/Worker.h"
 
@@ -27,14 +36,14 @@ using jperipheral::SerialPortContext;
 #include "jace/proxy/java/lang/Long.h"
 using jace::proxy::java::lang::Long;
 
-#include "jace/proxy/jperipheral/PeripheralNotFoundException.h"
-using jace::proxy::jperipheral::PeripheralNotFoundException;
+#include "jace/proxy/org/jperipheral/PeripheralNotFoundException.h"
+using jace::proxy::org::jperipheral::PeripheralNotFoundException;
 
-#include "jace/proxy/jperipheral/PeripheralInUseException.h"
-using jace::proxy::jperipheral::PeripheralInUseException;
+#include "jace/proxy/org/jperipheral/PeripheralInUseException.h"
+using jace::proxy::org::jperipheral::PeripheralInUseException;
 
-#include "jace/proxy/jperipheral/SerialChannel_NativeListener.h"
-using jace::proxy::jperipheral::SerialChannel_NativeListener;
+#include "jace/proxy/org/jperipheral/SerialChannel_NativeListener.h"
+using jace::proxy::org::jperipheral::SerialChannel_NativeListener;
 
 #include "jace/proxy/java/io/IOException.h"
 using jace::proxy::java::io::IOException;
@@ -54,8 +63,8 @@ using jace::proxy::java::lang::Integer;
 #include "jace/proxy/java/lang/String.h"
 using jace::proxy::java::lang::String;
 
-#include "jace/proxy/jperipheral/nio/channels/InterruptedByTimeoutException.h"
-using jace::proxy::jperipheral::nio::channels::InterruptedByTimeoutException;
+#include "jace/proxy/org/jperipheral/nio/channels/InterruptedByTimeoutException.h"
+using jace::proxy::org::jperipheral::nio::channels::InterruptedByTimeoutException;
 
 #include "jace/Jace.h"
 using jace::toWString;

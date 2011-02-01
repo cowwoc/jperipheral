@@ -18,8 +18,8 @@ using std::endl;
 #include <vector>
 using std::vector;
 
-#include "jace/proxy/jperipheral/Main.h"
-using jace::proxy::jperipheral::Main;
+#include "jace/proxy/org/jperipheral/Main.h"
+using jace::proxy::org::jperipheral::Main;
 
 #include "jace/JArray.h"
 using jace::JArray;

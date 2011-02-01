@@ -12,10 +12,7 @@
 	<import file="nbproject/build-impl.xml"/>
 
 	<target name="-post-init">
-		<condition property="config.exists">
-			<isset property="config"/>
-		</condition>
-		<fail unless="${config.exists}" message="${config} must be defined"/>
+		<fail unless="config" message="config may not be null"/>
 
 		<!-- Convert "platform.buildType" to "platform/buildType" -->
 		<loadresource property="platform.path">

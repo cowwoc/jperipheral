@@ -3,10 +3,10 @@
 
 #include "jace/namespace.h"
 
-#include "jace/peer/jperipheral/SerialChannel.h"
-#include "jace/proxy/jperipheral/SerialPort.h"
-#include "jace/proxy/jperipheral/SerialChannel_NativeListener.h"
-#include "jace/proxy/jperipheral/SerialChannel_SerialFuture.h"
+#include "jace/peer/org/jperipheral/SerialChannel.h"
+#include "jace/proxy/org/jperipheral/SerialPort.h"
+#include "jace/proxy/org/jperipheral/SerialChannel_NativeListener.h"
+#include "jace/proxy/org/jperipheral/SerialChannel_SerialFuture.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -137,7 +137,7 @@ public:
 	 *
 	 * @return the NativeListener associated with the operation.
 	 */
-	::jace::proxy::jperipheral::SerialChannel_NativeListener* getListener();
+	::jace::proxy::org::jperipheral::SerialChannel_NativeListener* getListener();
 	/**
 	 * Returns the maximum number of milliseconds to wait before throwing InterruptedByTimeoutException.
 	 *
@@ -168,7 +168,7 @@ public:
 	 *
 	 * @param listener the NativeListener associated with the operation.
 	 */
-	void setListener(::jace::proxy::jperipheral::SerialChannel_NativeListener listener);
+	void setListener(::jace::proxy::org::jperipheral::SerialChannel_NativeListener listener);
 	/**
 	 * Sets the maximum number of milliseconds to wait before throwing InterruptedByTimeoutException.
 	 *
@@ -206,7 +206,7 @@ protected:
 	/**
 	 * The NativeListener associated with the operation.
 	 */
-	::jace::proxy::jperipheral::SerialChannel_NativeListener* listener;
+	::jace::proxy::org::jperipheral::SerialChannel_NativeListener* listener;
 	/**
 	 * The serial port.
 	 */
@@ -329,15 +329,15 @@ private:
 /**
  * Returns the serial port context.
  */
-SerialPortContext* getContext(::jace::proxy::jperipheral::SerialPort port);
+SerialPortContext* getContext(::jace::proxy::org::jperipheral::SerialPort port);
 /**
  * Returns the serial port context.
  */
-SerialPortContext* getContext(::jace::proxy::jperipheral::SerialChannel channel);
+SerialPortContext* getContext(::jace::proxy::org::jperipheral::SerialChannel channel);
 /**
  * Returns the Task associated with a Future.
  */
-boost::shared_ptr<Task>* getContext(::jace::proxy::jperipheral::SerialChannel_SerialFuture future);
+boost::shared_ptr<Task>* getContext(::jace::proxy::org::jperipheral::SerialChannel_SerialFuture future);
 
 /**
  * Returns the String representation of the current source-code position.

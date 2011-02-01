@@ -1,11 +1,11 @@
-#include "jace/peer/jperipheral/SerialChannel_SerialFuture.h"
-using jace::peer::jperipheral::SerialChannel_SerialFuture;
+#include "jace/peer/org/jperipheral/SerialChannel_SerialFuture.h"
+using jace::peer::org::jperipheral::SerialChannel_SerialFuture;
 using jace::proxy::types::JBoolean;
 
-#include "jace/proxy/jperipheral/SerialChannel_SerialFuture.h"
+#include "jace/proxy/org/jperipheral/SerialChannel_SerialFuture.h"
 
-#include "jace/proxy/jperipheral/SerialChannel_NativeListener.h"
-using jace::proxy::jperipheral::SerialChannel_NativeListener;
+#include "jace/proxy/org/jperipheral/SerialChannel_NativeListener.h"
+using jace::proxy::org::jperipheral::SerialChannel_NativeListener;
 
 #include "jperipheral/SerialPortHelper.h"
 using jperipheral::getContext;

@@ -19,9 +19,6 @@ using jace::proxy::org::jperipheral::SerialPort_DataBits;
 #include "jace/proxy/org/jperipheral/SerialPort_FlowControl.h"
 using jace::proxy::org::jperipheral::SerialPort_FlowControl;
 
-#include "jace/proxy/org/jperipheral/SerialPort_WithString.h"
-using jace::proxy::org::jperipheral::SerialPort_WithString;
-
 #include "jperipheral/Worker.h"
 
 #include "jperipheral/SerialPortHelper.h"

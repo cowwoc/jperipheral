@@ -8,7 +8,6 @@
 		<version>1.0-SNAPSHOT</version>
 	</parent>
 	<artifactId>jperipheral-cpp</artifactId>
-	<version>1.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<name>JPeripheral C++</name>
 	<description>JPeripheral, C++ source-code</description>
@@ -51,25 +50,11 @@
 									<outputDirectory>${project.build.directory}/dependency/boost/${boost.classifier}</outputDirectory>
 								</artifactItem>
 								<artifactItem>
-									<groupId>com.googlecode.boost-maven-project</groupId>
-									<artifactId>boost-date-time</artifactId>
-									<version>${boost.version}</version>
-									<classifier>${boost.classifier}</classifier>
-									<outputDirectory>${project.build.directory}/dependency/boost/${boost.classifier}</outputDirectory>
-								</artifactItem>
-								<artifactItem>
-									<groupId>com.googlecode.boost-maven-project</groupId>
-									<artifactId>boost-thread</artifactId>
-									<version>${boost.version}</version>
-									<classifier>${boost.classifier}</classifier>
-									<outputDirectory>${project.build.directory}/dependency/boost/${boost.classifier}</outputDirectory>
-								</artifactItem>
-								<artifactItem>
 									<groupId>com.googlecode.jace</groupId>
 									<artifactId>jace-core-cpp</artifactId>
-									<classifier>${jace.classifier}</classifier>
+									<classifier>${classifier}</classifier>
 									<version>1.2-SNAPSHOT</version>
-									<outputDirectory>${project.build.directory}/dependency/jace/${jace.classifier}</outputDirectory>
+									<outputDirectory>${project.build.directory}/dependency/jace/${classifier}</outputDirectory>
 								</artifactItem>
 								<artifactItem>
 									<groupId>com.googlecode.jperipheral</groupId>
@@ -110,21 +95,42 @@
 					<buildType>${build.type}</buildType>
 					<environmentVariables>
 						<BOOST_HOME>${project.build.directory}/dependency/boost/${boost.classifier}</BOOST_HOME>
-						<JACE_HOME>${project.build.directory}/dependency/jace/${jace.classifier}</JACE_HOME>
+						<JACE_HOME>${project.build.directory}/dependency/jace/${classifier}</JACE_HOME>
 					</environmentVariables>					
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>build-helper-maven-plugin</artifactId>
+				<version>1.5</version>
+				<executions>
+					<execution>
+						<id>add-resource</id>
+						<phase>generate-resources</phase>
+						<goals>
+							<goal>add-resource</goal>
+						</goals>
+						<configuration>
+							<resources>
+								<resource>
+									<directory>${project.build.directory}/cmake/${platform}/${build.type}</directory>
+									<includes>
+										<include>*.lib</include>
+										<include>*.dll</include>
+										<include>*.pdb</include>
+									</includes>
+									<targetPath>lib</targetPath>
+								</resource>
+							</resources>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<artifactId>maven-jar-plugin</artifactId>
 				<version>2.3.1</version>
 				<configuration>
-					<classifier>${jace.classifier}</classifier>
-					<classesDirectory>${project.build.directory}/cmake/${platform}/${build.type}</classesDirectory>
-					<includes>
-						<include>*.lib</include>
-						<include>*.dll</include>
-						<include>*.pdb</include>
-					</includes>
+					<classifier>${classifier}</classifier>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -189,7 +195,7 @@
 	</build>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<jace.classifier>${platform}-${build.type}</jace.classifier>
+		<classifier>${platform}-${build.type}</classifier>
 		<boost.version>1.45.0-SNAPSHOT</boost.version>
 	</properties>
 	<profiles>

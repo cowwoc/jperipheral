@@ -20,6 +20,7 @@
         </action>
         <action>
             <actionName>build-with-dependencies</actionName>
+            <basedir>../</basedir>
             <reactor>also-make</reactor>
             <goals>
                 <goal>help:all-profiles</goal>
@@ -91,6 +92,12 @@
         </action>
         <action>
             <actionName>profile</actionName>
+            <goals>
+                <goal>help:all-profiles</goal>
+            </goals>
+        </action>
+        <action>
+            <actionName>javadoc</actionName>
             <goals>
                 <goal>help:all-profiles</goal>
             </goals>

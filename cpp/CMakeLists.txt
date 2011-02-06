@@ -25,14 +25,13 @@ set (jperipheral_VERSION_MINOR 0)
 add_definitions (-D_UNICODE -DUNICODE -DJPERIPHERAL_EXPORTS -DJACE_PROXY_EXPORTS)
 
 file (TO_NATIVE_PATH ${PROJECT_BINARY_DIR} NATIVE_PROJECT_BINARY_DIR)
-file (TO_NATIVE_PATH "$ENV{JACE_HOME}/bin" JACE_LIBRARY)
-file (TO_NATIVE_PATH "$ENV{BOOST_HOME}/lib" BOOST_LIBRARY)
+file (TO_NATIVE_PATH "$ENV{JACE_HOME}/lib" JACE_LIBRARY)
 set (BOOST_INCLUDE "$ENV{BOOST_HOME}")
 set (JACE_INCLUDE "$ENV{JACE_HOME}/include")
 set (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MP")
 
 include_directories (target/generated-sources/include windows/include ${JACE_INCLUDE} ${BOOST_INCLUDE} $ENV{JAVA_HOME}/include $ENV{JAVA_HOME}/include/win32) 
-link_directories (${JACE_LIBRARY} ${BOOST_LIBRARY})
+link_directories (${JACE_LIBRARY})
 
 get_headers ("${CMAKE_CURRENT_SOURCE_DIR}/windows/include" TEMP)
 set (HEADER_FILES ${TEMP})
@@ -48,7 +47,7 @@ add_library (jperipheral SHARED ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries (jperipheral jace.lib)
 
 add_executable (main windows/source/jperipheral/Main.cpp)
-target_link_libraries (main jace.lib jperipheral)
+target_link_libraries (main jperipheral)
 
 if (${CMAKE_GENERATOR} MATCHES "Visual Studio")
   add_custom_command (TARGET jperipheral POST_BUILD COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/post-build \"${CMAKE_CFG_INTDIR}\" \"${JACE_LIBRARY}\" \"${NATIVE_PROJECT_BINARY_DIR}\")

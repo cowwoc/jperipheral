@@ -1,77 +1,80 @@
 package org.jperipheral;
 
+import com.google.common.base.Charsets;
+import com.google.common.base.Function;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
+import com.google.common.primitives.Bytes;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
+import java.nio.channels.AsynchronousByteChannel;
+import java.nio.channels.CompletionHandler;
+import java.nio.channels.InterruptedByTimeoutException;
+import java.nio.channels.ReadPendingException;
+import java.nio.channels.ShutdownChannelGroupException;
+import java.nio.channels.WritePendingException;
 import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CharsetEncoder;
-import java.nio.charset.CoderResult;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
+import java.nio.charset.MalformedInputException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.jperipheral.nio.channels.AsynchronousByteChannel;
-import org.jperipheral.nio.channels.CompletionHandler;
-import org.jperipheral.nio.channels.ReadPendingException;
-import org.jperipheral.nio.channels.ShutdownChannelGroupException;
-import org.jperipheral.nio.channels.WritePendingException;
 
 /**
  * An adapter that maps an AsynchronousCharChannel on top of an existing AsynchronousByteChannel.
  *
  * @author Gili Tzabari
  */
-public class AsynchronousByteCharChannel implements AsynchronousCharChannel
+public final class AsynchronousByteCharChannel implements AsynchronousCharChannel
 {
 	/**
 	 * The underlying AsynchronousByteChannel.
 	 */
 	private final AsynchronousByteChannel channel;
 	/**
-	 * The underlying AsynchronousByteChannelTimeouts or null if timeouts are not supported.
-	 */
-	private final AsynchronousByteChannelTimeouts channelTimeouts;
-	/**
 	 * The character encoding.
 	 */
 	private final Charset charset;
 	/**
-	 * Used to encode characters being written.
-	 */
-	private final CharsetEncoder encoder;
-	/**
-	 * Used to decode characters being read.
-	 */
-	private final CharsetDecoder decoder;
-	/**
 	 * Searches for line delimiters.
 	 */
 	private final Pattern delimiters = Pattern.compile("\\r|\\n");
+	private final ScheduledExecutorService timer = Executors.newScheduledThreadPool(0,
+		new ThreadFactoryBuilder().setDaemon(false).setNameFormat(getClass().getName() + "-%d").build());
+	// ---- START READ OPERATIONS ----
+	private State readState = State.INITIAL;
 	/**
-	 * Indicates if there is an ongoing read operation.
+	 * Retains malformed byte sequence in the hope of more data coming in.
 	 */
-	private boolean readPending;
+	private final DecodingWriteableByteChannel readDecoder;
 	/**
-	 * Indicates if there is an ongoing write operation.
+	 * Bytes read from the AsynchronousByteChannel, later decoded into <code>charactersRead</code>.
+	 * Any bytes that cannot be decoded (some characters span multiple bytes) remain in the buffer
+	 * for subsequent read operations.
 	 */
-	private boolean writePending;
+	private final ByteBuffer bytesRead = ByteBuffer.allocate(1024);
+	/**
+	 * Characters decoded from <code>bytesRead</code>.
+	 */
+	private final StringBuilder charactersRead = new StringBuilder();
 	/**
 	 * Indicates if the subsequent newline character should be disregarded by readLine().
 	 */
 	private boolean consumeNewline;
+	// ---- END READ OPERATIONS ----		
+	private State writeState = State.INITIAL;
 	/**
-	 * The buffer containing characters decoded from <code>readBytes</code>.
+	 * The bytes to write out.
 	 */
-	private StringBuilder readString = new StringBuilder();
-	/**
-	 * The buffer that the underlying AsynchronousByteChannel writes into.
-	 */
-	private ByteBuffer readBytes = ByteBuffer.allocate(1024);
+	private ByteBuffer bytesToWrite = ByteBuffer.allocate(0);
 
 	/**
 	 * Creates a new AsynchronousCharChannel.
@@ -84,13 +87,8 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	private AsynchronousByteCharChannel(AsynchronousByteChannel channel, Charset charset)
 	{
 		this.channel = channel;
-		if (channel instanceof AsynchronousByteChannelTimeouts)
-			this.channelTimeouts = (AsynchronousByteChannelTimeouts) channel;
-		else
-			this.channelTimeouts = null;
 		this.charset = charset;
-		this.encoder = charset.newEncoder();
-		this.decoder = charset.newDecoder();
+		this.readDecoder = new DecodingWriteableByteChannel(charset);
 	}
 
 	/**
@@ -112,36 +110,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 																		CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
-		if (target.isReadOnly())
-			throw new IllegalArgumentException("target may not be read-only");
-		if (readPending)
-			throw new ReadPendingException();
-		readPending = true;
-		if (target.remaining() <= 0)
-		{
-			readPending = false;
-			handler.completed(0, attachment);
-			return;
-		}
-		try
-		{
-			read(new CharBufferWriter(target), attachment, handler);
-		}
-		catch (ReadPendingException e)
-		{
-			readPending = false;
-			throw new AssertionError(e);
-		}
-		catch (ShutdownChannelGroupException e)
-		{
-			readPending = false;
-			throw e;
-		}
-		catch (RuntimeException e)
-		{
-			readPending = false;
-			throw e;
-		}
+		read(target, Long.MAX_VALUE, TimeUnit.MILLISECONDS, attachment, handler);
 	}
 
 	@Override
@@ -152,181 +121,137 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 																		CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
-		if (target.isReadOnly())
-			throw new IllegalArgumentException("target may not be read-only");
-		if (readPending)
-			throw new ReadPendingException();
-		readPending = true;
-		if (target.remaining() <= 0)
+		synchronized (this)
 		{
-			readPending = false;
-			handler.completed(0, attachment);
-			return;
-		}
-		try
-		{
-			read(new CharBufferWriter(target), timeout, unit, attachment, handler);
-		}
-		catch (ReadPendingException e)
-		{
-			readPending = false;
-			throw new AssertionError(e);
-		}
-		catch (ShutdownChannelGroupException e)
-		{
-			readPending = false;
-			throw e;
-		}
-		catch (UnsupportedOperationException e)
-		{
-			readPending = false;
-			throw e;
-		}
-		catch (RuntimeException e)
-		{
-			readPending = false;
-			throw e;
-		}
-	}
-
-	/**
-	 * @see #read(CharBuffer,Object,CompletionHandler)
-	 */
-	private synchronized <A> void read(CharSequenceWriter target, A attachment,
-																		 CompletionHandler<Integer, ? super A> handler)
-		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
-	{
-		CompletionHandler<Integer, ByteBuffer> readHandler = getReadHandler(target, attachment, handler);
-		if (readHandler == null)
-		{
-			readPending = false;
-			return;
-		}
-		channel.read(readBytes, readBytes, readHandler);
-	}
-
-	/**
-	 * @see #read(CharBuffer,long,TimeUnit,Object,CompletionHandler)
-	 */
-	private synchronized <A> void read(CharSequenceWriter target, long timeout, TimeUnit unit,
-																		 A attachment, CompletionHandler<Integer, ? super A> handler)
-		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException,
-					 UnsupportedOperationException
-	{
-		if (channelTimeouts == null)
-			throw new UnsupportedOperationException();
-		CompletionHandler<Integer, ByteBuffer> readHandler = getReadHandler(target, attachment, handler);
-		if (readHandler == null)
-		{
-			readPending = false;
-			return;
-		}
-		channelTimeouts.read(readBytes, timeout, unit, readBytes, readHandler);
-	}
-
-	/**
-	 * Returns the CompletionHandler to use with the read operation.
-	 *
-	 * @param   <A>
-	 *          The attachment type
-	 * @param   target
-	 *          The buffer into which characters are to be transferred
-	 * @param   attachment
-	 *          The object to attach to the I/O operation; can be {@code null}
-	 * @param   handler
-	 *          The completion handler
-	 * @return  null if the operation completed without needing to read from the underlying channel
-	 */
-	private <A> CompletionHandler<Integer, ByteBuffer> getReadHandler(CharSequenceWriter target,
-																																		A attachment,
-																																		CompletionHandler<Integer, ? super A> handler)
-	{
-		if (readString.length() > 0)
-		{
-			// Try satisfying the request using the buffer
-			try
+			if (target.isReadOnly())
+				throw new IllegalArgumentException("target may not be read-only");
+			if (readState != State.INITIAL)
+				throw new ReadPendingException();
+			if (target.remaining() <= 0)
 			{
-				int charactersTransferred = target.write(readString);
-				if (charactersTransferred > 0)
+				handler.completed(0, attachment);
+				return;
+			}
+			readState = State.RUNNING;
+		}
+		Future<Void> timeoutTimer;
+		if (timeout == Long.MAX_VALUE)
+			timeoutTimer = Futures.immediateFuture(null);
+		else
+		{
+			timeoutTimer = timer.schedule(new Callable<Void>()
+			{
+				@Override
+				public Void call() throws IOException
 				{
-					readString.delete(0, charactersTransferred);
-					handler.completed(charactersTransferred, attachment);
+					synchronized (AsynchronousByteCharChannel.this)
+					{
+						if (readState == State.RUNNING)
+							readState = State.INTERRUPTED;
+					}
+					close();
+					return null;
 				}
-			}
-			catch (IOException e)
-			{
-				handler.failed(e, attachment);
-			}
-			return null;
+			}, timeout, unit);
 		}
-		readBytes.clear();
-		return new ReadHandler<A>(attachment, handler, target);
+		DoneReading<Integer, Void> doneReading = new DoneReading(handler, timeoutTimer);
+		ReadCharacters readCharacters = new ReadCharacters(target, doneReading);
+		this.consumeNewline = false;
+		bytesRead.clear();
+		readCharacters.completed(false, null);
+		// ReadCharacters.completed() invokes channel.read() if it needs more bytes
 	}
 
 	@Override
 	public Future<Integer> read(CharBuffer target)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
-		if (target.isReadOnly())
-			throw new IllegalArgumentException("target may not be read-only");
-		if (target.remaining() <= 0)
-			return new CompletedFuture(0);
-		return read(new CharBufferWriter(target));
-	}
-
-	/**
-	 * @see #read(CharBuffer)
-	 */
-	private synchronized Future<Integer> read(CharSequenceWriter target)
-		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
-	{
-		if (readPending)
-			throw new ReadPendingException();
-		readPending = true;
-		if (readString.length() > 0)
+		synchronized (this)
 		{
-			// Try satisfying the request using the buffer
-			try
-			{
-				int charactersTransferred = target.write(readString);
-				if (charactersTransferred > 0)
-				{
-					readString.delete(0, charactersTransferred);
-					readPending = false;
-					return new CompletedFuture(charactersTransferred);
-				}
-			}
-			catch (IOException e)
-			{
-				return new CompletedFuture(e);
-			}
+			if (target.isReadOnly())
+				throw new IllegalArgumentException("target may not be read-only");
+			if (readState != State.INITIAL)
+				throw new ReadPendingException();
+			if (target.remaining() <= 0)
+				return Futures.immediateFuture(0);
+			readState = State.RUNNING;
 		}
-		readBytes.clear();
-		try
-		{
-			return new ReadFuture(channel.read(readBytes), readBytes, target);
-		}
-		catch (RuntimeException e)
-		{
-			readPending = false;
-			throw e;
-		}
+		SettableFuture<Integer> result = SettableFuture.create();
+		FutureCompletionHandler<Integer> futureToHandler = new FutureCompletionHandler<>(result);
+		Future<Void> timeoutTimer = Futures.immediateFuture(null);
+		DoneReading<Integer, Void> doneReading = new DoneReading(futureToHandler, timeoutTimer);
+		ReadCharacters readCharacters = new ReadCharacters(target, doneReading);
+		this.consumeNewline = false;
+		bytesRead.clear();
+		readCharacters.completed(false, null);
+		// ReadCharacters.completed() invokes channel.read() if it needs more bytes
+		return result;
 	}
 
 	@Override
 	public <A> void readLine(A attachment, CompletionHandler<String, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
-		StringBuilder target = new StringBuilder();
-		read(new LineWriter(target), attachment, new ReadLineHandler<A>(handler, target));
+		readLine(Long.MAX_VALUE, TimeUnit.MILLISECONDS, attachment, handler);
+	}
+
+	@Override
+	public <A> void readLine(long timeout, TimeUnit unit, A attachment,
+													 CompletionHandler<String, ? super A> handler)
+		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
+	{
+		synchronized (this)
+		{
+			if (readState != State.INITIAL)
+				throw new ReadPendingException();
+			readState = State.RUNNING;
+		}
+		Future<Void> timeoutTimer;
+		if (timeout == Long.MAX_VALUE)
+			timeoutTimer = Futures.immediateFuture(null);
+		else
+		{
+			timeoutTimer = timer.schedule(new Callable<Void>()
+			{
+				@Override
+				public Void call() throws IOException
+				{
+					synchronized (AsynchronousByteCharChannel.this)
+					{
+						if (readState == State.RUNNING)
+							readState = State.INTERRUPTED;
+					}
+					close();
+					return null;
+				}
+			}, timeout, unit);
+		}
+		DoneReading<Integer, Void> doneReading = new DoneReading(handler, timeoutTimer);
+		ReadLine readLine = new ReadLine(attachment, doneReading);
+		bytesRead.clear();
+		readLine.completed(false, null);
+		// ReadCharacters.completed() invokes channel.read() if it needs more bytes
 	}
 
 	@Override
 	public Future<String> readLine()
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
-		StringBuilder target = new StringBuilder();
-		return new ReadLineFuture(read(new LineWriter(target)), target);
+		synchronized (this)
+		{
+			if (readState != State.INITIAL)
+				throw new ReadPendingException();
+			readState = State.RUNNING;
+		}
+		SettableFuture<String> result = SettableFuture.create();
+		FutureCompletionHandler<String> futureToHandler = new FutureCompletionHandler<>(result);
+		DoneReading<Integer, Void> doneReading = new DoneReading(futureToHandler,
+			Futures.immediateFuture(null));
+		ReadLine readLine = new ReadLine(null, doneReading);
+		bytesRead.clear();
+		readLine.completed(false, null);
+		// ReadLine.completed() invokes channel.read() if it needs more bytes
+		return result;
 	}
 
 	@Override
@@ -335,27 +260,7 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 																		 boolean endOfInput)
 		throws WritePendingException, ShutdownChannelGroupException
 	{
-		if (writePending)
-			throw new WritePendingException();
-		writePending = true;
-		ByteBuffer sourceBytes = getBytes(source, attachment, handler, endOfInput);
-		if (sourceBytes == null)
-		{
-			writePending = false;
-			return;
-		}
-		CompletionHandler<Integer, ByteBuffer> writeHandler = new WriteHandler<A>(attachment, handler,
-			source,
-			endOfInput);
-		try
-		{
-			channel.write(sourceBytes, sourceBytes, writeHandler);
-		}
-		catch (RuntimeException e)
-		{
-			writePending = false;
-			throw e;
-		}
+		write(source, Long.MAX_VALUE, TimeUnit.MILLISECONDS, attachment, handler, endOfInput);
 	}
 
 	@Override
@@ -368,115 +273,86 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		throws IllegalArgumentException, WritePendingException, ShutdownChannelGroupException,
 					 UnsupportedOperationException
 	{
-		if (channelTimeouts == null)
-			throw new UnsupportedOperationException();
-		if (writePending)
-			throw new WritePendingException();
-		writePending = true;
-		ByteBuffer sourceBytes = getBytes(source, attachment, handler, endOfInput);
-		if (sourceBytes == null)
+		synchronized (this)
 		{
-			writePending = false;
-			return;
+			if (writeState != State.INITIAL)
+				throw new WritePendingException();
+			if (source.remaining() <= 0)
+			{
+				handler.completed(0, attachment);
+				return;
+			}
+			writeState = State.RUNNING;
 		}
-		CompletionHandler<Integer, ByteBuffer> writeHandler = new WriteHandler<A>(attachment, handler,
-			source,
-			endOfInput);
+		Future<Void> timeoutTimer;
+		if (timeout == Long.MAX_VALUE)
+			timeoutTimer = Futures.immediateFuture(null);
+		else
+		{
+			timeoutTimer = timer.schedule(new Callable<Void>()
+			{
+				@Override
+				public Void call() throws IOException
+				{
+					synchronized (AsynchronousByteCharChannel.this)
+					{
+						if (writeState == State.RUNNING)
+							writeState = State.INTERRUPTED;
+					}
+					close();
+					return null;
+				}
+			}, timeout, unit);
+		}
+		DoneWriting<Integer, Void> doneWriting = new DoneWriting(handler, timeoutTimer);
+		EncodingReadableByteChannel encoder = new EncodingReadableByteChannel(charset);
+		encoder.append(source);
+		this.bytesToWrite = ByteBuffer.allocate(encoder.maxReadCount());
 		try
 		{
-			channelTimeouts.write(sourceBytes, timeout, unit, sourceBytes, writeHandler);
+			encoder.read(bytesToWrite);
 		}
-		catch (WritePendingException e)
+		catch (IOException e)
 		{
-			writePending = false;
-			throw new AssertionError(e);
+			handler.failed(e, attachment);
+			return;
 		}
-		catch (ShutdownChannelGroupException e)
-		{
-			writePending = false;
-			throw e;
-		}
-		catch (RuntimeException e)
-		{
-			writePending = false;
-			throw e;
-		}
+		WriteCharacters writeCharacters = new WriteCharacters(source, doneWriting);
+		channel.write(bytesToWrite, attachment, writeCharacters);
 	}
 
 	@Override
 	public synchronized Future<Integer> write(CharBuffer source, boolean endOfInput)
 		throws WritePendingException, ShutdownChannelGroupException
 	{
-		if (writePending)
-			throw new WritePendingException();
-		writePending = true;
-		PollableCompletionHandler handler = new PollableCompletionHandler();
-		ByteBuffer sourceBytes = getBytes(source, null, handler, endOfInput);
-		if (sourceBytes == null)
+		synchronized (this)
 		{
-			writePending = false;
-			return new CompletedFuture(handler.throwable);
+			if (writeState != State.INITIAL)
+				throw new WritePendingException();
+			if (source.remaining() <= 0)
+				return Futures.immediateFuture(0);
+			writeState = State.RUNNING;
 		}
+		SettableFuture<Integer> result = SettableFuture.create();
+		FutureCompletionHandler<Integer> futureToHandler = new FutureCompletionHandler<>(result);
+		Future<Void> timeoutTimer = Futures.immediateFuture(null);
+		DoneWriting<Integer, Void> doneWriting = new DoneWriting(futureToHandler, timeoutTimer);
+
+		EncodingReadableByteChannel encoder = new EncodingReadableByteChannel(charset);
+		encoder.append(source);
+		this.bytesToWrite = ByteBuffer.allocate(encoder.maxReadCount());
 		try
 		{
-			return new WriteFuture(channel.write(sourceBytes), source, sourceBytes, endOfInput);
+			encoder.read(bytesToWrite);
 		}
-		catch (RuntimeException e)
+		catch (IOException e)
 		{
-			writePending = false;
-			throw e;
+			futureToHandler.failed(e, null);
+			return result;
 		}
-	}
-
-	/**
-	 * Returns the buffer from which bytes are to be retrieved.
-	 *
-	 * @param <A>
-	 *        The attachment type
-	 * @param source
-	 *        The buffer from which characters are to be retrieved
-	 * @param attachment
-	 *        The object to attach to the I/O operation; can be {@code null}
-	 * @param handler
-	 *        The completion handler object
-	 * @param endOfInput
-	 *        <code>true</code> if, and only if, the invoker can provide no additional input characters beyond
-	 *        those in the given buffer.
-	 *
-	 * @throws WritePendingException
-	 *         If the channel does not allow more than one write to be outstanding
-	 *         and a previous write has not completed
-	 * @throws ShutdownChannelGroupException
-	 *         If the channel is associated with a {@link AsynchronousChannelGroup
-	 *         group} that has terminated
-	 * @return The buffer from which bytes are to be retrieved, or null if an error occured and was delegated
-	 *         to the <code>CompletionHandler</code>
-	 */
-	private <A> ByteBuffer getBytes(CharBuffer source,
-																	A attachment, CompletionHandler<Integer, ? super A> handler,
-																	boolean endOfInput)
-	{
-		ByteBuffer sourceBytes = ByteBuffer.allocate((int) Math.ceil(encoder.maxBytesPerChar()
-																																 * source.remaining()));
-		// duplicate source to avoid modifying its position
-		CharBuffer sourceCopy = source.duplicate();
-		CoderResult encodingResult = encoder.encode(sourceCopy, sourceBytes, endOfInput);
-		if (encodingResult.isError())
-		{
-			delegateError(encodingResult, attachment, handler);
-			return null;
-		}
-		if (endOfInput)
-		{
-			encodingResult = encoder.flush(sourceBytes);
-			if (encodingResult.isError())
-			{
-				delegateError(encodingResult, attachment, handler);
-				return null;
-			}
-		}
-		sourceBytes.flip();
-		return sourceBytes;
+		WriteCharacters writeCharacters = new WriteCharacters(source, doneWriting);
+		channel.write(bytesToWrite, null, writeCharacters);
+		return result;
 	}
 
 	@Override
@@ -491,172 +367,6 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 		return channel.isOpen();
 	}
 
-	/**
-	 * A Future for an operation that has already completed.
-	 *
-	 * @author Gili Tzabari
-	 */
-	private static class CompletedFuture implements Future<Integer>
-	{
-		private final int charactersTransfered;
-		private final Throwable throwable;
-
-		/**
-		 * Creates a new CompletedFuture.
-		 *
-		 * @param charactersTransfered
-		 *        The number of characters transfered
-		 */
-		public CompletedFuture(int charactersTransfered)
-		{
-			this.charactersTransfered = charactersTransfered;
-			this.throwable = null;
-		}
-
-		/**
-		 * Creates a new CompletedFuture.
-		 *
-		 * @param throwable the Throwable thrown by the operation
-		 */
-		public CompletedFuture(Throwable throwable)
-		{
-			this.throwable = throwable;
-			this.charactersTransfered = 0;
-		}
-
-		@Override
-		public boolean cancel(boolean mayInterruptIfRunning)
-		{
-			return false;
-		}
-
-		@Override
-		public boolean isCancelled()
-		{
-			return false;
-		}
-
-		@Override
-		public boolean isDone()
-		{
-			return true;
-		}
-
-		@Override
-		public Integer get() throws InterruptedException, ExecutionException
-		{
-			if (throwable != null)
-				throw new ExecutionException(throwable);
-			return charactersTransfered;
-		}
-
-		@Override
-		public Integer get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
-																													 TimeoutException
-		{
-			if (throwable != null)
-				throw new ExecutionException(throwable);
-			return charactersTransfered;
-		}
-	}
-
-	/**
-	 * Invoked when a byte reading operation completes.
-	 *
-	 * @param <A>
-	 *        The attachment type
-	 * @param bytesRead
-	 *        The buffer from which bytes are to be retrieved
-	 * @param endOfInput
-	 *        true if the end of stream has been reached
-	 * @param target
-	 *        The buffer into which characters are to be transferred
-	 * @param attachment
-	 *        The object to attach to the I/O operation; can be null
-	 * @param handler
-	 *        The CompletionHandler to delegate to
-	 * @return true if the read operation completed
-	 */
-	private <A> boolean onBytesRead(ByteBuffer bytesRead, boolean endOfInput,
-																	CharSequenceWriter target,
-																	A attachment, CompletionHandler<Integer, ? super A> handler)
-	{
-		try
-		{
-			decodeBytesForRead(decoder, bytesRead, endOfInput, readString);
-			int charactersTransferred = target.write(readString);
-			if (endOfInput && charactersTransferred == 0)
-				charactersTransferred = -1;
-			if (charactersTransferred != 0)
-			{
-				if (charactersTransferred > 0)
-					readString.delete(0, charactersTransferred);
-				handler.completed(charactersTransferred, attachment);
-				return true;
-			}
-		}
-		catch (IOException e)
-		{
-			handler.failed(e, attachment);
-			return true;
-		}
-		return false;
-	}
-
-	/**
-	 * Decodes a ByteBuffer.
-	 *
-	 * @param decoder
-	 *        The Charset decoder
-	 * @param source
-	 *        The ByteBuffer to decode
-	 * @param endOfInput
-	 *        true if the end of the stream has been reached
-	 * @param target
-	 *        The buffer into which characters are to be transferred
-	 * @throws CharacterCodingException
-	 *         If a decoding error occured
-	 */
-	private static void decodeBytesForRead(CharsetDecoder decoder, ByteBuffer source,
-																				 boolean endOfInput,
-																				 StringBuilder target)
-		throws CharacterCodingException
-	{
-		final CharBuffer charBuffer = CharBuffer.allocate((int) Math.ceil(decoder.maxCharsPerByte() * source.
-			remaining()));
-		CoderResult decodingResult = decoder.decode(source, charBuffer, endOfInput);
-		if (decodingResult.isError())
-			decodingResult.throwException();
-		charBuffer.flip();
-		target.append(charBuffer.toString());
-		if (endOfInput)
-			flushDecoderForRead(decoder, charBuffer, target);
-	}
-
-	/**
-	 * Flush the CharsetDecoder.
-	 *
-	 * @param decoder
-	 *        The Charset decoder
-	 * @param temp
-	 *        A temporary buffer
-	 * @param target
-	 *        The buffer into which characters are to be transferred
-	 */
-	private static void flushDecoderForRead(CharsetDecoder decoder, CharBuffer temp,
-																					StringBuilder target)
-	{
-		CoderResult decodingResult;
-		do
-		{
-			temp.clear();
-			decodingResult = decoder.flush(temp);
-			temp.flip();
-			target.append(temp.toString());
-		}
-		while (!decodingResult.isUnderflow());
-	}
-
 	@Override
 	public String toString()
 	{
@@ -664,856 +374,532 @@ public class AsynchronousByteCharChannel implements AsynchronousCharChannel
 	}
 
 	/**
-	 * A handler for consuming the result of an asynchronous character reading operation.
+	 * The operation state.
+	 */
+	public static enum State
+	{
+		/**
+		 * The operation hasn't started.
+		 */
+		INITIAL,
+		/**
+		 * The operation is running.
+		 */
+		RUNNING,
+		/**
+		 * The operation was interrupted.
+		 */
+		INTERRUPTED
+	}
+
+	/**
+	 * Decodes bytesRead into charactersRead.
 	 *
+	 * @param <A> the type of the object attached to the I/O operation
 	 * @author Gili Tzabari
 	 */
-	private class ReadHandler<A> implements CompletionHandler<Integer, ByteBuffer>
+	private class ByteDecoder<A> implements CompletionHandler<Integer, A>
 	{
-		private final CompletionHandler<Integer, ? super A> handler;
-		private final A attachment;
-		private final CharSequenceWriter target;
+		private CompletionHandler<Boolean, A> handler;
 
 		/**
-		 * Creates a new ReadHandler.
+		 * Creates a new ByteDecoder.
 		 *
-		 * @param attachment
-		 *        The object to attach to the I/O operation; can be null
-		 * @param handler
-		 *        The CompletionHandler to delegate to
-		 * @param target
-		 *        The buffer into which characters are to be transferred
+		 * @param handler a handler for consuming the result of an asynchronous I/O operation
 		 */
-		public ReadHandler(A attachment, CompletionHandler<Integer, ? super A> handler,
-											 CharSequenceWriter target)
+		public ByteDecoder(CompletionHandler<Boolean, A> handler)
 		{
 			this.handler = handler;
-			this.attachment = attachment;
-			this.target = target;
-		}
-
-		@Override
-		public void completed(Integer numBytesRead, ByteBuffer bytesRead)
-		{
-			if (onBytesRead(bytesRead, numBytesRead == -1, target, attachment, handler))
-			{
-				synchronized (AsynchronousByteCharChannel.this)
-				{
-					readPending = false;
-				}
-				return;
-			}
-
-			// ask for more bytes
-			bytesRead.compact();
-			channel.read(bytesRead, bytesRead, this);
-		}
-
-		@Override
-		public void failed(Throwable throwable, ByteBuffer source)
-		{
-			handler.failed(throwable, attachment);
-			synchronized (AsynchronousByteCharChannel.this)
-			{
-				readPending = false;
-			}
-		}
-	}
-
-	/**
-	 * A CompletionHandler that retains its results for future examination.
-	 *
-	 * @author Gili Tzabari
-	 */
-	private static class PollableCompletionHandler implements CompletionHandler<Integer, Void>
-	{
-		public Integer result;
-		public Throwable throwable;
-
-		@Override
-		public void completed(Integer result, Void attachment)
-		{
-			this.result = result;
-		}
-
-		@Override
-		public void failed(Throwable throwable, Void attachment)
-		{
-			this.throwable = throwable;
-		}
-	}
-
-	/**
-	 * The result of an asynchronous character reading operation.
-	 *
-	 * @author Gili Tzabari
-	 */
-	private class ReadFuture implements Future<Integer>
-	{
-		private final ByteBuffer source;
-		private final CharSequenceWriter target;
-		private Future<Integer> future;
-		private ExecutionException exception;
-
-		/**
-		 * Creates a new ReadFuture.
-		 *
-		 * @param future
-		 *        The result of an asynchronous byte reading operation
-		 * @param source
-		 *        The buffer from which bytes are to be retrieved
-		 * @param target
-		 *        The buffer into which characters are to be transferred
-		 */
-		private ReadFuture(Future<Integer> future, ByteBuffer source, CharSequenceWriter target)
-		{
-			this.future = future;
-			this.source = source;
-			this.target = target;
-		}
-
-		@Override
-		public boolean cancel(boolean mayInterruptIfRunning)
-		{
-			return future.cancel(mayInterruptIfRunning);
-		}
-
-		@Override
-		public boolean isCancelled()
-		{
-			return future.isCancelled();
-		}
-
-		@Override
-		public boolean isDone()
-		{
-			return future.isDone();
-		}
-
-		@Override
-		public Integer get() throws CancellationException, InterruptedException, ExecutionException
-		{
-			if (exception != null)
-			{
-				// Prevent CharsetDecoder from being invoked again
-				throw exception;
-			}
-			while (true)
-			{
-				boolean endOfInput = future.get() == -1;
-				PollableCompletionHandler handler = new PollableCompletionHandler();
-				source.flip();
-				if (onBytesRead(source, endOfInput, target, null, handler))
-				{
-					synchronized (AsynchronousByteCharChannel.this)
-					{
-						readPending = false;
-					}
-					if (handler.throwable != null)
-					{
-						exception = new ExecutionException(handler.throwable);
-						throw exception;
-					}
-					return handler.result;
-				}
-
-				// ask for more bytes
-				source.compact();
-				future = channel.read(source);
-			}
-		}
-
-		@Override
-		public Integer get(long timeout, TimeUnit unit) throws CancellationException,
-																													 InterruptedException,
-																													 ExecutionException, TimeoutException
-		{
-			if (exception != null)
-			{
-				// Prevent CharsetDecoder from being invoked again
-				throw exception;
-			}
-			while (true)
-			{
-				boolean endOfInput;
-				try
-				{
-					endOfInput = future.get(timeout, unit) == -1;
-				}
-				catch (CancellationException e)
-				{
-					synchronized (AsynchronousByteCharChannel.this)
-					{
-						readPending = false;
-					}
-					throw e;
-				}
-				catch (InterruptedException e)
-				{
-					synchronized (AsynchronousByteCharChannel.this)
-					{
-						readPending = false;
-					}
-					throw e;
-				}
-				catch (ExecutionException e)
-				{
-					synchronized (AsynchronousByteCharChannel.this)
-					{
-						readPending = false;
-					}
-					throw e;
-				}
-				catch (TimeoutException e)
-				{
-					synchronized (AsynchronousByteCharChannel.this)
-					{
-						readPending = false;
-					}
-					throw e;
-				}
-				PollableCompletionHandler handler = new PollableCompletionHandler();
-				source.flip();
-				if (onBytesRead(source, endOfInput, target, null, handler))
-				{
-					synchronized (AsynchronousByteCharChannel.this)
-					{
-						readPending = false;
-					}
-					if (handler.throwable != null)
-					{
-						exception = new ExecutionException(handler.throwable);
-						throw exception;
-					}
-					return handler.result;
-				}
-
-				// ask for more bytes
-				source.compact();
-				future = channel.read(source);
-			}
-		}
-	}
-
-	/**
-	 * A handler for consuming the result of an asynchronous line reading operation.
-	 *
-	 * @author Gili Tzabari
-	 */
-	private static class ReadLineHandler<A> implements CompletionHandler<Integer, A>
-	{
-		private final CompletionHandler<String, ? super A> handler;
-		private final StringBuilder target;
-
-		/**
-		 * Creates a new ReadLineHandler.
-		 *
-		 * @param attachment
-		 *        The object to attach to the I/O operation; can be null
-		 * @param handler
-		 *        The CompletionHandler to delegate to
-		 * @param target
-		 *        The buffer into which characters are to be transferred
-		 */
-		public ReadLineHandler(CompletionHandler<String, ? super A> handler, StringBuilder target)
-		{
-			this.handler = handler;
-			this.target = target;
 		}
 
 		@Override
 		public void completed(Integer numBytesRead, A attachment)
 		{
+			assert (numBytesRead != 0);
 			if (numBytesRead == -1)
-				handler.completed(null, attachment);
-			else
-				handler.completed(target.toString(), attachment);
-		}
-
-		@Override
-		public void failed(Throwable throwable, A attachment)
-		{
-			handler.failed(throwable, attachment);
-		}
-	}
-
-	/**
-	 * The result of an asynchronous line reading operation.
-	 *
-	 * @author Gili Tzabari
-	 */
-	private static class ReadLineFuture implements Future<String>
-	{
-		private Future<Integer> future;
-		private final StringBuilder target;
-
-		/**
-		 * Creates a new ReadLineFuture.
-		 *
-		 * @param future
-		 *        The result of an asynchronous byte reading operation
-		 * @param target
-		 *        The buffer into which characters are to be transferred
-		 */
-		private ReadLineFuture(Future<Integer> future, StringBuilder target)
-		{
-			this.future = future;
-			this.target = target;
-		}
-
-		@Override
-		public boolean cancel(boolean mayInterruptIfRunning)
-		{
-			return future.cancel(mayInterruptIfRunning);
-		}
-
-		@Override
-		public boolean isCancelled()
-		{
-			return future.isCancelled();
-		}
-
-		@Override
-		public boolean isDone()
-		{
-			return future.isDone();
-		}
-
-		@Override
-		public String get() throws CancellationException, InterruptedException, ExecutionException
-		{
-			Integer result = future.get();
-			if (result == -1)
-				return null;
-			return target.toString();
-		}
-
-		@Override
-		public String get(long timeout, TimeUnit unit) throws CancellationException,
-																													InterruptedException,
-																													ExecutionException, TimeoutException
-		{
-			Integer result = future.get(timeout, unit);
-			if (result == -1)
-				return null;
-			return target.toString();
-		}
-	}
-
-	/**
-	 * Invoked when a byte reading operation completes.
-	 *
-	 * @param <A>
-	 *        The attachment type
-	 * @param source
-	 *        The buffer from which characters are to be retrieved
-	 * @param sourceOffset
-	 *        Source's initial position when the write operation began
-	 * @param bytesWritten
-	 *        The bytes that were written
-	 * @param bytesRead
-	 *        The buffer from which bytes are to be retrieved
-	 * @param target
-	 *        The buffer into which characters are to be transferred
-	 * @param attachment
-	 *        The object to attach to the I/O operation; can be null
-	 * @param handler
-	 *        The CompletionHandler to delegate to
-	 * @param endOfInput
-	 *        true if the end of the stream has been reached
-	 * @return true if the write operation completed
-	 */
-	private <A> boolean onBytesWritten(CharBuffer source, int sourceOffset, ByteBuffer bytesWritten,
-																		 A attachment, CompletionHandler<Integer, ? super A> handler,
-																		 boolean endOfInput)
-	{
-		// Decode the bytes we sent out
-		CharsetDecoder decoderForWrite = charset.newDecoder();
-		final CharBuffer charBuffer = CharBuffer.allocate((int) Math.ceil(decoderForWrite.
-			maxCharsPerByte()
-																																			* bytesWritten.remaining()));
-		CoderResult decodingResult = decoderForWrite.decode(bytesWritten, charBuffer, endOfInput);
-		if (decodingResult.isUnmappable())
-		{
-			delegateError(decodingResult, attachment, handler);
-			return true;
-		}
-		if (decodingResult.isMalformed())
-		{
-			// The write operation stopped in the middle of a codepoint
-			skipWellFormedBytes(source, bytesWritten, decoderForWrite);
-
-			bytesWritten.clear();
-			putCodepoint(bytesWritten, source.toString().codePointAt(0), encoder);
-			if (bytesWritten.position() > decodingResult.length())
 			{
-				// Send the rest of the codepoint
-				bytesWritten.position(decodingResult.length());
-				return false;
+				handler.completed(true, attachment);
+				return;
 			}
-			delegateError(decodingResult, attachment, handler);
-			return true;
-		}
-		// We sent a whole number of codepoints
-		source.position(source.position() + charBuffer.position());
-		if (endOfInput)
-			flushDecoderForWrite(decoderForWrite, charBuffer, source);
-
-		handler.completed(source.position() - sourceOffset, attachment);
-		return true;
-	}
-
-	/**
-	 * Skips any well-formed bytes that were written.
-	 *
-	 * @param source
-	 *        The buffer from which characters are to be retrieved
-	 * @param malformedBytes
-	 *        The buffer containing the malformed bytes
-	 */
-	private static void skipWellFormedBytes(CharBuffer source, ByteBuffer malformedBytes,
-																					CharsetDecoder decoder)
-	{
-		malformedBytes.flip();
-		CharBuffer charBuffer = CharBuffer.allocate((int) Math.ceil(decoder.maxCharsPerByte() * malformedBytes.
-			remaining()));
-		CoderResult decodingResult = decoder.decode(malformedBytes, charBuffer, true);
-		assertCoderResult(decodingResult);
-		decodingResult = decoder.flush(charBuffer);
-		assertCoderResult(decodingResult);
-		source.position(source.position() + charBuffer.position());
-	}
-
-	/**
-	 * Puts a codepoint into a ByteBuffer.
-	 *
-	 * @param target
-	 *        The buffer to write into
-	 * @param codepoint
-	 *        The codepoint
-	 */
-	private static void putCodepoint(ByteBuffer target, int codepoint, CharsetEncoder encoder)
-	{
-		// Encode one codepoint
-		int charCount = Character.charCount(codepoint);
-		CharBuffer codepointBuffer = CharBuffer.allocate(charCount);
-		codepointBuffer.put(Character.toChars(codepoint));
-		codepointBuffer.flip();
-		CoderResult result = encoder.encode(codepointBuffer, target, true);
-		assertCoderResult(result);
-		result = encoder.flush(target);
-		assertCoderResult(result);
-	}
-
-	/**
-	 * Throws AssertionError if an CoderResult error has occured.
-	 *
-	 * @param coderResult
-	 *        The result of an coding operation
-	 * @throws AssertionError
-	 *         If coderResult.isError()
-	 */
-	private static void assertCoderResult(CoderResult coderResult) throws AssertionError
-	{
-		if (coderResult.isError())
-		{
+			bytesRead.flip();
+			assert (bytesRead.remaining() == numBytesRead): "remaining: " + bytesRead.remaining()
+																											+ ", numBytesRead: " + numBytesRead;
 			try
 			{
-				coderResult.throwException();
+				readDecoder.write(bytesRead);
+				bytesRead.compact();
 			}
-			catch (CharacterCodingException e)
+			catch (IOException e)
 			{
+				handler.failed(e, attachment);
+				return;
+			}
+			StringBuilder decodedCharacters = readDecoder.toStringBuilder();
+			charactersRead.append(decodedCharacters);
+			int numCharactersRead = decodedCharacters.length();
+			decodedCharacters.delete(0, numCharactersRead);
+			handler.completed(numCharactersRead == 0, attachment);
+		}
+
+		@Override
+		public void failed(Throwable t, A attachment)
+		{
+			handler.failed(t, attachment);
+		}
+	}
+
+	/**
+	 * Attempts to read one character.
+	 *
+	 * @param <A> the type of the object attached to the I/O operation
+	 * @author Gili Tzabari
+	 */
+	private class ReadCharacters<A> implements CompletionHandler<Boolean, A>
+	{
+		private final CharBuffer target;
+		private final CompletionHandler<Integer, A> handler;
+
+		/**
+		 * Creates a new ReadCharacters.
+		 *
+		 * @param target the buffer into which characters are to be transferred
+		 * @param handler a handler for consuming the result of an asynchronous I/O operation.
+		 *   The value denotes the number of characters read by the operation. The current object's
+		 *   attachment is passed to the handler.
+		 * @throws NullPointerException if target or handler are null
+		 */
+		public ReadCharacters(CharBuffer target, CompletionHandler<Integer, A> handler)
+		{
+			Preconditions.checkNotNull(target, "target may not be null");
+			Preconditions.checkNotNull(handler, "handler may not be null");
+
+			this.target = target;
+			this.handler = handler;
+		}
+
+		@Override
+		public void completed(Boolean endOfStream, A attachment)
+		{
+			if (charactersRead.length() == 0 && !endOfStream)
+			{
+				// We don't have any buffered characters and there is more data in the stream, so keep on
+				// reading.
+				ByteDecoder<Void> byteDecoder = new ByteDecoder(this);
+				channel.read(bytesRead, null, byteDecoder);
+				return;
+			}
+
+			int numCharactersRead = Math.min(charactersRead.length(), target.remaining());
+
+			target.put(charactersRead.substring(0, numCharactersRead));
+			charactersRead.delete(0, numCharactersRead);
+
+			handler.completed(numCharactersRead, attachment);
+		}
+
+		@Override
+		public void failed(Throwable t, A attachment)
+		{
+			handler.failed(t, attachment);
+		}
+	}
+
+	/**
+	 * Attempts to read one line of text.
+	 *
+	 * @param <A> the type of the object attached to the I/O operation
+	 * @author Gili Tzabari
+	 */
+	private class ReadLine<A> implements CompletionHandler<Boolean, A>
+	{
+		private final StringBuilder target = new StringBuilder();
+		private final CompletionHandler<String, A> handler;
+
+		/**
+		 * Creates a new LineListener.
+		 *
+		 * @param handler a handler for consuming the result of an asynchronous I/O operation. The
+		 *   value denotes the line read. The current object's attachment is passed to the handler.
+		 * @throws NullPointerException if handler is null
+		 */
+		public ReadLine(A attachment, CompletionHandler<String, A> handler)
+		{
+			this.handler = handler;
+		}
+
+		@Override
+		public void completed(Boolean endOfStream, A attachment)
+		{
+			while (true)
+			{
+				Matcher matcher = delimiters.matcher(charactersRead);
+				if (!matcher.find())
+				{
+					target.append(charactersRead);
+					charactersRead.setLength(0);
+					if (!endOfStream)
+					{
+						// delimiters not found and there is more data in the stream, so keep on reading.
+						ByteDecoder<Void> byteDecoder = new ByteDecoder(this);
+						channel.read(bytesRead, null, byteDecoder);
+						return;
+					}
+					break;
+				}
+				// Matcher.group() references the original String so we need to backup the result before
+				// modifying the String.
+				String match = matcher.group();
+				target.append(charactersRead, 0, matcher.start());
+				charactersRead.delete(0, matcher.end());
+				switch (match)
+				{
+					case "\r":
+					{
+						consumeNewline = true;
+						break;
+					}
+					case "\n":
+					{
+						if (consumeNewline && matcher.start() == 0)
+						{
+							// Handle the case where \r\n is split across separate reads
+							consumeNewline = false;
+							continue;
+						}
+						break;
+					}
+					default:
+						throw new AssertionError("Unexpected delimiter: '" + toHex(match) + "'");
+				}
+				break;
+			}
+			handler.completed(target.toString(), attachment);
+		}
+
+		@Override
+		public void failed(Throwable t, A attachment)
+		{
+			handler.failed(t, attachment);
+		}
+	}
+
+	/**
+	 * Notified when a read operation completes.
+	 *
+	 * @param <V> the result type of the I/O operation
+	 * @param <A> the type of the object attached to the I/O operation
+	 * @author Gili Tzabari
+	 */
+	private class DoneReading<V, A> implements CompletionHandler<V, A>
+	{
+		private final CompletionHandler<V, A> delegate;
+		private final Future<?> timer;
+		private boolean done;
+
+		/**
+		 * Creates a new DoneReading.
+		 *
+		 * @param delegate the handler to delegate to. The current object's attachment is passed to the
+		 *   delegate.
+		 * @param timer the timeout timer to cancel when the operation completes
+		 * through to the delegate.
+		 */
+		public DoneReading(CompletionHandler<V, A> delegate, Future<?> timer)
+		{
+			Preconditions.checkNotNull(delegate, "delegate may not be null");
+			Preconditions.checkNotNull(timer, "timer may not be null");
+
+			this.delegate = delegate;
+			this.timer = timer;
+		}
+
+		@Override
+		public void completed(V value, A attachment)
+		{
+			done = true;
+			timer.cancel(false);
+			boolean interrupted;
+			synchronized (AsynchronousByteCharChannel.this)
+			{
+				switch (readState)
+				{
+					case INTERRUPTED:
+					{
+						readState = State.INITIAL;
+						interrupted = true;
+						break;
+					}
+					case RUNNING:
+					{
+						readState = State.INITIAL;
+						interrupted = false;
+						break;
+					}
+					default:
+						throw new AssertionError("Unexpected state: " + readState);
+				}
+			}
+			if (interrupted)
+				delegate.failed(new InterruptedByTimeoutException(), attachment);
+			else
+				delegate.completed(value, attachment);
+		}
+
+		@Override
+		public void failed(Throwable t, A attachment)
+		{
+			done = true;
+			timer.cancel(false);
+			boolean interrupted;
+			synchronized (AsynchronousByteCharChannel.this)
+			{
+				interrupted = readState == State.INTERRUPTED;
+				readState = State.INITIAL;
+			}
+			if (interrupted)
+			{
+				InterruptedByTimeoutException interruptedException = new InterruptedByTimeoutException();
+				interruptedException.addSuppressed(t);
+				delegate.failed(interruptedException, attachment);
+			}
+			else
+				delegate.failed(t, attachment);
+		}
+
+		/**
+		 * Indicates if the operation has completed.
+		 * 
+		 * @return true if the operation has completed
+		 */
+		public boolean isDone()
+		{
+			return done;
+		}
+	}
+
+	/**
+	 * Attempts to write characters.
+	 *
+	 * @param <A> the type of the object attached to the I/O operation
+	 * @author Gili Tzabari
+	 */
+	private class WriteCharacters<A> implements CompletionHandler<Integer, A>
+	{
+		private final CharBuffer source;
+		private final CompletionHandler<Integer, A> handler;
+		private final int initialPosition;
+
+		/**
+		 * Creates a new WriteCharacters.
+		 *
+		 * @param source the buffer from which characters are to be transferred
+		 * @param handler a handler for consuming the result of an asynchronous I/O operation.
+		 *   The value denotes the number of characters read by the operation. The current object's
+		 *   attachment is passed to the handler.
+		 * @throws NullPointerException if target or handler are null
+		 */
+		public WriteCharacters(CharBuffer source, CompletionHandler<Integer, A> handler)
+		{
+			Preconditions.checkNotNull(source, "source may not be null");
+			Preconditions.checkNotNull(handler, "handler may not be null");
+
+			this.source = source;
+			this.handler = handler;
+			this.initialPosition = source.position();
+		}
+
+		@Override
+		public void completed(Integer numBytesWritten, A attachment)
+		{
+			assert (numBytesWritten != 0);
+			ByteBuffer outstandingBytes = updateSourcePosition(numBytesWritten);
+			if (outstandingBytes.hasRemaining())
+			{
+				channel.write(outstandingBytes, attachment, this);
+				return;
+			}
+			handler.completed(source.position() - initialPosition, attachment);
+		}
+
+		@Override
+		public void failed(Throwable t, A attachment)
+		{
+			handler.failed(t, attachment);
+		}
+
+		/**
+		 * Updates the position of the CharBuffer that was written out.
+		 * If the write operation stopped in the middle of a multi-byte character, returns the
+		 * bytes that must be written to complete the character.
+		 * 
+		 * @param numBytesWritten the number of bytes that were written
+		 * @return empty buffer if the last character written was whole
+		 */
+		private ByteBuffer updateSourcePosition(int numBytesWritten)
+		{
+			// Convert the bytes that were sent back into characters
+			DecodingWriteableByteChannel decoder = new DecodingWriteableByteChannel(charset);
+			ByteBuffer actualBytesWritten = bytesToWrite.duplicate();
+			actualBytesWritten.limit(numBytesWritten);
+			try
+			{
+				try
+				{
+					decoder.write(actualBytesWritten);
+					decoder.close();
+
+					// Move source forward by the number of whole characters written
+					source.position(source.position() + decoder.toStringBuilder().length());
+					return ByteBuffer.allocate(0);
+				}
+				catch (MalformedInputException unused)
+				{
+					// continue processing below
+				}
+				// Move source forward by the number of whole characters written
+				CharBuffer wholeCharsWritten = source.duplicate();
+				wholeCharsWritten.limit(wholeCharsWritten.position() + decoder.toStringBuilder().length());
+				source.position(wholeCharsWritten.limit());
+
+				// Calculate how many bytes make up the whole characters written
+				EncodingReadableByteChannel encoder = new EncodingReadableByteChannel(charset);
+				encoder.append(wholeCharsWritten);
+				bytesToWrite.position(0);
+				encoder.read(bytesToWrite);
+				int wholeBytesWritten = bytesToWrite.position();
+				int malformedBytesWritten = numBytesWritten - wholeBytesWritten;
+
+				// Encode the partially-written character
+				encoder.append(String.valueOf(source.get()));
+				ByteBuffer result = ByteBuffer.allocate(encoder.maxReadCount());
+				encoder.read(result);
+				result.flip();
+				result.position(malformedBytesWritten);
+				return result;
+			}
+			catch (IOException e)
+			{
+				// we've already encoded/decoded this String without running into unmappable
+				// characters so CharCodingException should not occur. Furthermore, all operations take
+				// place on memory buffers so IOException should not occur.
 				throw new AssertionError(e);
 			}
 		}
 	}
 
 	/**
-	 * Delegate a decoding error if necessary.
+	 * Notified when a write operation completes.
 	 *
-	 * @param <A>
-	 *        The attachment type
-	 * @param coderResult
-	 *        The CoderResult
-	 * @param attachment
-	 *        The object to attach to the I/O operation; can be null
-	 * @param handler
-	 *        The CompletionHandler to delegate to
-	 */
-	private static <A> void delegateError(CoderResult coderResult, A attachment,
-																				CompletionHandler<?, ? super A> handler)
-	{
-		try
-		{
-			coderResult.throwException();
-		}
-		catch (CharacterCodingException e)
-		{
-			handler.failed(e, attachment);
-		}
-	}
-
-	/**
-	 * Flush the CharsetDecoder.
-	 *
-	 * @param decoder
-	 *        The Charset decoder
-	 * @param temp
-	 *        A temporary buffer
-	 * @param source
-	 *        The buffer from which bytes are to be retrieved
-	 */
-	private static void flushDecoderForWrite(CharsetDecoder decoder, CharBuffer charBuffer,
-																					 CharBuffer source)
-	{
-		CoderResult decodingResult;
-		do
-		{
-			charBuffer.clear();
-			decodingResult = decoder.flush(charBuffer);
-			source.position(source.position() + charBuffer.position());
-		}
-		while (!decodingResult.isUnderflow());
-	}
-
-	/**
-	 * A handler for consuming the result of an asynchronous character writing operation.
-	 *
+	 * @param <V> the result type of the I/O operation
+	 * @param <A> the type of the object attached to the I/O operation
 	 * @author Gili Tzabari
 	 */
-	private class WriteHandler<A> implements CompletionHandler<Integer, ByteBuffer>
+	private class DoneWriting<V, A> implements CompletionHandler<V, A>
 	{
-		private final CompletionHandler<Integer, ? super A> handler;
-		private final A attachment;
-		private final CharBuffer source;
-		/**
-		 * Source's initial position.
-		 */
-		private final int sourceOffset;
-		private final boolean endOfInput;
+		private final CompletionHandler<V, A> delegate;
+		private final Future<?> timer;
+		private boolean done;
 
 		/**
-		 * Creates a new WriteHandler.
+		 * Creates a new DoneWriting.
 		 *
-		 * @param attachment
-		 *        The object to attach to the I/O operation; can be null
-		 * @param handler
-		 *        The CompletionHandler to delegate to
-		 * @param source
-		 *        The buffer from which bytes are to be retrieved
-		 * @param endOfInput
-		 *        true if the end of stream has been reached
+		 * @param delegate the handler to delegate to. The current object's attachment is passed to the
+		 *   delegate.
+		 * @param timer the timeout timer to cancel when the operation completes
+		 * through to the delegate.
 		 */
-		public WriteHandler(A attachment, CompletionHandler<Integer, ? super A> handler,
-												CharBuffer source,
-												boolean endOfInput)
+		public DoneWriting(CompletionHandler<V, A> delegate, Future<?> timer)
 		{
-			this.handler = handler;
-			this.attachment = attachment;
-			this.source = source;
-			this.sourceOffset = source.position();
-			this.endOfInput = endOfInput;
+			Preconditions.checkNotNull(delegate, "delegate may not be null");
+			Preconditions.checkNotNull(timer, "timer may not be null");
+
+			this.delegate = delegate;
+			this.timer = timer;
 		}
 
 		@Override
-		public void completed(Integer unused, ByteBuffer bytesWritten)
+		public void completed(V value, A attachment)
 		{
-			// Ensure we wrote a whole number of characters
-			bytesWritten.flip();
-			if (onBytesWritten(source, sourceOffset, bytesWritten, attachment, handler, endOfInput))
-			{
-				synchronized (AsynchronousByteCharChannel.this)
-				{
-					writePending = false;
-				}
-				return;
-			}
-
-			// Write the remaining bytes
-			channel.write(bytesWritten, bytesWritten, this);
-		}
-
-		@Override
-		public void failed(Throwable throwable, ByteBuffer source)
-		{
-			handler.failed(throwable, attachment);
+			done = true;
+			timer.cancel(false);
+			boolean interrupted;
 			synchronized (AsynchronousByteCharChannel.this)
 			{
-				readPending = false;
+				switch (writeState)
+				{
+					case INTERRUPTED:
+					{
+						writeState = State.INITIAL;
+						interrupted = true;
+						break;
+					}
+					case RUNNING:
+					{
+						writeState = State.INITIAL;
+						interrupted = false;
+						break;
+					}
+					default:
+						throw new AssertionError("Unexpected state: " + readState);
+				}
 			}
+			if (interrupted)
+				delegate.failed(new InterruptedByTimeoutException(), attachment);
+			else
+				delegate.completed(value, attachment);
 		}
-	}
 
-	/**
-	 * The result of an asynchronous character writing operation.
-	 *
-	 * @author Gili Tzabari
-	 */
-	private class WriteFuture implements Future<Integer>
-	{
-		private final CharBuffer source;
-		private final ByteBuffer bytesWritten;
+		@Override
+		public void failed(Throwable t, A attachment)
+		{
+			done = true;
+			timer.cancel(false);
+			boolean interrupted;
+			synchronized (AsynchronousByteCharChannel.this)
+			{
+				interrupted = writeState == State.INTERRUPTED;
+				writeState = State.INITIAL;
+			}
+			if (interrupted)
+			{
+				InterruptedByTimeoutException interruptedException = new InterruptedByTimeoutException();
+				interruptedException.addSuppressed(t);
+				delegate.failed(interruptedException, attachment);
+			}
+			else
+				delegate.failed(t, attachment);
+		}
+
 		/**
-		 * Source's initial position.
+		 * Indicates if the operation has completed.
+		 * 
+		 * @return true if the operation has completed
 		 */
-		private final int sourceOffset;
-		private final boolean endOfInput;
-		private Future<Integer> future;
-		private ExecutionException throwable;
-
-		/**
-		 * Creates a new WriteFuture.
-		 *
-		 * @param future
-		 *        The result of an asynchronous byte writing operation
-		 * @param source
-		 *        The buffer from which characters are to be retrieved
-		 * @param bytesWritten
-		 *        The buffer from which bytes are to be retrieved
-		 * @param endOfInput
-		 *        true if the end of stream has been reached
-		 */
-		private WriteFuture(Future<Integer> future, CharBuffer source, ByteBuffer bytesWritten,
-												boolean endOfInput)
-		{
-			this.future = future;
-			this.source = source;
-			this.bytesWritten = bytesWritten;
-			this.sourceOffset = source.position();
-			this.endOfInput = endOfInput;
-		}
-
-		@Override
-		public boolean cancel(boolean mayInterruptIfRunning)
-		{
-			return future.cancel(mayInterruptIfRunning);
-		}
-
-		@Override
-		public boolean isCancelled()
-		{
-			return future.isCancelled();
-		}
-
-		@Override
 		public boolean isDone()
 		{
-			return future.isDone();
-		}
-
-		@Override
-		public Integer get() throws CancellationException, InterruptedException, ExecutionException
-		{
-			if (throwable != null)
-			{
-				// Prevent CharsetDecoder from being invoked again
-				throw throwable;
-			}
-			while (true)
-			{
-				future.get();
-
-				// Ensure we wrote a whole number of characters
-				bytesWritten.flip();
-				PollableCompletionHandler handler = new PollableCompletionHandler();
-				if (onBytesWritten(source, sourceOffset, bytesWritten, null, handler, endOfInput))
-				{
-					synchronized (AsynchronousByteCharChannel.this)
-					{
-						writePending = false;
-					}
-					if (handler.throwable != null)
-					{
-						throwable = new ExecutionException(handler.throwable);
-
-						throw throwable;
-					}
-					return handler.result;
-				}
-
-				// Write the remaining bytes
-				future = channel.write(bytesWritten);
-			}
-		}
-
-		@Override
-		public Integer get(long timeout, TimeUnit unit) throws CancellationException,
-																													 InterruptedException,
-																													 ExecutionException, TimeoutException
-		{
-			if (throwable != null)
-			{
-				// Prevent CharsetDecoder from being invoked again
-				throw throwable;
-			}
-			while (true)
-			{
-				try
-				{
-					future.get(timeout, unit);
-				}
-				catch (CancellationException e)
-				{
-					synchronized (AsynchronousByteCharChannel.this)
-					{
-						writePending = false;
-					}
-					throw e;
-				}
-				catch (InterruptedException e)
-				{
-					synchronized (AsynchronousByteCharChannel.this)
-					{
-						writePending = false;
-					}
-					throw e;
-				}
-				catch (ExecutionException e)
-				{
-					synchronized (AsynchronousByteCharChannel.this)
-					{
-						writePending = false;
-					}
-					throw e;
-				}
-				catch (TimeoutException e)
-				{
-					synchronized (AsynchronousByteCharChannel.this)
-					{
-						writePending = false;
-					}
-					throw e;
-				}
-
-				// Ensure we wrote a whole number of characters
-				bytesWritten.flip();
-				PollableCompletionHandler handler = new PollableCompletionHandler();
-				if (onBytesWritten(source, sourceOffset, bytesWritten, null, handler, endOfInput))
-				{
-					synchronized (AsynchronousByteCharChannel.this)
-					{
-						writePending = false;
-					}
-					if (handler.throwable != null)
-					{
-						throwable = new ExecutionException(handler.throwable);
-
-						throw throwable;
-					}
-					return handler.result;
-				}
-
-				// Write the remaining bytes
-				future = channel.write(bytesWritten);
-			}
+			return done;
 		}
 	}
 
 	/**
-	 * An interface for writing CharSequences.
-	 *
-	 * @author Gili Tzabari
+	 * Returns a String's bytes in hexidecimal format.
+	 * 
+	 * @param text the String to convert to hex
+	 * @return the String bytes in hexidecimal format
 	 */
-	private interface CharSequenceWriter
+	private String toHex(String text)
 	{
-		/**
-		 * Writes a sequence of characters.
-		 *
-		 * @param source
-		 *        The character sequence to write
-		 * @return The number of characters that were consumed,
-		 *         <tt>0</tt>&nbsp;<tt>&lt;=</tt>&nbsp;<tt>n</tt>&nbsp;<tt>&lt;</tt>&nbsp;<tt>source.length()</tt>.
-		 *         Note that there is no implied correlation between the number of characters that are consumed
-		 *         and the number of characters that are written. Writers may choose to skip an arbitrary number
-		 *         of bytes.
-		 * @throws IOException
-		 *         If an I/O error occurs
-		 */
-		int write(CharSequence source) throws IOException;
-	}
-
-	/**
-	 * A CharSequenceWriter for writing into CharBuffers.
-	 *
-	 * @author Gili Tzabari
-	 */
-	private static class CharBufferWriter implements CharSequenceWriter
-	{
-		private final CharBuffer target;
-
-		/**
-		 * Creates a new CharBufferWriter.
-		 *
-		 * @param target
-		 *        The buffer into which characters are to be transferred
-		 */
-		public CharBufferWriter(CharBuffer target)
-		{
-			this.target = target;
-		}
-
-		@Override
-		public int write(CharSequence source)
-		{
-			int result = Math.min(source.length(), target.remaining());
-
-			// WORKAROUND: http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4860681
-			StringBuilder sourceString = (StringBuilder) source;
-
-			target.put(sourceString.substring(0, result));
-			return result;
-		}
-	}
-
-	/**
-	 * A CharSequenceWriter for writing lines of text.
-	 *
-	 * @author Gili Tzabari
-	 */
-	private class LineWriter implements CharSequenceWriter
-	{
-		private final StringBuilder target;
-
-		/**
-		 * Creates a new StringBuilderWriter.
-		 *
-		 * @param target
-		 *        The buffer into which characters are to be transferred
-		 */
-		public LineWriter(StringBuilder target)
-		{
-			this.target = target;
-		}
-
-		@Override
-		public int write(CharSequence source) throws IOException
-		{
-			Matcher matcher = delimiters.matcher(source);
-			int startIndex = 0;
-			while (true)
+		return Joiner.on(", ").join(Iterables.transform(Bytes.asList(text.getBytes(Charsets.UTF_8)),
+			new Function<Byte, String>()
 			{
-				if (!matcher.find())
-					return 0;
-				if (matcher.group().equals("\r"))
-					consumeNewline = true;
-				else if (matcher.group().equals("\n"))
+				@Override
+				public String apply(Byte input)
 				{
-					if (consumeNewline && matcher.start() == 0)
-					{
-						// "consumeNewline" gets reset if we find a real line terminator, otherwise we need to retain
-						// its value for the next method invocation.
-						startIndex = "\n".length();
-						continue;
-					}
-					consumeNewline = false;
+					String result = Integer.toHexString(input).toUpperCase();
+					if (input < 16)
+						return "0x0" + result;
+					return "0x" + result;
 				}
-
-				target.append(source.subSequence(startIndex, matcher.start()));
-
-				// +1 to strip out the line delimiter
-				return matcher.start() + 1;
-			}
-		}
+			}));
 	}
-
 }

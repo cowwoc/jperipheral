@@ -1,6 +1,6 @@
 package org.jperipheral;
 
-import org.jperipheral.nio.channels.AsynchronousByteChannel;
+import java.nio.channels.AsynchronousByteChannel;
 
 /**
  * A peripheral.

@@ -2,23 +2,23 @@ package org.jperipheral;
 
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
+import java.nio.channels.AsynchronousChannel;
+import java.nio.channels.CompletionHandler;
+import java.nio.channels.InterruptedByTimeoutException;
+import java.nio.channels.ReadPendingException;
+import java.nio.channels.ShutdownChannelGroupException;
+import java.nio.channels.WritePendingException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import org.jperipheral.nio.channels.AsynchronousChannel;
-import org.jperipheral.nio.channels.CompletionHandler;
-import org.jperipheral.nio.channels.InterruptedByTimeoutException;
-import org.jperipheral.nio.channels.ReadPendingException;
-import org.jperipheral.nio.channels.ShutdownChannelGroupException;
-import org.jperipheral.nio.channels.WritePendingException;
 
 /**
  * An asynchronous channel that can read and write characters.
  *
  * <p> Some channels may not allow more than one read or write to be outstanding
  * at any given time. If a thread invokes a read method before a previous read
- * operation has completed then a {@link ReadPendingException} will be thrown.
+ * operation has completed then a {@link ReadPendingException} might be thrown.
  * Similarly, if a write method is invoked before a previous write has completed
- * then {@link WritePendingException} is thrown. Whether or not other kinds of
+ * then {@link WritePendingException} might be thrown. Whether or not other kinds of
  * I/O operations may proceed concurrently with a read operation depends upon
  * the type of the channel.
  *
@@ -53,7 +53,9 @@ import org.jperipheral.nio.channels.WritePendingException;
  * state of the {@link ByteBuffer}, or the sequence of buffers, for the I/O
  * operation is not defined. Buffers should be discarded or at least care must
  * be taken to ensure that the buffers are not accessed while the channel remains
- * open.
+ * open. All methods that accept timeout parameters treat values less than or equal to zero to mean
+ * that the I/O operation times out immediately, and a value of <code>Long.MAX_VALUE</code> to mean
+ * that the I/O operation does not timeout.
  *
  * @author Gili Tzabari
  */
@@ -91,7 +93,7 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * <p> This method may be invoked at any time. Some channel types may not
 	 * allow more than one read to be outstanding at any given time. If a thread
 	 * initiates a read operation before a previous read operation has
-	 * completed then a {@link ReadPendingException} will be thrown.
+	 * completed then a {@link ReadPendingException} might be thrown.
 	 *
 	 * @param   <A>
 	 *          The attachment type
@@ -110,8 +112,8 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * @throws ShutdownChannelGroupException
 	 *         If the channel group is shutdown
 	 */
-	<A> void read(CharBuffer target, A attachment,
-								CompletionHandler<Integer, ? super A> handler)
+	 <A> void read(CharBuffer target, A attachment,
+								 CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;
 
 	/**
@@ -153,17 +155,18 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 *          If the {@code timeout} parameter is negative or the buffer is
 	 *          read-only
 	 * @throws  ReadPendingException
-	 *          If a read operation is already in progress on this channel
+	 *          If the channel does not allow more than one read to be outstanding
+	 *          and a previous read has not completed
 	 * @throws  ShutdownChannelGroupException
 	 *          If the channel group is shutdown
 	 * @throws  UnsupportedOperationException
 	 *          If the implementation does not support this operation
 	 */
-	<A> void read(CharBuffer target,
-								long timeout,
-								TimeUnit unit,
-								A attachment,
-								CompletionHandler<Integer, ? super A> handler)
+	 <A> void read(CharBuffer target,
+								 long timeout,
+								 TimeUnit unit,
+								 A attachment,
+								 CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException,
 					 UnsupportedOperationException;
 
@@ -221,13 +224,13 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * will not have changed.
 	 *
 	 * <p> Buffers are not safe for use by multiple concurrent threads so care
-	 * should be taken to not to access the buffer until the operaton has
+	 * should be taken to not to access the buffer until the operation has
 	 * completed.
 	 *
 	 * <p> This method may be invoked at any time. Some channel types may not
 	 * allow more than one read to be outstanding at any given time. If a thread
 	 * initiates a read operation before a previous read operation has
-	 * completed then a {@link ReadPendingException} will be thrown.
+	 * completed then a {@link ReadPendingException} might be thrown.
 	 *
 	 * @param   <A>
 	 *          The attachment type
@@ -244,7 +247,63 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * @throws ShutdownChannelGroupException
 	 *         If the channel group is shutdown
 	 */
-	<A> void readLine(A attachment, CompletionHandler<String, ? super A> handler)
+	 <A> void readLine(A attachment, CompletionHandler<String, ? super A> handler)
+		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;
+
+	/**
+	 * Reads a line of characters from this channel into the given buffer.
+	 *
+	 * <p> This method initiates an asynchronous read operation to read a
+	 * line of characters from this channel into the given buffer. A line
+	 * is delimited by any one of a line feed <code>'\n'</code>,
+	 * a carriage return <code>'\r'</code>, or a carriage return followed
+	 * immediately by a linefeed. The {@code handler} parameter is a completion
+	 * handler that is invoked when the read operation completes (or fails).
+	 * The result passed to the completion handler is the line of characters
+	 * that was read (excluding termination characters) or {@code null} if no
+	 * characters could be read because the channel has reached end-of-stream.
+	 *
+	 * <p> Suppose that a character sequence of length <i>n</i> is read, where
+	 * <i>n</i>&nbsp;<tt>&gt;</tt>&nbsp;<tt>0</tt>. This character sequence
+	 * will be transferred into the buffer so that the first character in the
+	 * sequence is at index <i>p</i> and the last character is at index
+	 * <i>p</i>&nbsp;<tt>+</tt>&nbsp;<i>n</i>&nbsp;<tt>-</tt>&nbsp;<tt>1</tt>&nbsp;<tt>-</tt>&nbsp;<i>d</i>,
+	 * where <i>p</i> is the buffer's position at the moment the read is
+	 * performed and <i>d</i> is the length of the line delimiter. Upon completion
+	 * the buffer's position will be equal to
+	 * <i>p</i>&nbsp;<tt>+</tt>&nbsp;<i>n</i>&nbsp;<tt>-</tt>&nbsp;<i>d</i>; its limit
+	 * will not have changed.
+	 *
+	 * <p> Buffers are not safe for use by multiple concurrent threads so care
+	 * should be taken to not to access the buffer until the operation has
+	 * completed.
+	 *
+	 * <p> This method may be invoked at any time. Some channel types may not
+	 * allow more than one read to be outstanding at any given time. If a thread
+	 * initiates a read operation before a previous read operation has
+	 * completed then a {@link ReadPendingException}  might be thrown.
+	 *
+	 * @param   <A>
+	 *          The attachment type
+	 * @param   timeout
+	 *          The timeout, or {@code 0L} for no timeout
+	 * @param   unit
+	 *          The time unit of the {@code timeout} argument
+	 * @param   attachment
+	 *          The object to attach to the I/O operation; can be {@code null}
+	 * @param   handler
+	 *          The completion handler
+	 *
+	 * @throws  IllegalArgumentException
+	 *          If the buffer is read-only
+	 * @throws  ReadPendingException
+	 *          If the channel does not allow more than one read to be outstanding
+	 *          and a previous read has not completed
+	 * @throws ShutdownChannelGroupException
+	 *         If the channel group is shutdown
+	 */
+	 <A> void readLine(long timeout, TimeUnit unit, A attachment,
+										 CompletionHandler<String, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;
 
 	/**
@@ -305,7 +364,7 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * <p> This method may be invoked at any time. Some channel types may not
 	 * allow more than one write to be outstanding at any given time. If a thread
 	 * initiates a write operation before a previous write operation has
-	 * completed then a {@link WritePendingException} will be thrown.
+	 * completed then a {@link WritePendingException} might be thrown.
 	 *
 	 * @param <A>
 	 *        The attachment type
@@ -325,10 +384,10 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * @throws ShutdownChannelGroupException
 	 *         If the channel group is shutdown
 	 */
-	<A> void write(CharBuffer source,
-								 A attachment,
-								 CompletionHandler<Integer, ? super A> handler,
-								 boolean endOfInput)
+	 <A> void write(CharBuffer source,
+									A attachment,
+									CompletionHandler<Integer, ? super A> handler,
+									boolean endOfInput)
 		throws WritePendingException, ShutdownChannelGroupException;
 
 	/**
@@ -371,18 +430,19 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * @throws  IllegalArgumentException
 	 *          If the {@code timeout} parameter is negative
 	 * @throws  WritePendingException
-	 *          If a write operation is already in progress on this channel
+	 *          If the channel does not allow more than one write to be outstanding
+	 *          and a previous write has not completed
 	 * @throws  ShutdownChannelGroupException
 	 *          If the channel group is shutdown
 	 * @throws  UnsupportedOperationException
 	 *          If the implementation does not support this operation
 	 */
-	<A> void write(CharBuffer source,
-								 long timeout,
-								 TimeUnit unit,
-								 A attachment,
-								 CompletionHandler<Integer, ? super A> handler,
-								 boolean endOfInput)
+	 <A> void write(CharBuffer source,
+									long timeout,
+									TimeUnit unit,
+									A attachment,
+									CompletionHandler<Integer, ? super A> handler,
+									boolean endOfInput)
 		throws IllegalArgumentException, WritePendingException, ShutdownChannelGroupException,
 					 UnsupportedOperationException;
 

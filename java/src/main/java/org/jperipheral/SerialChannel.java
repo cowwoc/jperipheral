@@ -2,8 +2,14 @@ package org.jperipheral;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousByteChannel;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.CompletionHandler;
+import java.nio.channels.InterruptedByTimeoutException;
+import java.nio.channels.ReadPendingException;
+import java.nio.channels.ShutdownChannelGroupException;
+import java.nio.channels.WritePendingException;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -13,11 +19,6 @@ import org.jperipheral.SerialPort.DataBits;
 import org.jperipheral.SerialPort.FlowControl;
 import org.jperipheral.SerialPort.Parity;
 import org.jperipheral.SerialPort.StopBits;
-import org.jperipheral.nio.channels.CompletionHandler;
-import org.jperipheral.nio.channels.InterruptedByTimeoutException;
-import org.jperipheral.nio.channels.ReadPendingException;
-import org.jperipheral.nio.channels.ShutdownChannelGroupException;
-import org.jperipheral.nio.channels.WritePendingException;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
@@ -49,7 +50,7 @@ import org.slf4j.LoggerFactory;
  * 
  * @author Gili Tzabari
  */
-public class SerialChannel extends AsynchronousSerialChannel
+public class SerialChannel implements AsynchronousByteChannel
 {
 	/**
 	 * A pointer to the native object, accessed by the native code.
@@ -150,7 +151,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 		if (target.remaining() <= 0)
 			return new NoOpFuture();
-		final SerialFuture<Integer> result = new SerialFuture<Integer>(new Runnable()
+		final SerialFuture<Integer> result = new SerialFuture<>(new Runnable()
 		{
 			@Override
 			public void run()
@@ -174,8 +175,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 	}
 
 	@Override
-	public synchronized <A> void read(final ByteBuffer target, final long timeout,
-																		final TimeUnit unit, final A attachment,
+	public synchronized <A> void read(final ByteBuffer target, final A attachment,
 																		final CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
@@ -199,8 +199,8 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 		try
 		{
-			nativeRead(target, TimeUnit.MILLISECONDS.convert(timeout, unit),
-				new NativeListenerToCompletionHandler<A>(handler, attachment, new Runnable()
+			nativeRead(target, Long.MAX_VALUE,
+				new NativeListenerToCompletionHandler<>(handler, attachment, new Runnable()
 			{
 				@Override
 				public void run()
@@ -233,7 +233,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 		if (source.remaining() <= 0)
 			return new NoOpFuture();
-		final SerialFuture<Integer> result = new SerialFuture<Integer>(new Runnable()
+		final SerialFuture<Integer> result = new SerialFuture<>(new Runnable()
 		{
 			@Override
 			public void run()
@@ -257,8 +257,7 @@ public class SerialChannel extends AsynchronousSerialChannel
 	}
 
 	@Override
-	public synchronized <A> void write(final ByteBuffer source, final long timeout,
-																		 final TimeUnit unit, final A attachment,
+	public synchronized <A> void write(final ByteBuffer source, final A attachment,
 																		 final CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, WritePendingException, ShutdownChannelGroupException
 	{
@@ -280,8 +279,8 @@ public class SerialChannel extends AsynchronousSerialChannel
 		}
 		try
 		{
-			nativeWrite(source, TimeUnit.MILLISECONDS.convert(timeout, unit),
-				new NativeListenerToCompletionHandler<A>(handler, attachment, new Runnable()
+			nativeWrite(source, Long.MAX_VALUE,
+				new NativeListenerToCompletionHandler<>(handler, attachment, new Runnable()
 			{
 				@Override
 				public void run()

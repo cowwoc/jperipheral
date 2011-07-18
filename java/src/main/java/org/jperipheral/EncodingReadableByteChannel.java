@@ -21,7 +21,14 @@ public class EncodingReadableByteChannel implements ReadableByteChannel
 	private boolean endOfInput;
 	private boolean flushing;
 	private boolean endOfStream;
+	/**
+	 * We copy data from input to charBuffer.
+	 */
 	private final CharBuffer charBuffer;
+	/**
+	 * We decode characters from charBuffer to byteBuffer.
+	 */
+	private final ByteBuffer byteBuffer;
 	private final CharsetEncoder encoder;
 	private boolean closed;
 
@@ -33,7 +40,10 @@ public class EncodingReadableByteChannel implements ReadableByteChannel
 	public EncodingReadableByteChannel(Charset charset)
 	{
 		this.encoder = charset.newEncoder();
-		this.charBuffer = CharBuffer.allocate(1024);
+		this.charBuffer = CharBuffer.allocate(128);
+		this.byteBuffer = ByteBuffer.allocate((int) Math.ceil(encoder.maxBytesPerChar() * charBuffer.
+			length()));
+		this.byteBuffer.flip();
 		this.charBuffer.flip();
 	}
 
@@ -53,16 +63,6 @@ public class EncodingReadableByteChannel implements ReadableByteChannel
 		input.append(text);
 	}
 
-	/**
-	 * Returns the maximum number of bytes that a read may return.
-	 * 
-	 * @return the maximum number of bytes that a read may return
-	 */
-	public int maxReadCount()
-	{
-		return (int) Math.ceil(encoder.maxBytesPerChar() * charBuffer.length());
-	}
-
 	@Override
 	public int read(ByteBuffer dst) throws IOException
 	{
@@ -70,44 +70,50 @@ public class EncodingReadableByteChannel implements ReadableByteChannel
 			throw new ClosedChannelException();
 		if (endOfStream)
 			return -1;
-
-		if (!endOfInput)
+		if (!byteBuffer.hasRemaining())
 		{
-			// Fill the String buffer
-			charBuffer.compact();
-			if (charBuffer.length() > 0 && input.length() == 0)
-				endOfInput = true;
-			else
+			if (!endOfInput)
 			{
-				int count = Math.min(input.length(), charBuffer.length());
-				charBuffer.put(input.substring(0, count));
-				input.delete(0, count);
+				// Fill the char buffer
+				charBuffer.compact();
+				if (charBuffer.length() > 0 && input.length() == 0)
+					endOfInput = true;
+				else
+				{
+					int count = Math.min(input.length(), charBuffer.length());
+					charBuffer.put(input.substring(0, count));
+					input.delete(0, count);
+				}
+				charBuffer.flip();
 			}
-			charBuffer.flip();
+			if (!flushing)
+			{
+				// Fill the byte buffer
+				byteBuffer.compact();
+				CoderResult encodingResult = encoder.encode(charBuffer, byteBuffer, endOfInput);
+				if (encodingResult.isError())
+					encodingResult.throwException();
+				flushing = endOfInput && !encodingResult.isOverflow();
+				byteBuffer.flip();
+			}
+			if (flushing)
+			{
+				flushing = true;
+				// Encode the final bytes
+				CoderResult encodingResult = encoder.flush(dst);
+				if (encodingResult.isError())
+					encodingResult.throwException();
+				endOfStream = encodingResult.isUnderflow();
+			}
 		}
-		int result = 0;
-		if (!flushing)
-		{
-			int positionBeforeWriting = dst.position();
-			CoderResult encodingResult = encoder.encode(charBuffer, dst, endOfInput);
-			if (encodingResult.isError())
-				encodingResult.throwException();
-			flushing = endOfInput && !encodingResult.isOverflow();
-			result = dst.position() - positionBeforeWriting;
-		}
-		if (flushing)
-		{
-			flushing = true;
-			// Encode the final bytes
-			int positionBeforeWriting = dst.position();
-			CoderResult encodingResult = encoder.flush(dst);
-			if (encodingResult.isError())
-				encodingResult.throwException();
-			result += dst.position() - positionBeforeWriting;
-			endOfStream = encodingResult.isUnderflow();
-			if (result == 0)
-				return -1;
-		}
+		ByteBuffer truncated = byteBuffer.duplicate();
+		if (byteBuffer.remaining() > dst.remaining())
+			truncated.limit(truncated.position() + dst.remaining());
+		dst.put(truncated);
+		int result = truncated.position() - byteBuffer.position();
+		byteBuffer.position(truncated.position());
+		if (result == 0 && flushing)
+			return -1;
 		return result;
 	}
 

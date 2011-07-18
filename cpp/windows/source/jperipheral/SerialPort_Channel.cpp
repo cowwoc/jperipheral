@@ -60,8 +60,8 @@ using jace::proxy::java::lang::Integer;
 #include "jace/proxy/java/lang/String.h"
 using jace::proxy::java::lang::String;
 
-#include "jace/proxy/org/jperipheral/nio/channels/InterruptedByTimeoutException.h"
-using jace::proxy::org::jperipheral::nio::channels::InterruptedByTimeoutException;
+#include "jace/proxy/java/nio/channels/InterruptedByTimeoutException.h"
+using jace::proxy::java::nio::channels::InterruptedByTimeoutException;
 
 #include "jace/Jace.h"
 using jace::toWString;
@@ -87,7 +87,7 @@ void setReadTimeout(HANDLE port, JLong timeout)
 	COMMTIMEOUTS timeouts = {0};
 	if (!GetCommTimeouts(port, &timeouts))
 	{
-		throw IOException(jace::java_new<IOException>(L"GetCommTimeouts() failed with error: " + 
+		throw IOException(jace::java_new<IOException>(L"GetCommTimeouts() failed with error: " +
 			getErrorMessage(GetLastError())));
 	}
 	timeouts.ReadIntervalTimeout = MAXDWORD;
@@ -116,7 +116,7 @@ void setReadTimeout(HANDLE port, JLong timeout)
 	}
 	if (!SetCommTimeouts(port, &timeouts))
 	{
-		throw IOException(jace::java_new<IOException>(L"SetCommTimeouts() failed with error: " + 
+		throw IOException(jace::java_new<IOException>(L"SetCommTimeouts() failed with error: " +
 			getErrorMessage(GetLastError())));
 	}
 }
@@ -132,7 +132,7 @@ void setWriteTimeout(HANDLE port, JLong timeout)
 	COMMTIMEOUTS timeouts = {0};
 	if (!GetCommTimeouts(port, &timeouts))
 	{
-		throw IOException(jace::java_new<IOException>(L"GetCommTimeouts() failed with error: " + 
+		throw IOException(jace::java_new<IOException>(L"GetCommTimeouts() failed with error: " +
 			getErrorMessage(GetLastError())));
 	}
 	timeouts.WriteTotalTimeoutMultiplier = 0;
@@ -159,7 +159,7 @@ void setWriteTimeout(HANDLE port, JLong timeout)
 	}
 	if (!SetCommTimeouts(port, &timeouts))
 	{
-		throw IOException(jace::java_new<IOException>(L"SetCommTimeouts() failed with error: " + 
+		throw IOException(jace::java_new<IOException>(L"SetCommTimeouts() failed with error: " +
 			getErrorMessage(GetLastError())));
 	}
 }
@@ -244,7 +244,7 @@ public:
 			JInt remaining = javaBuffer->remaining();
 			if (remaining <= 0)
 			{
-				listener->onFailure(AssertionError(jace::java_new<AssertionError>(L"ByteBuffer.remaining()==" + 
+				listener->onFailure(AssertionError(jace::java_new<AssertionError>(L"ByteBuffer.remaining()==" +
 					toWString((jint) remaining))));
 				return;
 			}
@@ -254,17 +254,17 @@ public:
 
 			setReadTimeout(port, timeout);
 
-			OverlappedContainer<Task>* userData = 
+			OverlappedContainer<Task>* userData =
 				new OverlappedContainer<Task>(shared_from_this());
 
 			DWORD bytesTransferred;
-			if (!ReadFile(port, nativeBuffer + this->nativeBuffer->position(), remaining, &bytesTransferred, 
+			if (!ReadFile(port, nativeBuffer + this->nativeBuffer->position(), remaining, &bytesTransferred,
 				&userData->getOverlapped()))
 			{
 				DWORD errorCode = GetLastError();
 				if (errorCode != ERROR_IO_PENDING)
 				{
-					listener->onFailure(IOException(jace::java_new<IOException>(L"ReadFile() failed with error: " + 
+					listener->onFailure(IOException(jace::java_new<IOException>(L"ReadFile() failed with error: " +
 						getErrorMessage(errorCode))));
 					return;
 				}
@@ -291,7 +291,7 @@ public:
 class WriteTask: public Task
 {
 public:
-	WriteTask(SingleThreadExecutor& workerThread, HANDLE& _port, ByteBuffer _javaBuffer, JLong _timeout): 
+	WriteTask(SingleThreadExecutor& workerThread, HANDLE& _port, ByteBuffer _javaBuffer, JLong _timeout):
 			Task(workerThread, _port)
 	{
 		setJavaBuffer(new ByteBuffer(_javaBuffer));
@@ -339,7 +339,7 @@ public:
 			JInt remaining = nativeBuffer->remaining();
 			if (remaining <= 0)
 			{
-				listener->onFailure(AssertionError(jace::java_new<AssertionError>(L"ByteBuffer.remaining()==" + 
+				listener->onFailure(AssertionError(jace::java_new<AssertionError>(L"ByteBuffer.remaining()==" +
 					toWString((jint) remaining))));
 				return;
 			}
@@ -349,10 +349,10 @@ public:
 
 			setWriteTimeout(port, timeout);
 
-			OverlappedContainer<Task>* userData = 
+			OverlappedContainer<Task>* userData =
 				new OverlappedContainer<Task>(shared_from_this());
 			DWORD bytesTransferred;
-			if (!WriteFile(port, nativeBuffer + this->nativeBuffer->position(), remaining, &bytesTransferred, 
+			if (!WriteFile(port, nativeBuffer + this->nativeBuffer->position(), remaining, &bytesTransferred,
 				&userData->getOverlapped()))
 			{
 				DWORD errorCode = GetLastError();
@@ -404,7 +404,7 @@ JLong SerialChannel::nativeOpen(String name)
 				throw PeripheralInUseException(jace::java_new<PeripheralInUseException>(name, Throwable()));
 			default:
 			{
-				throw IOException(jace::java_new<IOException>(L"CreateFile() failed with error: " + 
+				throw IOException(jace::java_new<IOException>(L"CreateFile() failed with error: " +
 					getErrorMessage(GetLastError())));
 			}
 		}
@@ -414,7 +414,7 @@ JLong SerialChannel::nativeOpen(String name)
 	HANDLE completionPort = CreateIoCompletionPort(port, ::jperipheral::worker->completionPort, Task::COMPLETION, 0);
 	if (completionPort==0)
 	{
-		throw AssertionError(jace::java_new<AssertionError>(L"CreateIoCompletionPort() failed with error: " + 
+		throw AssertionError(jace::java_new<AssertionError>(L"CreateIoCompletionPort() failed with error: " +
 			getErrorMessage(GetLastError())));
 	}
 
@@ -431,10 +431,10 @@ void SerialChannel::nativeConfigure(JInt baudRate,
 {
 	SerialPortContext* context = getContext(getJaceProxy());
 	DCB dcb = {0};
-	
+
 	if (!GetCommState(context->getPort(), &dcb))
 	{
-		throw IOException(jace::java_new<IOException>(L"GetCommState() failed with error: " + 
+		throw IOException(jace::java_new<IOException>(L"GetCommState() failed with error: " +
 			getErrorMessage(GetLastError())));
 	}
 	dcb.BaudRate = baudRate;
@@ -559,7 +559,7 @@ void SerialChannel::nativeConfigure(JInt baudRate,
 
 	if (!SetCommState(context->getPort(), &dcb))
 	{
-		throw IOException(jace::java_new<IOException>(L"SetCommState() failed with error: " + 
+		throw IOException(jace::java_new<IOException>(L"SetCommState() failed with error: " +
 			getErrorMessage(GetLastError())));
 	}
 }
@@ -574,7 +574,7 @@ void SerialChannel::nativeConfigure(JInt baudRate,
 //	SerialPortContext* context = getContext(getJaceProxy());
 //  if (!ClearCommError(context->port, &errors, &comStat))
 //	{
-//		throw IOException(jace::java_new<IOException>(L"ClearCommError() failed with error: " + 
+//		throw IOException(jace::java_new<IOException>(L"ClearCommError() failed with error: " +
 //			getErrorMessage(GetLastError())));
 //	}
 //
@@ -607,10 +607,10 @@ void SerialChannel::nativeConfigure(JInt baudRate,
 //
 //  if (comStat.fXoffSent)
 //    cerr << "Tx waiting, XOFF char sent" << endl;
-//  
+//
 //  if (comStat.fEof)
 //    cerr << "EOF character received" << endl;
-//  
+//
 //  if (comStat.fTxim)
 //    cerr << "Character waiting for Tx; char queued with TransmitCommChar" << endl;
 //
@@ -632,7 +632,7 @@ void SerialChannel::nativeRead(ByteBuffer target, JLong timeout, SerialChannel_N
 	SerialPortContext* context = getContext(getJaceProxy());
 	SingleThreadExecutor& readThread = context->getReadThread();
 
-	boost::shared_ptr<Task> task(new ReadTask(readThread, context->getPort(), target, 
+	boost::shared_ptr<Task> task(new ReadTask(readThread, context->getPort(), target,
 		timeout));
 	task->setListener(listener);
 	readThread.execute(task);
@@ -643,7 +643,7 @@ void SerialChannel::nativeWrite(ByteBuffer source, JLong timeout, SerialChannel_
 	SerialPortContext* context = getContext(getJaceProxy());
 	SingleThreadExecutor& writeThread = context->getWriteThread();
 
-	boost::shared_ptr<Task> task(new WriteTask(writeThread, context->getPort(), source, 
+	boost::shared_ptr<Task> task(new WriteTask(writeThread, context->getPort(), source,
 		timeout));
 	task->setListener(listener);
 	writeThread.execute(task);

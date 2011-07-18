@@ -26,7 +26,7 @@ public class DecodingWriteableByteChannel implements WritableByteChannel
 	/**
 	 * Holds a byte sequence that is malformed for this charset unless subsequent bytes are supplied.
 	 */
-	private final ByteBuffer malformedBytes;
+	private final ByteBuffer byteBuffer;
 
 	/**
 	 * Creates a new DecodingWriteableByteChannel.
@@ -37,8 +37,7 @@ public class DecodingWriteableByteChannel implements WritableByteChannel
 	{
 		this.decoder = charset.newDecoder();
 		this.charBuffer = CharBuffer.allocate((int) Math.ceil(decoder.maxCharsPerByte() * 1024));
-		this.malformedBytes = ByteBuffer.allocate((int) Math.ceil(decoder.maxCharsPerByte()));
-		this.malformedBytes.flip();
+		this.byteBuffer = ByteBuffer.allocate((int) Math.ceil(decoder.maxCharsPerByte() * 1024));
 	}
 
 	@Override
@@ -46,44 +45,28 @@ public class DecodingWriteableByteChannel implements WritableByteChannel
 	{
 		if (closed)
 			throw new ClosedChannelException();
-		int bytesRead = 0;
 		CoderResult decodingResult;
-		if (malformedBytes.remaining() > 0)
-		{
-			// Try to fill malformedBytes so it contains at least one character's worth of data
-			int bytesToTransfer = Math.min(malformedBytes.remaining(), src.remaining());
-			ByteBuffer truncated = src.duplicate();
-			truncated.limit(truncated.position() + bytesToTransfer);
-			malformedBytes.put(truncated);
-			src.position(src.position() + bytesToTransfer);
-			decodingResult = decoder.decode(malformedBytes, charBuffer, false);
-			assert (!decodingResult.isOverflow()): "charBuffer should be able to hold one character";
-			if (decodingResult.isError())
-				decodingResult.throwException();
-			if (decodingResult.isUnderflow())
-			{
-				// Transfer the remaining bytes back into src
-				src.position(src.position() - malformedBytes.remaining());
-			}
-			malformedBytes.clear();
-		}
+		assert (byteBuffer.hasRemaining()): byteBuffer;
+
+		// Ensure byteBuffer contains at least one character's worth of data
+		int bytesRead = Math.min(byteBuffer.remaining(), src.remaining());
+		ByteBuffer truncated = src.duplicate();
+		truncated.limit(truncated.position() + bytesRead);
+		byteBuffer.put(truncated);
+		src.position(src.position() + bytesRead);
+		
 		do
 		{
-			int positionBeforeReading = src.position();
-			decodingResult = decoder.decode(src, charBuffer, false);
+			byteBuffer.flip();
+			decodingResult = decoder.decode(byteBuffer, charBuffer, false);
 			if (decodingResult.isError())
 				decodingResult.throwException();
-			bytesRead += src.position() - positionBeforeReading;
 			charBuffer.flip();
 			result.append(charBuffer.toString());
 			charBuffer.clear();
 		}
 		while (decodingResult.isOverflow());
-
-		// The remaining bytes denote a malformed byte sequence for this charset unless subsequent bytes
-		// are supplied.
-		malformedBytes.put(src);
-		malformedBytes.flip();
+		byteBuffer.compact();
 		return bytesRead;
 	}
 
@@ -102,10 +85,10 @@ public class DecodingWriteableByteChannel implements WritableByteChannel
 			do
 			{
 				charBuffer.clear();
-				ByteBuffer empty = ByteBuffer.allocate(0);
+				byteBuffer.flip();
 				do
 				{
-					decodingResult = decoder.decode(empty, charBuffer, true);
+					decodingResult = decoder.decode(byteBuffer, charBuffer, true);
 					if (decodingResult.isError())
 						decodingResult.throwException();
 					charBuffer.flip();

@@ -4,7 +4,6 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
-import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -98,7 +97,7 @@ public class Main
 			for (String line: lines)
 			{
 //				System.out.println("sending: " + line);
-				channel.write(CharBuffer.wrap(line + "\r"), false).get(30, TimeUnit.SECONDS);
+				channel.write(CharBuffer.wrap(line + "\r")).get(30, TimeUnit.SECONDS);
 //				System.out.println("got : " + channel.readLine().get(30, TimeUnit.SECONDS));
 			}
 		}

@@ -52,7 +52,7 @@
 									<groupId>com.googlecode.jace</groupId>
 									<artifactId>jace-core-cpp</artifactId>
 									<classifier>${classifier}</classifier>
-									<version>1.2.0</version>
+									<version>1.2.1</version>
 									<outputDirectory>${project.build.directory}/dependency/jace/${classifier}</outputDirectory>
 								</artifactItem>
 								<artifactItem>
@@ -75,7 +75,7 @@
 			<plugin>
 				<groupId>com.googlecode.cmake-maven-project</groupId>
 				<artifactId>cmake-maven-plugin</artifactId>
-				<version>0.2</version>
+				<version>0.3</version>
 				<executions>
 					<execution>
 						<id>cmake</id>
@@ -89,7 +89,7 @@
 				<configuration>
 					<sourcePath>${basedir}/../cpp</sourcePath>
 					<targetPath>${project.build.directory}/cmake/${platform}</targetPath>
-<!--					<generator>${cmake.generator}</generator>-->
+					<generator>${cmake.generator}</generator>
 					<projectPath>${project.build.directory}/cmake/${platform}/jperipheral.sln</projectPath>
 					<buildType>${build.type}</buildType>
 					<environmentVariables>
@@ -135,7 +135,7 @@
 			<plugin>
 				<groupId>com.googlecode.jace</groupId>
 				<artifactId>jace-maven-plugin</artifactId>
-				<version>1.2.0</version>
+				<version>1.2.1</version>
 				<executions>
 					<execution>
 						<id>jace.generate.SerialChannel.peer</id>

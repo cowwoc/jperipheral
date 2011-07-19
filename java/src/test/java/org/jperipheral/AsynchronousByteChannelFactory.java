@@ -1,37 +1,38 @@
 package org.jperipheral;
 
+import java.util.NavigableMap;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousByteChannel;
 import java.nio.channels.CompletionHandler;
 import java.nio.charset.Charset;
+import java.util.Map.Entry;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * @author Gili Tzabari
  */
 public class AsynchronousByteChannelFactory
 {
-	private static final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory()
-	{
-		private ThreadFactory delegate = Executors.defaultThreadFactory();
-
-		@Override
-		public Thread newThread(Runnable r)
+	private static final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1,
+		new ThreadFactory()
 		{
-			Thread result = delegate.newThread(r);
-			result.setDaemon(true);
-			return result;
-		}
-	});
+			private ThreadFactory delegate = Executors.defaultThreadFactory();
+
+			@Override
+			public Thread newThread(Runnable r)
+			{
+				Thread result = delegate.newThread(r);
+				result.setDaemon(true);
+				return result;
+			}
+		});
 
 	/**
 	 * Creates an AsynchronousByteChannel that reads a predefined string.
@@ -141,155 +142,25 @@ public class AsynchronousByteChannelFactory
 	}
 
 	/**
-	 * Creates an AsynchronousByteChannel that limits the number of bytes that may be read.
+	 * Creates an AsynchronousByteChannel that interrupts a read/write operation at a specific
+	 * position. Any read/write operations that span the position will be forced to read/write up to
+	 * the position. Reads/writes at a barrier will wait for the time to elapse and then read/write
+	 * up to the next barrier.
 	 * 
 	 * @param channel the channel to wrap
-	 * @param limit the number of bytes that may be read before end-of-stream should be returned
+	 * @param readBarriers Map[byteIndex, delayInMilliseconds] that indicates when a byte will become available for
+	 *   reading. Bytes not mentioned by the map are available immediately.
+	 * @param writeBarriers Map[byteIndex, delayInMilliseconds] that indicates when a byte will become available for
+	 *   writing. Bytes not mentioned by the map are available immediately.
 	 * @return a AsynchronousByteChannel
-	 * @throws IllegalArgumentException if limit is negative
+	 * @throws IllegalArgumentException if {@code readBarriers < 0 || writeBarriers < 0}
 	 */
-	public static AsynchronousByteChannel limit(final AsynchronousByteChannel channel,
-																							final long limit)
+	public static AsynchronousByteChannel delay(final AsynchronousByteChannel channel,
+																							final NavigableMap<Long, Long> readBarriers,
+																							final NavigableMap<Long, Long> writeBarriers)
 	{
-		Preconditions.checkArgument(limit >= 0, "limit must be non-negative");
-
-		return new AsynchronousByteChannel()
-		{
-			private long position = 0;
-
-			@Override
-			public <A> void read(final ByteBuffer dst, final A attachment,
-													 final CompletionHandler<Integer, ? super A> handler)
-			{
-				final long remaining = limit - position;
-				if (remaining < dst.remaining())
-					dst.limit(dst.position() + (int) remaining);
-				channel.read(dst, attachment, new CompletionHandler<Integer, A>()
-				{
-					@Override
-					public void completed(Integer bytesRead, A attachment)
-					{
-						// keep track of position
-						int result;
-						if (bytesRead != -1)
-						{
-							position += bytesRead;
-							result = bytesRead;
-						}
-						else if (remaining == 0)
-							result = -1;
-						else
-							result = bytesRead;
-						handler.completed(result, attachment);
-					}
-
-					@Override
-					public void failed(Throwable t, A attachment)
-					{
-						handler.failed(t, attachment);
-					}
-				});
-			}
-
-			@Override
-			public Future<Integer> read(final ByteBuffer dst)
-			{
-				final long remaining = limit - position;
-				if (remaining < dst.remaining())
-					dst.limit(dst.position() + (int) remaining);
-				final Future<Integer> delegate = channel.read(dst);
-				return new Future<Integer>()
-				{
-					@Override
-					public boolean cancel(boolean mayInterruptIfRunning)
-					{
-						return delegate.cancel(mayInterruptIfRunning);
-					}
-
-					@Override
-					public boolean isCancelled()
-					{
-						return delegate.isCancelled();
-					}
-
-					@Override
-					public boolean isDone()
-					{
-						return delegate.isDone();
-					}
-
-					@Override
-					public Integer get() throws InterruptedException, ExecutionException
-					{
-						try
-						{
-							return get(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
-						}
-						catch (TimeoutException e)
-						{
-							throw new AssertionError(e);
-						}
-					}
-
-					@Override
-					public Integer get(long timeout, TimeUnit unit) throws InterruptedException,
-																																 ExecutionException,
-																																 TimeoutException
-					{
-						Integer result = delegate.get(timeout, unit);
-						// keep track of position
-						if (result != -1)
-							position += result;
-						else if (remaining == 0)
-							result = -1;
-						return result;
-					}
-				};
-			}
-
-			@Override
-			public <A> void write(ByteBuffer src, A attachment,
-														CompletionHandler<Integer, ? super A> handler)
-			{
-				throw new UnsupportedOperationException("This channel only supports read operations");
-			}
-
-			@Override
-			public Future<Integer> write(ByteBuffer src)
-			{
-				throw new UnsupportedOperationException("This channel only supports read operations");
-			}
-
-			@Override
-			public void close() throws IOException
-			{
-				channel.close();
-			}
-
-			@Override
-			public boolean isOpen()
-			{
-				return channel.isOpen();
-			}
-		};
-	}
-
-	/**
-	 * Creates an AsynchronousByteChannel that interrupts a read operation at a specific position.
-	 * Any read operations that span the position will be forced to read up to the position.
-	 * Subsequent reads will proceed normally.
-	 * 
-	 * @param channel the channel to wrap
-	 * @param readBarrier the position at which read operations should be interrupted (0 to disable)
-	 * @param writeBarrier the position at which write operations should be interrupted (0 to disable)
-	 * @return a AsynchronousByteChannel
-	 * @throws IllegalArgumentException if {@code readBarrier < 0 || writeBarrier < 0}
-	 */
-	public static AsynchronousByteChannel interruptAt(final AsynchronousByteChannel channel,
-																										final long readBarrier, final long writeBarrier)
-	{
-		Preconditions.checkArgument(readBarrier >= 0, "readBarrier must be non-negative");
-		Preconditions.checkArgument(writeBarrier >= 0, "writeBarrier must be non-negative");
+		Preconditions.checkNotNull(readBarriers, "readBarriers may not be null");
+		Preconditions.checkNotNull(writeBarriers, "writeBarriers may not be null");
 
 		return new AsynchronousByteChannel()
 		{
@@ -300,86 +171,69 @@ public class AsynchronousByteChannelFactory
 			public <A> void read(final ByteBuffer dst, final A attachment,
 													 final CompletionHandler<Integer, ? super A> handler)
 			{
-				final long remaining = readBarrier - readPosition;
-				if (remaining <= 0)
-				{
-					channel.read(dst, attachment, handler);
-					return;
-				}
-				ByteBuffer truncated = dst.duplicate();
-				if (remaining < truncated.remaining())
-					truncated.limit(truncated.position() + (int) remaining);
-				channel.read(truncated, attachment, new CompletionHandler<Integer, A>()
+				Entry<Long, Long> nextRead = readBarriers.higherEntry(readPosition);
+				final long remaining;
+				Long timeLeft = readBarriers.get(readPosition);
+				if (nextRead == null)
+					remaining = dst.remaining();
+				else
+					remaining = nextRead.getKey() - readPosition;
+				if (timeLeft == null)
+					timeLeft = 0L;
+				executor.schedule(new Runnable()
 				{
 					@Override
-					public void completed(Integer result, A attachment)
+					public void run()
 					{
-						// keep track of position
-						if (result != -1)
+						ByteBuffer truncated = dst.duplicate();
+						if (remaining < truncated.remaining())
+							truncated.limit(truncated.position() + (int) remaining);
+						channel.read(truncated, attachment, new CompletionHandler<Integer, A>()
 						{
-							readPosition += result;
-							dst.position(dst.position() + result);
-						}
-						handler.completed(result, attachment);
-					}
+							@Override
+							public void completed(Integer result, A attachment)
+							{
+								// keep track of position
+								if (result != -1)
+								{
+									readPosition += result;
+									dst.position(dst.position() + result);
+								}
+								handler.completed(result, attachment);
+							}
 
-					@Override
-					public void failed(Throwable t, A attachment)
-					{
-						handler.failed(t, attachment);
+							@Override
+							public void failed(Throwable t, A attachment)
+							{
+								handler.failed(t, attachment);
+							}
+						});
 					}
-				});
+				}, timeLeft, TimeUnit.MILLISECONDS);
 			}
 
 			@Override
 			public Future<Integer> read(final ByteBuffer dst)
 			{
-				final long remaining = readBarrier - readPosition;
-				if (remaining <= 0)
-					return channel.read(dst);
-				ByteBuffer truncated = dst.duplicate();
-				if (remaining < truncated.remaining())
-					truncated.limit(truncated.position() + (int) remaining);
-				final Future<Integer> delegate = channel.read(truncated);
-				return new Future<Integer>()
+				Entry<Long, Long> nextRead = readBarriers.higherEntry(readPosition);
+				final long remaining;
+				Long timeLeft = readBarriers.get(readPosition);
+				if (nextRead == null)
+					remaining = dst.remaining();
+				else
+					remaining = nextRead.getKey() - readPosition;
+				if (timeLeft == null)
+					timeLeft = 0L;
+				return executor.schedule(new Callable<Integer>()
 				{
 					@Override
-					public boolean cancel(boolean mayInterruptIfRunning)
+					public Integer call() throws Exception
 					{
-						return delegate.cancel(mayInterruptIfRunning);
-					}
+						ByteBuffer truncated = dst.duplicate();
+						if (remaining < truncated.remaining())
+							truncated.limit(truncated.position() + (int) remaining);
+						Integer result = channel.read(truncated).get();
 
-					@Override
-					public boolean isCancelled()
-					{
-						return delegate.isCancelled();
-					}
-
-					@Override
-					public boolean isDone()
-					{
-						return delegate.isDone();
-					}
-
-					@Override
-					public Integer get() throws InterruptedException, ExecutionException
-					{
-						try
-						{
-							return get(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
-						}
-						catch (TimeoutException e)
-						{
-							throw new AssertionError(e);
-						}
-					}
-
-					@Override
-					public Integer get(long timeout, TimeUnit unit) throws InterruptedException,
-																																 ExecutionException,
-																																 TimeoutException
-					{
-						Integer result = delegate.get(timeout, unit);
 						// keep track of position
 						if (result != -1)
 						{
@@ -388,93 +242,76 @@ public class AsynchronousByteChannelFactory
 						}
 						return result;
 					}
-				};
+				}, timeLeft, TimeUnit.MILLISECONDS);
 			}
 
 			@Override
-			public <A> void write(final ByteBuffer src, A attachment,
+			public <A> void write(final ByteBuffer src, final A attachment,
 														final CompletionHandler<Integer, ? super A> handler)
 			{
-				final long remaining = writeBarrier - writePosition;
-				if (remaining <= 0)
-				{
-					channel.write(src, attachment, handler);
-					return;
-				}
-				ByteBuffer truncated = src.duplicate();
-				if (remaining < truncated.remaining())
-					truncated.limit(truncated.position() + (int) remaining);
-				channel.write(truncated, attachment, new CompletionHandler<Integer, A>()
+				Entry<Long, Long> nextWrite = writeBarriers.higherEntry(writePosition);
+				final long remaining;
+				Long timeLeft = writeBarriers.get(writePosition);
+				if (nextWrite == null)
+					remaining = src.remaining();
+				else
+					remaining = nextWrite.getKey() - writePosition;
+				if (timeLeft == null)
+					timeLeft = 0L;
+				executor.schedule(new Runnable()
 				{
 					@Override
-					public void completed(Integer result, A attachment)
+					public void run()
 					{
-						// keep track of position
-						if (result != -1)
+						ByteBuffer truncated = src.duplicate();
+						if (remaining < truncated.remaining())
+							truncated.limit(truncated.position() + (int) remaining);
+						channel.write(truncated, attachment, new CompletionHandler<Integer, A>()
 						{
-							writePosition += result;
-							src.position(src.position() + result);
-						}
-						handler.completed(result, attachment);
-					}
+							@Override
+							public void completed(Integer result, A attachment)
+							{
+								// keep track of position
+								if (result != -1)
+								{
+									writePosition += result;
+									src.position(src.position() + result);
+								}
+								handler.completed(result, attachment);
+							}
 
-					@Override
-					public void failed(Throwable t, A attachment)
-					{
-						handler.failed(t, attachment);
+							@Override
+							public void failed(Throwable t, A attachment)
+							{
+								handler.failed(t, attachment);
+							}
+						});
 					}
-				});
-			};
+				}, timeLeft, TimeUnit.MILLISECONDS);
+			}
 
 			@Override
 			public Future<Integer> write(final ByteBuffer src)
 			{
-				final long remaining = writeBarrier - writePosition;
-				if (remaining <= 0)
-					return channel.write(src);
-				ByteBuffer truncated = src.duplicate();
-				if (remaining < truncated.remaining())
-					truncated.limit(truncated.position() + (int) remaining);
-				final Future<Integer> delegate = channel.write(truncated);
-				return new Future<Integer>()
+				Entry<Long, Long> nextWrite = writeBarriers.higherEntry(writePosition);
+				final long remaining;
+				Long timeLeft = writeBarriers.get(writePosition);
+				if (nextWrite == null)
+					remaining = src.remaining();
+				else
+					remaining = nextWrite.getKey() - writePosition;
+				if (timeLeft == null)
+					timeLeft = 0L;
+				return executor.schedule(new Callable<Integer>()
 				{
 					@Override
-					public boolean cancel(boolean mayInterruptIfRunning)
+					public Integer call() throws Exception
 					{
-						return delegate.cancel(mayInterruptIfRunning);
-					}
+						ByteBuffer truncated = src.duplicate();
+						if (remaining < truncated.remaining())
+							truncated.limit(truncated.position() + (int) remaining);
+						Integer result = channel.write(truncated).get();
 
-					@Override
-					public boolean isCancelled()
-					{
-						return delegate.isCancelled();
-					}
-
-					@Override
-					public boolean isDone()
-					{
-						return delegate.isDone();
-					}
-
-					@Override
-					public Integer get() throws InterruptedException, ExecutionException
-					{
-						try
-						{
-							return get(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
-						}
-						catch (TimeoutException e)
-						{
-							throw new AssertionError(e);
-						}
-					}
-
-					@Override
-					public Integer get(long timeout, TimeUnit unit) throws InterruptedException,
-																																 ExecutionException,
-																																 TimeoutException
-					{
-						Integer result = delegate.get(timeout, unit);
 						// keep track of position
 						if (result != -1)
 						{
@@ -483,7 +320,7 @@ public class AsynchronousByteChannelFactory
 						}
 						return result;
 					}
-				};
+				}, timeLeft, TimeUnit.MILLISECONDS);
 			}
 
 			@Override

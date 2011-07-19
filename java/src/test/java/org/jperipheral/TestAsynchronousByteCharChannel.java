@@ -3,13 +3,16 @@ package org.jperipheral;
 import com.google.common.base.Charsets;
 import java.nio.CharBuffer;
 import java.nio.channels.AsynchronousByteChannel;
+import java.util.Date;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * <p/>
  * <p/>
  * @author Gili Tzabari
  */
@@ -133,6 +136,45 @@ public class TestAsynchronousByteCharChannel
 	}
 
 	@Test
+	public void readCharactersFutureWithTimeout() throws InterruptedException, ExecutionException
+	{
+		log.trace("start");
+		String input = "1\r2\n3\r\n4";
+		StringBuilder output = new StringBuilder();
+
+		TreeMap<Long, Long> readBarrier = new TreeMap<>();
+		TreeMap<Long, Long> writeBarrier = new TreeMap<>();
+		readBarrier.put(5L, 500L);
+		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.delay(
+			AsynchronousByteChannelFactory.fromString(input, output, Charsets.UTF_8), readBarrier,
+			writeBarrier);
+		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
+			Charsets.UTF_8);
+
+		// Succeed on the first set of characters
+		CharBuffer buffer = CharBuffer.allocate(5);
+		Integer result = charChannel.read(buffer).get();
+		assert (result == 5): result;
+
+		buffer.flip();
+		assert (buffer.toString().equals(input.substring(0, 5))): buffer.toString();
+
+		// Time out on the second set of characters
+		buffer.clear();
+		try
+		{
+			result = charChannel.read(buffer).get(100, TimeUnit.MILLISECONDS);
+			assert (false): "Expected a timeout, got: " + result;
+		}
+		catch (TimeoutException unused)
+		{
+			System.out.println("read timeout: " + new Date().getTime());
+			// pass
+		}
+		log.trace("stop");
+	}
+
+	@Test
 	public void writeCharactersFuture() throws InterruptedException, ExecutionException
 	{
 		log.trace("start");
@@ -150,6 +192,45 @@ public class TestAsynchronousByteCharChannel
 		assert (result == 5): result;
 
 		assert (output.toString().equals(input.substring(0, 5))): output.toString();
+		log.trace("stop");
+	}
+
+	@Test
+	public void writeCharactersFutureWithTimeout() throws InterruptedException, ExecutionException
+	{
+		log.trace("start");
+		String input = "1\r2\n3\r\n4";
+		StringBuilder output = new StringBuilder();
+
+		TreeMap<Long, Long> readBarrier = new TreeMap<>();
+		TreeMap<Long, Long> writeBarrier = new TreeMap<>();
+		writeBarrier.put(5L, 500L);
+		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.delay(
+			AsynchronousByteChannelFactory.fromString(input, output, Charsets.UTF_8), readBarrier,
+			writeBarrier);
+		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
+			Charsets.UTF_8);
+
+		// Succeed on the first set of characters
+		CharBuffer buffer = CharBuffer.wrap(input);
+		buffer.limit(5);
+		Integer result = charChannel.write(buffer).get();
+		assert (result == 5): result;
+
+		assert (output.toString().equals(input.substring(0, 5))): output.toString();
+
+		// Time out on the second set of characters
+		buffer.clear();
+		try
+		{
+			result = charChannel.write(buffer).get(100, TimeUnit.MILLISECONDS);
+			assert (false): "Expected a timeout, got: " + result;
+		}
+		catch (TimeoutException unused)
+		{
+			System.out.println("read timeout: " + new Date().getTime());
+			// pass
+		}
 		log.trace("stop");
 	}
 
@@ -200,6 +281,47 @@ public class TestAsynchronousByteCharChannel
 	}
 
 	@Test
+	public void readCharactersHandlerWithTimeout() throws InterruptedException, ExecutionException
+	{
+		log.trace("start");
+		String input = "1\r2\n3\r\n4";
+		StringBuilder output = new StringBuilder();
+
+		TreeMap<Long, Long> readBarrier = new TreeMap<>();
+		TreeMap<Long, Long> writeBarrier = new TreeMap<>();
+		readBarrier.put(3L, 500L);
+		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.delay(
+			AsynchronousByteChannelFactory.fromString(input, output, Charsets.UTF_8), readBarrier,
+			writeBarrier);
+		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
+			Charsets.UTF_8);
+
+		// Succeed on the first set of characters
+		CharBuffer buffer = CharBuffer.allocate(3);
+		PollableCompletionHandler<Integer> handler = new PollableCompletionHandler<>();
+		synchronized (handler)
+		{
+			charChannel.read(buffer, null, handler);
+			handler.wait();
+		}
+		assert (handler.value == 3): handler.value;
+
+		buffer.flip();
+		assert (buffer.toString().equals(input.substring(0, 3))): buffer.toString();
+
+		// Time out on the second set of characters
+		buffer.flip();
+		handler = new PollableCompletionHandler<>();
+		synchronized (handler)
+		{
+			charChannel.read(buffer, null, handler);
+			handler.wait(100);
+			assert (!handler.done): "Expected a timeout, got: " + handler;
+		}
+		log.trace("stop");
+	}
+
+	@Test
 	public void writeCharactersHandler() throws InterruptedException, ExecutionException
 	{
 		log.trace("start");
@@ -221,7 +343,7 @@ public class TestAsynchronousByteCharChannel
 			handler.wait();
 		}
 		assert (handler.value == 5): handler.value;
-		
+
 		assert (output.toString().equals(input.substring(0, 5))): output.toString();
 		output.setLength(0);
 
@@ -233,7 +355,7 @@ public class TestAsynchronousByteCharChannel
 			handler.wait();
 		}
 		assert (handler.value == 3): handler.value;
-		
+
 		assert (output.toString().equals(input.substring(5, 8))): output.toString();
 
 		handler = new PollableCompletionHandler<>();
@@ -243,6 +365,47 @@ public class TestAsynchronousByteCharChannel
 			handler.wait();
 		}
 		assert (handler.value == 0): handler.value;
+		log.trace("stop");
+	}
+
+	@Test
+	public void writeCharHandlerWithTimeout() throws InterruptedException, ExecutionException
+	{
+		log.trace("start");
+		String input = "1\r2\n3\r\n4";
+		StringBuilder output = new StringBuilder();
+
+		TreeMap<Long, Long> readBarrier = new TreeMap<>();
+		TreeMap<Long, Long> writeBarrier = new TreeMap<>();
+		writeBarrier.put(3L, 500L);
+		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.delay(
+			AsynchronousByteChannelFactory.fromString(input, output, Charsets.UTF_8), readBarrier,
+			writeBarrier);
+		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
+			Charsets.UTF_8);
+
+		// Succeed on the first set of characters
+		CharBuffer buffer = CharBuffer.wrap(input);
+		buffer.limit(3);
+		PollableCompletionHandler<Integer> handler = new PollableCompletionHandler<>();
+		synchronized (handler)
+		{
+			charChannel.write(buffer, null, handler);
+			handler.wait();
+		}
+		assert (handler.value == 3): handler.value;
+
+		assert (output.toString().equals(input.substring(0, 3))): output.toString();
+
+		// Time out on the second set of characters
+		buffer.flip();
+		handler = new PollableCompletionHandler<>();
+		synchronized (handler)
+		{
+			charChannel.write(buffer, null, handler);
+			handler.wait(100);
+			assert (!handler.done): "Expected a timeout, got: " + handler;
+		}
 		log.trace("stop");
 	}
 
@@ -376,9 +539,12 @@ public class TestAsynchronousByteCharChannel
 		String input = "\uD840\uDC00123\uD840\uDC00";
 		StringBuilder output = new StringBuilder();
 
-		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
-			output, Charsets.UTF_8);
-		byteChannel = AsynchronousByteChannelFactory.interruptAt(byteChannel, 1, 0);
+		TreeMap<Long, Long> readBarrier = new TreeMap<>();
+		TreeMap<Long, Long> writeBarrier = new TreeMap<>();
+		readBarrier.put(1L, 200L);
+		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.delay(
+			AsynchronousByteChannelFactory.fromString(input, output, Charsets.UTF_8), readBarrier,
+			writeBarrier);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
 			Charsets.UTF_8);
 
@@ -399,7 +565,7 @@ public class TestAsynchronousByteCharChannel
 		assert (result == -1): result;
 		log.trace("stop");
 	}
-	
+
 	@Test
 	public void writeCharactersInterruptMidCharacter() throws InterruptedException, ExecutionException
 	{
@@ -408,9 +574,12 @@ public class TestAsynchronousByteCharChannel
 		String input = "\uD840\uDC00123\uD840\uDC00";
 		StringBuilder output = new StringBuilder();
 
-		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
-			output, Charsets.UTF_8);
-		byteChannel = AsynchronousByteChannelFactory.interruptAt(byteChannel, 0, 1);
+		TreeMap<Long, Long> readBarrier = new TreeMap<>();
+		TreeMap<Long, Long> writeBarrier = new TreeMap<>();
+		writeBarrier.put(1L, 200L);
+		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.delay(
+			AsynchronousByteChannelFactory.fromString(input, output, Charsets.UTF_8), readBarrier,
+			writeBarrier);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
 			Charsets.UTF_8);
 
@@ -424,7 +593,7 @@ public class TestAsynchronousByteCharChannel
 		buffer.limit(buffer.position() + 5);
 		result = charChannel.write(buffer).get();
 		assert (result == 5): result;
-		
+
 		assert (output.toString().equals(input.substring(2, 7))): output.toString();
 		output.setLength(0);
 

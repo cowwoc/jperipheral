@@ -52,7 +52,7 @@
 			<plugin>
 				<groupId>com.googlecode.jace</groupId>
 				<artifactId>jace-maven-plugin</artifactId>
-				<version>1.2.1</version>
+				<version>1.2.2</version>
 				<executions>
 					<execution>
 						<id>enhance-SerialChannel</id>
@@ -64,6 +64,9 @@
 							<outputFile>${project.build.directory}/classes/org/jperipheral/SerialChannel.class</outputFile>
 							<deallocationMethod>close</deallocationMethod>
 							<libraries>
+								<library>boost_date_time-vc100-mt-gd-1_46_1</library>
+								<library>boost_thread-vc100-mt-gd-1_46_1</library>
+								<library>jace</library>
 								<library>JPeripheral</library>
 							</libraries>
 						</configuration>
@@ -77,6 +80,9 @@
 							<inputFile>${project.build.directory}/classes/org/jperipheral/SerialChannel$SerialFuture.class</inputFile>
 							<outputFile>${project.build.directory}/classes/org/jperipheral/SerialChannel$SerialFuture.class</outputFile>
 							<libraries>
+								<library>boost_date_time-vc100-mt-gd-1_46_1</library>
+								<library>boost_thread-vc100-mt-gd-1_46_1</library>
+								<library>jace</library>
 								<library>JPeripheral</library>
 							</libraries>
 						</configuration>
@@ -114,7 +120,7 @@
 		<dependency>
 			<groupId>com.googlecode.jace</groupId>
 			<artifactId>jace-runtime</artifactId>
-			<version>1.2.1</version>
+			<version>1.2.2</version>
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>

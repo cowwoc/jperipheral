@@ -52,7 +52,7 @@
 									<groupId>com.googlecode.jace</groupId>
 									<artifactId>jace-core-cpp</artifactId>
 									<classifier>${classifier}</classifier>
-									<version>1.2.1</version>
+									<version>1.2.2</version>
 									<outputDirectory>${project.build.directory}/dependency/jace/${classifier}</outputDirectory>
 								</artifactItem>
 								<artifactItem>
@@ -135,7 +135,7 @@
 			<plugin>
 				<groupId>com.googlecode.jace</groupId>
 				<artifactId>jace-maven-plugin</artifactId>
-				<version>1.2.1</version>
+				<version>1.2.2</version>
 				<executions>
 					<execution>
 						<id>jace.generate.SerialChannel.peer</id>

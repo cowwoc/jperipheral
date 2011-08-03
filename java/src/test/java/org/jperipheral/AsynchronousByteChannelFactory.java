@@ -2,6 +2,7 @@ package org.jperipheral;
 
 import java.util.NavigableMap;
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousByteChannel;
@@ -12,7 +13,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -20,19 +20,13 @@ import java.util.concurrent.TimeUnit;
  */
 public class AsynchronousByteChannelFactory
 {
-	private static final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1,
-		new ThreadFactory()
-		{
-			private ThreadFactory delegate = Executors.defaultThreadFactory();
-
-			@Override
-			public Thread newThread(Runnable r)
-			{
-				Thread result = delegate.newThread(r);
-				result.setDaemon(true);
-				return result;
-			}
-		});
+	/*
+	 * executor's coreSize must be greater than one because some operations fire an I/O operation
+	 * in a separate executor thread and block the main thread using Future.get().
+	 */
+	private static final ScheduledExecutorService executor = Executors.newScheduledThreadPool(2,
+		new ThreadFactoryBuilder().setDaemon(true).
+		setNameFormat(AsynchronousByteChannelFactory.class.getSimpleName() + "-%d").build());
 
 	/**
 	 * Creates an AsynchronousByteChannel that reads a predefined string.
@@ -43,7 +37,7 @@ public class AsynchronousByteChannelFactory
 	 * @return a AsynchronousByteChannel
 	 */
 	public static AsynchronousByteChannel fromString(String input, final StringBuilder output,
-																									 final Charset charset)
+		final Charset charset)
 	{
 		final EncodingReadableByteChannel encoder = new EncodingReadableByteChannel(charset);
 		final DecodingWriteableByteChannel decoder = new DecodingWriteableByteChannel(charset);
@@ -55,7 +49,7 @@ public class AsynchronousByteChannelFactory
 
 			@Override
 			public <A> void read(final ByteBuffer dst, final A attachment,
-													 final CompletionHandler<Integer, ? super A> handler)
+				final CompletionHandler<Integer, ? super A> handler)
 			{
 				executor.execute(new Runnable()
 				{
@@ -89,7 +83,7 @@ public class AsynchronousByteChannelFactory
 
 			@Override
 			public <A> void write(final ByteBuffer src, final A attachment,
-														final CompletionHandler<Integer, ? super A> handler)
+				final CompletionHandler<Integer, ? super A> handler)
 			{
 				executor.execute(new Runnable()
 				{
@@ -156,8 +150,8 @@ public class AsynchronousByteChannelFactory
 	 * @throws IllegalArgumentException if {@code readBarriers < 0 || writeBarriers < 0}
 	 */
 	public static AsynchronousByteChannel delay(final AsynchronousByteChannel channel,
-																							final NavigableMap<Long, Long> readBarriers,
-																							final NavigableMap<Long, Long> writeBarriers)
+		final NavigableMap<Long, Long> readBarriers,
+		final NavigableMap<Long, Long> writeBarriers)
 	{
 		Preconditions.checkNotNull(readBarriers, "readBarriers may not be null");
 		Preconditions.checkNotNull(writeBarriers, "writeBarriers may not be null");
@@ -169,7 +163,7 @@ public class AsynchronousByteChannelFactory
 
 			@Override
 			public <A> void read(final ByteBuffer dst, final A attachment,
-													 final CompletionHandler<Integer, ? super A> handler)
+				final CompletionHandler<Integer, ? super A> handler)
 			{
 				Entry<Long, Long> nextRead = readBarriers.higherEntry(readPosition);
 				final long remaining;
@@ -247,7 +241,7 @@ public class AsynchronousByteChannelFactory
 
 			@Override
 			public <A> void write(final ByteBuffer src, final A attachment,
-														final CompletionHandler<Integer, ? super A> handler)
+				final CompletionHandler<Integer, ? super A> handler)
 			{
 				Entry<Long, Long> nextWrite = writeBarriers.higherEntry(writePosition);
 				final long remaining;

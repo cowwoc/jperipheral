@@ -39,16 +39,16 @@ int main(int argc, char* argv[])
 
 	OptionList options;
 
-	options.push_back(ClassPath("jperipheral.jar;"
+	options.push_back(ClassPath("jperipheral-java-1.0-SNAPSHOT.jar;"
 		"joda-time-1.6.jar;"
 		"slf4j-api-1.6.1.jar;"
-		"google-collect-1.0-rc2.jar;"
+		"guava-r09.jar;"
 		"aopalliance.jar;"
-		"guice-2.0.jar;"
-		"guice-assistedinject-2.0;"
-		"jace-runtime.jar;"
-		"logback-classic-0.9.24.jar;"
-		"logback-core-0.9.24.jar;"
+		"guice-3.0.jar;"
+		"javax.inject-1.jar;"
+		"jace-runtime-1.2.3.jar;"
+		"logback-classic-0.9.26.jar;"
+		"logback-core-0.9.26.jar;"
 		));
 	//options.push_back(Verbose(Verbose::JNI));
 	//options.push_back(Verbose(Verbose::CLASS));

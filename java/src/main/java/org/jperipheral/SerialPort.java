@@ -1,10 +1,10 @@
 package org.jperipheral;
 
-import java.io.IOException;
+import com.google.common.base.Preconditions;
 
 /**
  * A serial port.
- * 
+ * <p/>
  * @author Gili Tzabari
  * @see http://www.lammertbies.nl/comm/info/RS-232_specs.html
  */
@@ -208,40 +208,25 @@ public final class SerialPort implements Peripheral
 	 * Creates a new SerialPort.
 	 *
 	 * @param name the port name
-	 * @throws PeripheralNotFoundException if the comport does not exist
-	 * @throws IllegalArgumentException if name is null
+	 * @throws NullPointerException if name is null
+	 * @throws IllegalStateException if name.trim().isEmpty()
 	 */
 	public SerialPort(String name)
 		throws PeripheralNotFoundException
 	{
-		if (name == null)
-			throw new IllegalArgumentException("name may not be null");
+		Preconditions.checkNotNull(name, "name may not be null");
+		Preconditions.checkArgument(!name.trim().isEmpty(), "name may not be an empty string");
+
 		this.name = name;
-		try
-		{
-			SerialChannel channel = new SerialChannel(this);
-			channel.close();
-		}
-		catch (PeripheralInUseException e)
-		{
-			// the serial port exists, but is in use
-		}
-		catch (PeripheralNotFoundException e)
-		{
-			throw e;
-		}
-		catch (IOException e)
-		{
-			// We didn't write anything so close() shouldn't fail
-			throw new AssertionError(e);
-		}
 	}
 
 	@Override
-	public SerialChannel newAsynchronousChannel()
+	public SerialChannel newAsynchronousChannel(PeripheralChannelGroup group)
 		throws PeripheralNotFoundException, PeripheralInUseException
 	{
-		return new SerialChannel(this);
+		SerialChannel result = new SerialChannel(this, group);
+		group.addChannel(result);
+		return result;
 	}
 
 	@Override

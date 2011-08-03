@@ -3,13 +3,12 @@ package org.jperipheral;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.channels.AsynchronousChannel;
+import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.CompletionHandler;
 import java.nio.channels.InterruptedByTimeoutException;
 import java.nio.channels.ReadPendingException;
 import java.nio.channels.ShutdownChannelGroupException;
 import java.nio.channels.WritePendingException;
-import java.nio.charset.MalformedInputException;
-import java.nio.charset.UnmappableCharacterException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -111,11 +110,12 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * @throws  ReadPendingException
 	 *          If the channel does not allow more than one read to be outstanding
 	 *          and a previous read has not completed
-	 * @throws ShutdownChannelGroupException
-	 *         If the channel group is shutdown
+	 * @throws  ShutdownChannelGroupException
+	 *          If the channel is associated with a {@link AsynchronousChannelGroup
+	 *          group} that has terminated
 	 */
 	 <A> void read(CharBuffer target, A attachment,
-								 CompletionHandler<Integer, ? super A> handler)
+		CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;
 
 	/**
@@ -141,11 +141,9 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * @throws  ReadPendingException
 	 *          If the channel does not allow more than one read to be outstanding
 	 *          and a previous read has not completed
-	 * @throws  ShutdownChannelGroupException
-	 *          If the channel group is shutdown
 	 */
 	Future<Integer> read(CharBuffer target)
-		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;
+		throws IllegalArgumentException, ReadPendingException;
 
 	/**
 	 * Reads a line of characters from this channel into the given buffer.
@@ -192,8 +190,9 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * @throws  ReadPendingException
 	 *          If the channel does not allow more than one read to be outstanding
 	 *          and a previous read has not completed
-	 * @throws ShutdownChannelGroupException
-	 *         If the channel group is shutdown
+	 * @throws  ShutdownChannelGroupException
+	 *          If the channel is associated with a {@link AsynchronousChannelGroup
+	 *          group} that has terminated
 	 */
 	 <A> void readLine(A attachment, CompletionHandler<String, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;
@@ -220,11 +219,9 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * @throws ReadPendingException
 	 *         If the channel does not allow more than one read to be outstanding
 	 *         and a previous read has not completed
-	 * @throws ShutdownChannelGroupException
-	 *         If the channel group is shutdown
 	 */
 	Future<String> readLine()
-		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;
+		throws IllegalArgumentException, ReadPendingException;
 
 	/**
 	 * Writes a sequence of characters to this channel from the given buffer.
@@ -275,11 +272,12 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 *         If the channel does not allow more than one write to be outstanding
 	 *         and a previous write has not completed
 	 * @throws ShutdownChannelGroupException
-	 *         If the channel group is shutdown
+	 *         If the channel is associated with a {@link AsynchronousChannelGroup
+	 *         group} that has terminated
 	 */
 	 <A> void write(CharBuffer source,
-									A attachment,
-									CompletionHandler<Integer, ? super A> handler)
+		A attachment,
+		CompletionHandler<Integer, ? super A> handler)
 		throws WritePendingException, ShutdownChannelGroupException;
 
 	/**
@@ -306,9 +304,7 @@ public interface AsynchronousCharChannel extends AsynchronousChannel
 	 * @throws WritePendingException
 	 *         If the channel does not allow more than one write to be outstanding
 	 *         and a previous write has not completed
-	 * @throws ShutdownChannelGroupException
-	 *         If the channel group is shutdown
 	 */
 	Future<Integer> write(CharBuffer source)
-		throws WritePendingException, ShutdownChannelGroupException;
+		throws WritePendingException;
 }

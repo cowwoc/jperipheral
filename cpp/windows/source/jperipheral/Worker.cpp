@@ -72,17 +72,10 @@ void Worker::run()
 			{
 				case ERROR_HANDLE_EOF:
 					break;
-				case ERROR_OPERATION_ABORTED:
-				{
-					// Triggered by CancelIo()
-					task->getListener()->onCancellation();
-					delete overlappedContainer;
-					break;
-				}
 				default:
 				{
-					task->getListener()->onFailure(IOException(jace::java_new<IOException>(
-						L"GetQueuedCompletionStatus() failed with error: " + getErrorMessage(errorCode))));
+					task->getHandler()->failed(IOException(jace::java_new<IOException>(
+						L"GetQueuedCompletionStatus() failed with error: " + getErrorMessage(errorCode))), *task->getAttachment());
 					delete overlappedContainer;
 					break;
 				}
@@ -109,8 +102,8 @@ void Worker::run()
 				}
 				default:
 				{
-					task->getListener()->onFailure(AssertionError(jace::java_new<AssertionError>(
-						wstring(L"completionKey==") + toWString(completionKey))));
+					task->getHandler()->failed(AssertionError(jace::java_new<AssertionError>(
+						wstring(L"completionKey==") + toWString(completionKey))), *task->getAttachment());
 					delete overlappedContainer;
 					break;
 				}

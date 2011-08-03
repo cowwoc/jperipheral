@@ -1,26 +1,24 @@
 package org.jperipheral;
 
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.SettableFuture;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousByteChannel;
 import java.nio.channels.AsynchronousCloseException;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.CompletionHandler;
 import java.nio.channels.InterruptedByTimeoutException;
 import java.nio.channels.ReadPendingException;
 import java.nio.channels.ShutdownChannelGroupException;
 import java.nio.channels.WritePendingException;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.jperipheral.SerialPort.DataBits;
 import org.jperipheral.SerialPort.FlowControl;
 import org.jperipheral.SerialPort.Parity;
 import org.jperipheral.SerialPort.StopBits;
-import org.joda.time.DateTime;
-import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,29 +27,28 @@ import org.slf4j.LoggerFactory;
  *
  * <h4>Timeouts</h4>
  *
- * <p> The {@link #read(ByteBuffer,long,TimeUnit,Object,CompletionHandler) read}
- * and {@link #write(ByteBuffer,long,TimeUnit,Object,CompletionHandler) write}
- * methods defined by this class allow a timeout to be specified when initiating
- * a read or write operation. If the timeout elapses before an operation completes
- * then the operation completes with the exception {@link
- * InterruptedByTimeoutException}. A timeout may leave the channel, or the
- * underlying connection, in an inconsistent state. Where the implementation
- * cannot guarantee that bytes have not been read from the channel then it puts
- * the channel into an implementation specific <em>error state</em>. A subsequent
- * attempt to initiate a {@code read} operation causes an unspecified runtime
- * exception to be thrown. Similarly if a {@code write} operation times out and
- * the implementation cannot guarantee bytes have not been written to the
- * channel then further attempts to {@code write} to the channel cause an
- * unspecified runtime exception to be thrown. When a timeout elapses then the
- * state of the {@link ByteBuffer}, or the sequence of buffers, for the I/O
- * operation is not defined. Buffers should be discarded or at least care must
- * be taken to ensure that the buffers are not accessed while the channel remains
+ * The {@link #read(ByteBuffer,long,TimeUnit,Object,CompletionHandler) read} and
+ * {@link #write(ByteBuffer,long,TimeUnit,Object,CompletionHandler) write} methods defined by this
+ * class allow a timeout to be specified when initiating a read or write operation. If the timeout
+ * elapses before an operation completes then the operation completes with the exception
+ * {@link InterruptedByTimeoutException}. A timeout may leave the channel, or the underlying
+ * connection, in an inconsistent state. Where the implementation cannot guarantee that bytes have
+ * not been read from the channel then it puts the channel into an implementation specific
+ * <em>error state</em>. A subsequent attempt to initiate a {
+ * @code read} operation causes an unspecified runtime exception to be thrown. Similarly if a
+ * {@code write} operation times out and the implementation cannot guarantee bytes have not been
+ * written to the channel then further attempts to {@code write} to the channel cause an unspecified
+ * runtime exception to be thrown. When a timeout elapses then the state of the {@link ByteBuffer},
+ * or the sequence of buffers, for the I/O operation is not defined. Buffers should be discarded or
+ * at least care must be taken to ensure that the buffers are not accessed while the channel remains
  * open.
- * 
+ *
  * @author Gili Tzabari
  */
 public class SerialChannel implements AsynchronousByteChannel
 {
+	private final Logger log = LoggerFactory.getLogger(SerialChannel.class);
+	private final PeripheralChannelGroup group;
 	/**
 	 * A pointer to the native object, accessed by the native code.
 	 */
@@ -60,28 +57,36 @@ public class SerialChannel implements AsynchronousByteChannel
 		"PMD.UnusedPrivateField",
 		"PMD.SingularField"
 	})
-	private transient final long nativeObject;
-	private transient final SerialPort port;
-	private transient int baudRate;
-	private transient DataBits dataBits;
-	private transient StopBits stopBits;
-	private transient Parity parity;
-	private transient FlowControl flowControl;
-	private transient boolean closed;
-	private transient boolean readPending;
-	private transient boolean writePending;
+	private final long nativeObject;
+	private final SerialPort port;
+	private int baudRate;
+	private DataBits dataBits;
+	private StopBits stopBits;
+	private Parity parity;
+	private FlowControl flowControl;
+	private AtomicBoolean closed = new AtomicBoolean();
+	private AtomicBoolean reading = new AtomicBoolean();
+	private AtomicBoolean readInterrupted = new AtomicBoolean();
+	private AtomicBoolean writing = new AtomicBoolean();
+	private AtomicBoolean writeInterrupted = new AtomicBoolean();
 
 	/**
-	 * Creates a new SerialChannel.
+	 * Creates a new SerialChannel. The caller is responsible for adding the channel into the group.
 	 *
 	 * @param port the serial port
+	 * @param group the group associated with the channel
 	 * @throws PeripheralNotFoundException if the comport does not exist
 	 * @throws PeripheralInUseException if the peripheral is locked by another application
+	 * @throws NullPointerException if port is null
 	 */
-	public SerialChannel(final SerialPort port)
+	SerialChannel(final SerialPort port, final PeripheralChannelGroup group)
 		throws PeripheralNotFoundException, PeripheralInUseException
 	{
+		Preconditions.checkNotNull(port, "port may not be null");
+		Preconditions.checkNotNull(group, "group may not be null");
+
 		this.port = port;
+		this.group = group;
 		this.nativeObject = nativeOpen(port.getName());
 	}
 
@@ -136,167 +141,190 @@ public class SerialChannel implements AsynchronousByteChannel
 	}
 
 	@Override
-	public synchronized Future<Integer> read(final ByteBuffer target)
-		throws IllegalArgumentException, ReadPendingException
-	{
-		if (target.isReadOnly())
-			throw new IllegalArgumentException("target may not be read-only");
-		synchronized (this)
-		{
-			if (closed)
-				return new ClosedFuture();
-			if (readPending)
-				throw new ReadPendingException();
-			readPending = true;
-		}
-		if (target.remaining() <= 0)
-			return new NoOpFuture();
-		final SerialFuture<Integer> result = new SerialFuture<>(new Runnable()
-		{
-			@Override
-			public void run()
-			{
-				synchronized (SerialChannel.this)
-				{
-					readPending = false;
-				}
-			}
-		});
-		try
-		{
-			nativeRead(target, Long.MAX_VALUE, result);
-			return result;
-		}
-		catch (RuntimeException e)
-		{
-			readPending = false;
-			throw e;
-		}
-	}
-
-	@Override
-	public synchronized <A> void read(final ByteBuffer target, final A attachment,
-																		final CompletionHandler<Integer, ? super A> handler)
+	public <A> void read(final ByteBuffer target, final A attachment,
+		final CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 	{
 		if (target.isReadOnly())
 			throw new IllegalArgumentException("target may not be read-only");
-		synchronized (this)
-		{
-			if (closed)
-			{
-				handler.failed(new ClosedChannelException(), attachment);
-				return;
-			}
-			if (readPending)
-				throw new ReadPendingException();
-			readPending = true;
-		}
-		if (target.remaining() <= 0)
-		{
-			handler.completed(0, attachment);
-			return;
-		}
-		try
-		{
-			nativeRead(target, Long.MAX_VALUE,
-				new NativeListenerToCompletionHandler<>(handler, attachment, new Runnable()
-			{
-				@Override
-				public void run()
-				{
-					synchronized (SerialChannel.this)
-					{
-						readPending = false;
-					}
-				}
-			}));
-		}
-		catch (RuntimeException e)
-		{
-			readPending = false;
-			throw e;
-		}
-	}
-
-	@Override
-	public synchronized Future<Integer> write(final ByteBuffer source)
-		throws WritePendingException
-	{
-		synchronized (this)
-		{
-			if (closed)
-				return new ClosedFuture();
-			if (writePending)
-				throw new WritePendingException();
-			writePending = true;
-		}
-		if (source.remaining() <= 0)
-			return new NoOpFuture();
-		final SerialFuture<Integer> result = new SerialFuture<>(new Runnable()
+		group.executor().submit(new Runnable()
 		{
 			@Override
 			public void run()
 			{
-				synchronized (SerialChannel.this)
+				if (closed.get())
 				{
-					writePending = false;
+					handler.failed(new AsynchronousCloseException(), attachment);
+					return;
+				}
+				if (!reading.compareAndSet(false, true))
+					throw new ReadPendingException();
+				OperationDone<Integer, ? super A> operationDone = new OperationDone<>(handler, reading);
+				if (readInterrupted.get())
+				{
+					operationDone.failed(new IllegalStateException("The previous read cancellation left the channel in an"
+						+ "inconsistent state. See java.nio.channels.AsynchronousChannel section Cancellation"
+						+ "for more information."), attachment);
+					return;
+				}
+				if (target.remaining() <= 0)
+				{
+					operationDone.completed(0, attachment);
+					return;
+				}
+				CompletionHandlerExecutor<Integer, ? super A> nativeThreadToExecutor = 
+					new CompletionHandlerExecutor(operationDone, group.executor());
+				try
+				{
+					nativeRead(target, Long.MAX_VALUE, attachment, nativeThreadToExecutor);
+				}
+				catch (RuntimeException e)
+				{
+					operationDone.failed(e, attachment);
 				}
 			}
 		});
-		try
-		{
-			nativeWrite(source, Long.MAX_VALUE, result);
-			return result;
-		}
-		catch (RuntimeException e)
-		{
-			writePending = false;
-			throw e;
-		}
 	}
 
 	@Override
-	public synchronized <A> void write(final ByteBuffer source, final A attachment,
-																		 final CompletionHandler<Integer, ? super A> handler)
-		throws IllegalArgumentException, WritePendingException, ShutdownChannelGroupException
+	public Future<Integer> read(final ByteBuffer target)
+		throws IllegalArgumentException, ReadPendingException
 	{
-		synchronized (this)
+		if (target.isReadOnly())
+			throw new IllegalArgumentException("target may not be read-only");
+		return group.executor().submit(new Callable<Integer>()
 		{
-			if (closed)
+			@Override
+			public Integer call() throws Exception
 			{
-				handler.failed(new ClosedChannelException(), attachment);
-				return;
-			}
-			if (writePending)
-				throw new WritePendingException();
-			writePending = true;
-		}
-		if (source.remaining() <= 0)
-		{
-			handler.completed(0, attachment);
-			return;
-		}
-		try
-		{
-			nativeWrite(source, Long.MAX_VALUE,
-				new NativeListenerToCompletionHandler<>(handler, attachment, new Runnable()
-			{
-				@Override
-				public void run()
+				if (closed.get())
+					throw new AsynchronousCloseException();
+				if (!reading.compareAndSet(false, true))
+					throw new ReadPendingException();
+				try
 				{
-					synchronized (SerialChannel.this)
+					if (readInterrupted.get())
 					{
-						writePending = false;
+						throw new IllegalStateException("The previous read cancellation left the channel in an"
+							+ "inconsistent state. See java.nio.channels.AsynchronousChannel section Cancellation"
+							+ "for more information.");
+					}
+					if (target.remaining() <= 0)
+						return 0;
+
+					SettableFuture<Integer> result = SettableFuture.create();
+					CompletionHandlerToFuture<Integer> handlerToFuture =
+						new CompletionHandlerToFuture<>(result);
+					try
+					{
+						nativeRead(target, Long.MAX_VALUE, null, handlerToFuture);
+						return result.get();
+					}
+					catch (InterruptedException e)
+					{
+						// Exit at the request of Future.cancel(true)
+						readInterrupted.set(true);
+						close();
+						throw e;
 					}
 				}
-			}));
-		}
-		catch (RuntimeException e)
+				finally
+				{
+					reading.set(false);
+				}
+			}
+		});
+	}
+
+	@Override
+	public <A> void write(final ByteBuffer source, final A attachment,
+		final CompletionHandler<Integer, ? super A> handler)
+		throws IllegalArgumentException, WritePendingException, ShutdownChannelGroupException
+	{
+		group.executor().submit(new Runnable()
 		{
-			readPending = false;
-			throw e;
-		}
+			@Override
+			public void run()
+			{
+				if (closed.get())
+				{
+					handler.failed(new AsynchronousCloseException(), attachment);
+					return;
+				}
+				if (!writing.compareAndSet(false, true))
+					throw new WritePendingException();
+				OperationDone<Integer, ? super A> operationDone = new OperationDone<>(handler, writing);
+				if (writeInterrupted.get())
+				{
+					operationDone.failed(new IllegalStateException("The previous write cancellation left the channel in an"
+						+ "inconsistent state. See java.nio.channels.AsynchronousChannel section Cancellation"
+						+ "for more information."), attachment);
+					return;
+				}
+				if (source.remaining() <= 0)
+				{
+					operationDone.completed(0, attachment);
+					return;
+				}
+				CompletionHandlerExecutor<Integer, ? super A> nativeThreadToExecutor = 
+					new CompletionHandlerExecutor(operationDone, group.executor());
+				try
+				{
+					nativeWrite(source, Long.MAX_VALUE, attachment, nativeThreadToExecutor);
+				}
+				catch (RuntimeException e)
+				{
+					operationDone.failed(e, attachment);
+				}
+			}
+		});
+	}
+
+	@Override
+	public Future<Integer> write(final ByteBuffer source)
+		throws WritePendingException
+	{
+		return group.executor().submit(new Callable<Integer>()
+		{
+			@Override
+			public Integer call() throws Exception
+			{
+				if (closed.get())
+					throw new AsynchronousCloseException();
+				if (!writing.compareAndSet(false, true))
+					throw new WritePendingException();
+				try
+				{
+					if (writeInterrupted.get())
+					{
+						throw new IllegalStateException("The previous write cancellation left the channel in an"
+							+ "inconsistent state. See java.nio.channels.AsynchronousChannel section Cancellation"
+							+ "for more information.");
+					}
+					if (source.remaining() <= 0)
+						return 0;
+					SettableFuture<Integer> result = SettableFuture.create();
+					CompletionHandlerToFuture<Integer> handlerToFuture =
+						new CompletionHandlerToFuture<>(result);
+					try
+					{
+						nativeWrite(source, Long.MAX_VALUE, null, handlerToFuture);
+						return result.get();
+					}
+					catch (InterruptedException e)
+					{
+						// Exit at the request of Future.cancel(true)
+						readInterrupted.set(true);
+						close();
+						throw e;
+					}
+				}
+				finally
+				{
+					writing.set(false);
+				}
+			}
+		});
 	}
 
 	/**
@@ -310,7 +338,7 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * @throws IOException if an I/O error occurs while configuring the channel
 	 */
 	public void configure(final int baudRate, final DataBits dataBits, final Parity parity,
-												final StopBits stopBits, final FlowControl flowControl)
+		final StopBits stopBits, final FlowControl flowControl)
 		throws IOException
 	{
 		nativeConfigure(baudRate, dataBits, parity, stopBits, flowControl);
@@ -322,18 +350,16 @@ public class SerialChannel implements AsynchronousByteChannel
 	}
 
 	@Override
-	public synchronized void close() throws IOException
+	public void close() throws IOException
 	{
-		if (closed)
-			return;
-		nativeClose();
-		closed = true;
+		if (closed.compareAndSet(false, true))
+			nativeClose();
 	}
 
 	@Override
-	public synchronized boolean isOpen()
+	public boolean isOpen()
 	{
-		return !closed;
+		return !closed.get();
 	}
 
 	/**
@@ -350,7 +376,7 @@ public class SerialChannel implements AsynchronousByteChannel
 	public String toString()
 	{
 		return port.getName() + "[" + baudRate + " " + dataBits + "-" + parity + "-" + stopBits + " "
-					 + flowControl + "]";
+			+ flowControl + "]";
 	}
 
 	/**
@@ -361,8 +387,8 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * @throws PeripheralNotFoundException if the comport does not exist
 	 * @throws PeripheralInUseException if the comport is locked by another application
 	 */
-	private native long nativeOpen(String name) throws PeripheralNotFoundException,
-																										 PeripheralInUseException;
+	private native long nativeOpen(String name)
+		throws PeripheralNotFoundException, PeripheralInUseException;
 
 	/**
 	 * Sets the port configuration.
@@ -375,7 +401,7 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * @throws IOException if an I/O error occurs while configuring the channel
 	 */
 	private native void nativeConfigure(int baudRate, DataBits dataBits, Parity parity,
-																			StopBits stopBits, FlowControl flowControl) throws IOException;
+		StopBits stopBits, FlowControl flowControl) throws IOException;
 
 	/**
 	 * Closes the port.
@@ -392,9 +418,12 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * @param timeout the number of milliseconds to wait before throwing
 	 *                InterruptedByTimeoutException. 0 means "return right away".
 	 *                Long.MAX_VALUE means "wait forever"
-	 * @param listener listens for native events
+	 * @param attachment the attachment associated with handler
+	 * @param handler a handler for consuming the result of an asynchronous I/O operation.
+	 *   On success, returns the number of bytes read.
 	 */
-	private native <A> void nativeRead(ByteBuffer target, long timeout, NativeListener listener);
+	private native <A> void nativeRead(ByteBuffer target, long timeout, A attachment,
+		CompletionHandler<Integer, A> handler);
 
 	/**
 	 * Writes data to the port.
@@ -404,378 +433,55 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * @param timeout the number of milliseconds to wait before throwing
 	 *                InterruptedByTimeoutException. 0 means "return right away".
 	 *                Long.MAX_VALUE means "wait forever"
-	 * @param listener listens for native events
+	 * @param attachment the attachment associated with handler
+	 * @param handler a handler for consuming the result of an asynchronous I/O operation.
+	 *   On success, returns the number of bytes written.
 	 */
-	private native <A> void nativeWrite(ByteBuffer source, long timeout, NativeListener listener);
+	private native <A> void nativeWrite(ByteBuffer source, long timeout, A attachment,
+		CompletionHandler<Integer, A> handler);
 
 	/**
-	 * Listens for native events.
+	 * Notified when a read operation completes.
 	 *
+	 * @param <V> the result type of the I/O operation
+	 * @param <A> the type of the object attached to the I/O operation
 	 * @author Gili Tzabari
 	 */
-	private interface NativeListener
+	private class OperationDone<V, A> implements CompletionHandler<V, A>
 	{
+		private final CompletionHandler<V, A> delegate;
+		private final AtomicBoolean running;
+
 		/**
-		 * Sets the the user object associated with the listener.
+		 * Creates a new OperationDone.
 		 *
-		 * @param userObject a pointer to the user object
+		 * @param delegate the handler to delegate to. The current object's attachment is passed to the
+		 *   delegate.
+		 * @param running an AtomicBoolean to set to false when the operation completes
+		 *   through to the delegate.
+		 * @throws NullPointerException if delegate or running are null
 		 */
-		void setUserObject(long userObject);
-
-		/**
-		 * Returns the user object associated with the listener.
-		 *
-		 * @return the pointer to the user object
-		 */
-		long getUserObject();
-
-		/**
-		 * Invoked if the operation completed successfully.
-		 *
-		 * @param value the operation return-value
-		 */
-		void onSuccess(Integer value);
-
-		/**
-		 * Invoked if the operation failed.
-		 *
-		 * @param throwable the Throwable associated with the failure
-		 */
-		void onFailure(Throwable throwable);
-
-		/**
-		 * Invokes if the operation was canceled.
-		 */
-		void onCancellation();
-	}
-
-	/**
-	 * A Future that always throws ClosedChannelException.
-	 *
-	 * @author Gili Tzabari
-	 */
-	private static class ClosedFuture implements Future<Integer>
-	{
-		@Override
-		public boolean cancel(final boolean mayInterruptIfRunning)
+		public OperationDone(CompletionHandler<V, A> delegate, AtomicBoolean running)
 		{
-			return false;
+			Preconditions.checkNotNull(delegate, "delegate may not be null");
+			Preconditions.checkNotNull(running, "running may not be null");
+
+			this.delegate = delegate;
+			this.running = running;
 		}
 
 		@Override
-		public boolean isCancelled()
+		public void completed(final V value, final A attachment)
 		{
-			return false;
+			running.set(false);
+			delegate.completed(value, attachment);
 		}
 
 		@Override
-		public boolean isDone()
+		public void failed(final Throwable t, final A attachment)
 		{
-			return true;
-		}
-
-		@Override
-		public Integer get() throws InterruptedException, ExecutionException
-		{
-			throw new ExecutionException(new ClosedChannelException());
-		}
-
-		@Override
-		public Integer get(final long timeout, final TimeUnit unit)
-			throws InterruptedException, ExecutionException, TimeoutException
-		{
-			throw new ExecutionException(new ClosedChannelException());
-		}
-	}
-
-	/**
-	 * Converts NativeListener events to CompletionHandler events.
-	 *
-	 * @type <A> the attachment type
-	 * @author Gili Tzabari
-	 */
-	private static class NativeListenerToCompletionHandler<A> implements NativeListener
-	{
-		private transient final CompletionHandler<Integer, ? super A> handler;
-		private transient final A attachment;
-		private transient final Runnable onDone;
-
-		/**
-		 * Creates a new CompletionHandlerAdapter.
-		 *
-		 * @param handler the CompletionHandler to wrap
-		 * @param attachment the attachment associated with the CompletionHandler
-		 * @param onDone the Runnable to invoke when the operation completes
-		 */
-		public NativeListenerToCompletionHandler(final CompletionHandler<Integer, ? super A> handler,
-																						 final A attachment,
-																						 final Runnable onDone)
-		{
-			this.handler = handler;
-			this.attachment = attachment;
-			this.onDone = onDone;
-		}
-
-		@Override
-		public void onSuccess(final Integer value)
-		{
-			handler.completed(value, attachment);
-			onDone.run();
-		}
-
-		@Override
-		public void onFailure(final Throwable throwable)
-		{
-			handler.failed(throwable, attachment);
-			onDone.run();
-		}
-
-		@Override
-		public void onCancellation()
-		{
-			handler.failed(new AsynchronousCloseException(), attachment);
-			onDone.run();
-		}
-
-		@Override
-		public void setUserObject(final long userObject)
-		{
-			throw new AssertionError("Never used by native code");
-		}
-
-		@Override
-		public long getUserObject()
-		{
-			throw new AssertionError("Never used by native code");
-		}
-	}
-
-	/**
-	 * A Future for serial-port operations.
-	 *
-	 * @param <A> the attachment type
-	 * @author Gili Tzabari
-	 */
-	private static class SerialFuture<A> implements Future<Integer>, NativeListener
-	{
-		private transient long userObject;
-		private transient Integer value;
-		private transient Throwable throwable;
-		private transient boolean done;
-		private transient boolean cancelled;
-		private transient boolean cancelRequested;
-		private transient final Runnable onDone;
-		private transient final Logger log = LoggerFactory.getLogger(SerialFuture.class);
-
-		/**
-		 * Creates a new SerialFuture.
-		 *
-		 * @param onDone the Runnable to invoke when the operation completes
-		 */
-		public SerialFuture(final Runnable onDone)
-		{
-			this.onDone = onDone;
-		}
-
-		@Override
-		public synchronized boolean cancel(final boolean mayInterruptIfRunning)
-		{
-			if (!mayInterruptIfRunning)
-			{
-				done = true;
-				return false;
-			}
-			if (done)
-				return false;
-			cancelRequested = true;
-			try
-			{
-				// NOTE: Canceling an operation may result in data loss.
-				// REFERENCE: http://stackoverflow.com/questions/1238905/what-does-cancelio-do-with-bytes-that-have-already-been-read
-				nativeCancel();
-			}
-			catch (IOException e)
-			{
-				log.error("", e);
-				return false;
-			}
-			while (!done)
-			{
-				try
-				{
-					// wait for onSuccess(), onFailure() or onCancellation() to get invoked
-					wait();
-				}
-				catch (InterruptedException e)
-				{
-					return false;
-				}
-			}
-			return cancelled;
-		}
-
-		@Override
-		public synchronized boolean isCancelled()
-		{
-			return cancelled;
-		}
-
-		@Override
-		public synchronized boolean isDone()
-		{
-			return done;
-		}
-
-		@Override
-		public synchronized Integer get()
-			throws CancellationException, InterruptedException, ExecutionException
-		{
-			while (!done)
-				wait();
-			if (cancelled)
-				throw new CancellationException();
-			if (throwable != null)
-				throw new ExecutionException(throwable);
-			return value;
-		}
-
-		@Override
-		public synchronized Integer get(final long timeout, final TimeUnit unit)
-			throws CancellationException, InterruptedException, ExecutionException, TimeoutException
-		{
-			DateTime endTime = new DateTime().plus(new Duration(TimeUnit.MILLISECONDS.convert(timeout,
-				unit)));
-			boolean timeoutOccured = false;
-			while (!done)
-			{
-				long timeLeft = new Duration(new DateTime(), endTime).getMillis();
-				if (timeLeft <= 0)
-				{
-					timeoutOccured = true;
-					cancel(true);
-					break;
-				}
-				wait(timeLeft);
-			}
-			if (cancelled)
-			{
-				if (timeoutOccured)
-					throw new TimeoutException();
-				throw new CancellationException();
-			}
-			if (throwable != null)
-				throw new ExecutionException(throwable);
-			return value;
-		}
-
-		@Override
-		public synchronized void onSuccess(final Integer value)
-		{
-			this.value = value;
-			onDone();
-		}
-
-		@Override
-		public synchronized void onFailure(final Throwable throwable)
-		{
-			this.throwable = throwable;
-			onDone();
-		}
-
-		@Override
-		public synchronized void onCancellation()
-		{
-			if (cancelRequested)
-			{
-				// Caused by Future.cancel()
-				cancelled = true;
-			}
-			else
-			{
-				// Otherwise, assume it was caused by AsynchronousChannel.close()
-				this.throwable = new AsynchronousCloseException();
-			}
-			onDone();
-		}
-
-		/**
-		 * Invoked when the operation completes.
-		 */
-		private synchronized void onDone()
-		{
-			done = true;
-			notifyAll();
-			onDone.run();
-			nativeDispose();
-		}
-
-		@Override
-		public synchronized void setUserObject(final long userObject)
-		{
-			// invoked by native code
-			this.userObject = userObject;
-		}
-
-		@Override
-		public synchronized long getUserObject()
-		{
-			// invoked by native code
-			return userObject;
-		}
-
-		/**
-		 * Cancels an ongoing operation.
-		 *
-		 * Implementation must ensure that nativeDispose() is not invoked at the same time.
-		 *
-		 * @throws IOException if the operation fails
-		 */
-		private native void nativeCancel() throws IOException;
-
-		/**
-		 * Disposes the resources associated with the native listener.
-		 *
-		 * Implementation must ensure that nativeCancel() is not invoked at the same time.
-		 */
-		private native void nativeDispose();
-	}
-
-	/**
-	 * A Future for reading or writing zero bytes.
-	 *
-	 * @author Gili Tzbari
-	 */
-	private static class NoOpFuture implements Future<Integer>
-	{
-		@Override
-		public boolean cancel(final boolean mayInterruptIfRunning)
-		{
-			return false;
-		}
-
-		@Override
-		public boolean isCancelled()
-		{
-			return false;
-		}
-
-		@Override
-		public boolean isDone()
-		{
-			return true;
-		}
-
-		@Override
-		public Integer get() throws InterruptedException, ExecutionException
-		{
-			return Integer.valueOf(0);
-		}
-
-		@Override
-		public Integer get(final long timeout, final TimeUnit unit)
-			throws InterruptedException, ExecutionException, TimeoutException
-		{
-			return get();
+			running.set(false);
+			delegate.failed(t, attachment);
 		}
 	}
 }

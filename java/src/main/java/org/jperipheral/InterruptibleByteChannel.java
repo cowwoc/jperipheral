@@ -58,7 +58,8 @@ public interface InterruptibleByteChannel
 	 *          If the channel does not allow more than one read to be outstanding
 	 *          and a previous read has not completed
 	 * @throws  ShutdownChannelGroupException
-	 *          If the channel group is shutdown
+	 *          If the channel is associated with a {@link AsynchronousChannelGroup
+	 *          group} that has terminated
 	 * @throws  UnsupportedOperationException
 	 *          If the implementation does not support this operation
 	 */
@@ -106,7 +107,8 @@ public interface InterruptibleByteChannel
 	 *          If the channel does not allow more than one write to be outstanding
 	 *          and a previous write has not completed
 	 * @throws  ShutdownChannelGroupException
-	 *          If the channel group is shutdown
+	 *          If the channel is associated with a {@link AsynchronousChannelGroup
+	 *          group} that has terminated
 	 * @throws  UnsupportedOperationException
 	 *          If the implementation does not support this operation
 	 */

@@ -27,7 +27,6 @@ using jperipheral::getErrorMessage;
 using jperipheral::OverlappedContainer;
 using jperipheral::Task;
 using jperipheral::getSourceCodePosition;
-using jperipheral::SingleThreadExecutor;
 using jperipheral::SerialPortContext;
 
 #include "jace/proxy/java/lang/Long.h"
@@ -39,8 +38,8 @@ using jace::proxy::org::jperipheral::PeripheralNotFoundException;
 #include "jace/proxy/org/jperipheral/PeripheralInUseException.h"
 using jace::proxy::org::jperipheral::PeripheralInUseException;
 
-#include "jace/proxy/org/jperipheral/SerialChannel_NativeListener.h"
-using jace::proxy::org::jperipheral::SerialChannel_NativeListener;
+#include "jace/proxy/java/nio/channels/CompletionHandler.h"
+using jace::proxy::java::nio::channels::CompletionHandler;
 
 #include "jace/proxy/java/io/IOException.h"
 using jace::proxy::java::io::IOException;
@@ -95,7 +94,7 @@ void setReadTimeout(HANDLE port, JLong timeout)
 	if (timeout == Long::MAX_VALUE())
 	{
 		// The Windows API does not provide a way to "wait forever" so instead we wait as long as possible
-		// and have Worker::run() repeat the operation as needed.
+		// and have onTimeout() repeat the operation as needed.
 		timeouts.ReadTotalTimeoutConstant = MAXDWORD - 1;
 	}
 	else if (timeout == static_cast<jlong>(0))
@@ -170,7 +169,7 @@ static void onTimeout(boost::shared_ptr<Task> task)
 	{
 		// Premature timeout caused by the fact that SerialPort_Channel.setReadTimeout() cannot
 		// "wait forever". Repeat the operation.
-		task->getWorkerThread().execute(task);
+		task->run();
 		return;
 	}
 	else if (task->getTimeout() > MAXDWORD)
@@ -179,12 +178,12 @@ static void onTimeout(boost::shared_ptr<Task> task)
 		// We repeat the operation as many times as necessary to statisfy the Java timeout.
 		long timeElapsed = task->getTimeElapsed();
 		task->setTimeout(task->getTimeout() - timeElapsed);
-		task->getWorkerThread().execute(task);
+		task->run();
 		return;
 	}
 	try
 	{
-		task->getListener()->onFailure(jace::java_new<InterruptedByTimeoutException>());
+		task->getHandler()->failed(jace::java_new<InterruptedByTimeoutException>(), *task->getAttachment());
 	}
 	catch (Throwable& t)
 	{
@@ -196,8 +195,8 @@ static void onTimeout(boost::shared_ptr<Task> task)
 class ReadTask: public Task
 {
 public:
-	ReadTask(SingleThreadExecutor& workerThread, HANDLE& _port, ByteBuffer _javaBuffer, JLong _timeout):
-			Task(workerThread, _port)
+	ReadTask(HANDLE& _port, ByteBuffer _javaBuffer, JLong _timeout, ::jace::proxy::java::lang::Object _attachment, ::jace::proxy::java::nio::channels::CompletionHandler _handler):
+			Task(_port, _attachment, _handler)
 	{
 		setJavaBuffer(new ByteBuffer(_javaBuffer));
 		if (javaBuffer->isDirect())
@@ -227,7 +226,7 @@ public:
 		try
 		{
 			Integer bytesTransferredAsInteger = Integer::valueOf(bytesTransfered);
-			listener->onSuccess(bytesTransferredAsInteger);
+			handler->completed(bytesTransferredAsInteger, *attachment);
 		}
 		catch (Throwable& t)
 		{
@@ -244,8 +243,8 @@ public:
 			JInt remaining = javaBuffer->remaining();
 			if (remaining <= 0)
 			{
-				listener->onFailure(AssertionError(jace::java_new<AssertionError>(L"ByteBuffer.remaining()==" +
-					toWString((jint) remaining))));
+				handler->failed(AssertionError(jace::java_new<AssertionError>(L"ByteBuffer.remaining()==" +
+					toWString((jint) remaining))), *attachment);
 				return;
 			}
 			JNIEnv* env = jace::attach(0, "ReadTask", true);
@@ -264,8 +263,9 @@ public:
 				DWORD errorCode = GetLastError();
 				if (errorCode != ERROR_IO_PENDING)
 				{
-					listener->onFailure(IOException(jace::java_new<IOException>(L"ReadFile() failed with error: " +
-						getErrorMessage(errorCode))));
+					cerr << "ReadTask.error" << endl;
+					handler->failed(IOException(jace::java_new<IOException>(L"ReadFile() failed with error: " +
+						getErrorMessage(errorCode))), *attachment);
 					return;
 				}
 			}
@@ -278,7 +278,7 @@ public:
 		{
 			try
 			{
-				listener->onFailure(t);
+				handler->failed(t, *attachment);
 			}
 			catch (Throwable& t)
 			{
@@ -291,8 +291,8 @@ public:
 class WriteTask: public Task
 {
 public:
-	WriteTask(SingleThreadExecutor& workerThread, HANDLE& _port, ByteBuffer _javaBuffer, JLong _timeout):
-			Task(workerThread, _port)
+	WriteTask(HANDLE& _port, ByteBuffer _javaBuffer, JLong _timeout, ::jace::proxy::java::lang::Object _attachment, ::jace::proxy::java::nio::channels::CompletionHandler _handler):
+			Task(_port, _attachment, _handler)
 	{
 		setJavaBuffer(new ByteBuffer(_javaBuffer));
 		if (javaBuffer->isDirect())
@@ -322,7 +322,7 @@ public:
 		try
 		{
 			Integer bytesTransferredAsInteger = Integer::valueOf(bytesTransfered);
-			listener->onSuccess(bytesTransferredAsInteger);
+			handler->completed(bytesTransferredAsInteger, *attachment);
 		}
 		catch (Throwable& t)
 		{
@@ -339,8 +339,8 @@ public:
 			JInt remaining = nativeBuffer->remaining();
 			if (remaining <= 0)
 			{
-				listener->onFailure(AssertionError(jace::java_new<AssertionError>(L"ByteBuffer.remaining()==" +
-					toWString((jint) remaining))));
+				handler->failed(AssertionError(jace::java_new<AssertionError>(L"ByteBuffer.remaining()==" +
+					toWString((jint) remaining))), *attachment);
 				return;
 			}
 			JNIEnv* env = jace::attach(0, "WriteTask", true);
@@ -358,8 +358,8 @@ public:
 				DWORD errorCode = GetLastError();
 				if (errorCode != ERROR_IO_PENDING)
 				{
-					listener->onFailure(IOException(jace::java_new<IOException>(L"WriteFile() failed with error: " +
-						getErrorMessage(errorCode))));
+					handler->failed(IOException(jace::java_new<IOException>(L"WriteFile() failed with error: " +
+						getErrorMessage(errorCode))), *attachment);
 					return;
 				}
 			}
@@ -372,7 +372,7 @@ public:
 		{
 			try
 			{
-				listener->onFailure(t);
+				handler->failed(t, *attachment);
 			}
 			catch (Throwable& t)
 			{
@@ -627,24 +627,20 @@ void SerialChannel::nativeClose()
 	delete context;
 }
 
-void SerialChannel::nativeRead(ByteBuffer target, JLong timeout, SerialChannel_NativeListener listener)
+void SerialChannel::nativeRead(ByteBuffer target, JLong timeout, Object attachment, CompletionHandler handler)
 {
 	SerialPortContext* context = getContext(getJaceProxy());
-	SingleThreadExecutor& readThread = context->getReadThread();
 
-	boost::shared_ptr<Task> task(new ReadTask(readThread, context->getPort(), target,
-		timeout));
-	task->setListener(listener);
-	readThread.execute(task);
+	boost::shared_ptr<Task> task(new ReadTask(context->getPort(), target,
+		timeout, attachment, handler));
+	task->run();
 }
 
-void SerialChannel::nativeWrite(ByteBuffer source, JLong timeout, SerialChannel_NativeListener listener)
+void SerialChannel::nativeWrite(ByteBuffer source, JLong timeout, Object attachment, CompletionHandler handler)
 {
 	SerialPortContext* context = getContext(getJaceProxy());
-	SingleThreadExecutor& writeThread = context->getWriteThread();
 
-	boost::shared_ptr<Task> task(new WriteTask(writeThread, context->getPort(), source,
-		timeout));
-	task->setListener(listener);
-	writeThread.execute(task);
+	boost::shared_ptr<Task> task(new WriteTask(context->getPort(), source,
+		timeout, attachment, handler));
+	task->run();
 }

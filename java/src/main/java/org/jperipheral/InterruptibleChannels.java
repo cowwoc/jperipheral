@@ -80,6 +80,7 @@ public class InterruptibleChannels
 		{
 			if (target.isReadOnly())
 				throw new IllegalArgumentException("target may not be read-only");
+			// TODO: interrupted should persist across read/write operations
 			final AtomicBoolean interrupted = new AtomicBoolean();
 			Future<Void> timeoutTimer;
 			if (timeout == Long.MAX_VALUE)

@@ -3,6 +3,7 @@ package org.jperipheral;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.channels.AsynchronousByteChannel;
+import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.CompletionHandler;
 import java.nio.channels.InterruptedByTimeoutException;
 import java.nio.channels.ReadPendingException;
@@ -58,7 +59,8 @@ public interface InterruptibleCharChannel
 	 * @throws  ReadPendingException
 	 *          If a read operation is already in progress on this channel
 	 * @throws  ShutdownChannelGroupException
-	 *          If the channel group is shutdown
+	 *          If the channel is associated with a {@link AsynchronousChannelGroup
+	 *          group} that has terminated
 	 * @throws  UnsupportedOperationException
 	 *          If the implementation does not support this operation
 	 */
@@ -115,8 +117,9 @@ public interface InterruptibleCharChannel
 	 * @throws  ReadPendingException
 	 *          If the channel does not allow more than one read to be outstanding
 	 *          and a previous read has not completed
-	 * @throws ShutdownChannelGroupException
-	 *         If the channel group is shutdown
+	 * @throws  ShutdownChannelGroupException
+	 *          If the channel is associated with a {@link AsynchronousChannelGroup
+	 *          group} that has terminated
 	 */
 	 <A> void readLine(long timeout, TimeUnit unit, A attachment,
 										 CompletionHandler<String, ? super A> handler)
@@ -166,7 +169,8 @@ public interface InterruptibleCharChannel
 	 *          If the channel does not allow more than one write to be outstanding
 	 *          and a previous write has not completed
 	 * @throws  ShutdownChannelGroupException
-	 *          If the channel group is shutdown
+	 *          If the channel is associated with a {@link AsynchronousChannelGroup
+	 *          group} that has terminated
 	 * @throws  UnsupportedOperationException
 	 *          If the implementation does not support this operation
 	 */

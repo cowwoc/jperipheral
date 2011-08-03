@@ -52,7 +52,7 @@
 			<plugin>
 				<groupId>com.googlecode.jace</groupId>
 				<artifactId>jace-maven-plugin</artifactId>
-				<version>1.2.2</version>
+				<version>1.2.3</version>
 				<executions>
 					<execution>
 						<id>enhance-SerialChannel</id>
@@ -64,24 +64,8 @@
 							<outputFile>${project.build.directory}/classes/org/jperipheral/SerialChannel.class</outputFile>
 							<deallocationMethod>close</deallocationMethod>
 							<libraries>
-								<library>boost_date_time-vc100-mt-gd-1_46_1</library>
-								<library>boost_thread-vc100-mt-gd-1_46_1</library>
-								<library>jace</library>
-								<library>JPeripheral</library>
-							</libraries>
-						</configuration>
-					</execution>
-					<execution>
-						<id>enhance-SerialChannel$SerialFuture</id>
-						<goals>
-							<goal>enhance-java</goal>
-						</goals>
-						<configuration>
-							<inputFile>${project.build.directory}/classes/org/jperipheral/SerialChannel$SerialFuture.class</inputFile>
-							<outputFile>${project.build.directory}/classes/org/jperipheral/SerialChannel$SerialFuture.class</outputFile>
-							<libraries>
-								<library>boost_date_time-vc100-mt-gd-1_46_1</library>
-								<library>boost_thread-vc100-mt-gd-1_46_1</library>
+								<library>boost_date_time-vc100-mt-gd-1_47</library>
+								<library>boost_thread-vc100-mt-gd-1_47</library>
 								<library>jace</library>
 								<library>JPeripheral</library>
 							</libraries>
@@ -104,11 +88,6 @@
 		</dependency>
 		<dependency>
 			<groupId>ch.qos.logback</groupId>
-			<artifactId>logback-core</artifactId>
-			<version>0.9.26</version>
-		</dependency>
-		<dependency>
-			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-classic</artifactId>
 			<version>0.9.26</version>
 		</dependency>
@@ -120,7 +99,7 @@
 		<dependency>
 			<groupId>com.googlecode.jace</groupId>
 			<artifactId>jace-runtime</artifactId>
-			<version>1.2.2</version>
+			<version>1.2.3</version>
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>
@@ -128,12 +107,12 @@
 			<artifactId>guava</artifactId>
 			<version>r09</version>
 		</dependency>
-	 <dependency>
-	  <groupId>junit</groupId>
-	  <artifactId>junit</artifactId>
-	  <version>4.8.2</version>
-	  <scope>test</scope>
-	 </dependency>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.8.2</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

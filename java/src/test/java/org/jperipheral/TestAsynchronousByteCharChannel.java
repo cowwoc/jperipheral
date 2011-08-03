@@ -6,6 +6,8 @@ import java.nio.channels.AsynchronousByteChannel;
 import java.util.Date;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.junit.Test;
@@ -13,12 +15,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * <p/>
  * @author Gili Tzabari
  */
 public class TestAsynchronousByteCharChannel
 {
 	private Logger log = LoggerFactory.getLogger(TestAsynchronousByteCharChannel.class);
+
+	/**
+	 * Creates a new channel group.
+	 * 
+	 * @return a new channel group
+	 */
+	private PeripheralChannelGroup newChannelGroup()
+	{
+		ExecutorService executor = Executors.newSingleThreadExecutor();
+		return new PeripheralChannelGroup(executor);
+	}
 
 	@Test
 	public void readCharFuture() throws InterruptedException, ExecutionException
@@ -30,7 +42,7 @@ public class TestAsynchronousByteCharChannel
 		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
 			output, Charsets.UTF_8);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		CharBuffer buffer = CharBuffer.allocate(1);
 		Integer result = charChannel.read(buffer).get();
@@ -51,7 +63,7 @@ public class TestAsynchronousByteCharChannel
 		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
 			output, Charsets.UTF_8);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		CharBuffer buffer = CharBuffer.wrap(input);
 		buffer.limit(1);
@@ -72,7 +84,7 @@ public class TestAsynchronousByteCharChannel
 		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
 			output, Charsets.UTF_8);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		CharBuffer buffer = CharBuffer.allocate(1);
 		PollableCompletionHandler<Integer> handler = new PollableCompletionHandler<>();
@@ -98,7 +110,7 @@ public class TestAsynchronousByteCharChannel
 		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
 			output, Charsets.UTF_8);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		CharBuffer buffer = CharBuffer.wrap(input);
 		buffer.limit(1);
@@ -124,7 +136,7 @@ public class TestAsynchronousByteCharChannel
 		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
 			output, Charsets.UTF_8);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		CharBuffer buffer = CharBuffer.allocate(5);
 		Integer result = charChannel.read(buffer).get();
@@ -149,7 +161,7 @@ public class TestAsynchronousByteCharChannel
 			AsynchronousByteChannelFactory.fromString(input, output, Charsets.UTF_8), readBarrier,
 			writeBarrier);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		// Succeed on the first set of characters
 		CharBuffer buffer = CharBuffer.allocate(5);
@@ -168,7 +180,7 @@ public class TestAsynchronousByteCharChannel
 		}
 		catch (TimeoutException unused)
 		{
-			System.out.println("read timeout: " + new Date().getTime());
+			log.trace("read timeout: " + new Date().getTime());
 			// pass
 		}
 		log.trace("stop");
@@ -184,7 +196,7 @@ public class TestAsynchronousByteCharChannel
 		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
 			output, Charsets.UTF_8);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		CharBuffer buffer = CharBuffer.wrap(input);
 		buffer.limit(5);
@@ -209,7 +221,7 @@ public class TestAsynchronousByteCharChannel
 			AsynchronousByteChannelFactory.fromString(input, output, Charsets.UTF_8), readBarrier,
 			writeBarrier);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		// Succeed on the first set of characters
 		CharBuffer buffer = CharBuffer.wrap(input);
@@ -228,7 +240,7 @@ public class TestAsynchronousByteCharChannel
 		}
 		catch (TimeoutException unused)
 		{
-			System.out.println("read timeout: " + new Date().getTime());
+			log.trace("read timeout: " + new Date().getTime());
 			// pass
 		}
 		log.trace("stop");
@@ -241,11 +253,10 @@ public class TestAsynchronousByteCharChannel
 		String input = "1\r2\n3\r\n4";
 		StringBuilder output = new StringBuilder();
 
-
 		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
 			output, Charsets.UTF_8);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		CharBuffer buffer = CharBuffer.allocate(5);
 		PollableCompletionHandler<Integer> handler = new PollableCompletionHandler<>();
@@ -294,7 +305,7 @@ public class TestAsynchronousByteCharChannel
 			AsynchronousByteChannelFactory.fromString(input, output, Charsets.UTF_8), readBarrier,
 			writeBarrier);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		// Succeed on the first set of characters
 		CharBuffer buffer = CharBuffer.allocate(3);
@@ -310,7 +321,7 @@ public class TestAsynchronousByteCharChannel
 		assert (buffer.toString().equals(input.substring(0, 3))): buffer.toString();
 
 		// Time out on the second set of characters
-		buffer.flip();
+		buffer.clear();
 		handler = new PollableCompletionHandler<>();
 		synchronized (handler)
 		{
@@ -332,7 +343,7 @@ public class TestAsynchronousByteCharChannel
 		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
 			output, Charsets.UTF_8);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		CharBuffer buffer = CharBuffer.wrap(input);
 		buffer.limit(5);
@@ -382,7 +393,7 @@ public class TestAsynchronousByteCharChannel
 			AsynchronousByteChannelFactory.fromString(input, output, Charsets.UTF_8), readBarrier,
 			writeBarrier);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		// Succeed on the first set of characters
 		CharBuffer buffer = CharBuffer.wrap(input);
@@ -419,7 +430,7 @@ public class TestAsynchronousByteCharChannel
 		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
 			output, Charsets.UTF_8);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		String result = charChannel.readLine().get();
 		assert (result.equals(input.substring(0, 1))): result;
@@ -436,7 +447,7 @@ public class TestAsynchronousByteCharChannel
 		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
 			output, Charsets.UTF_8);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		PollableCompletionHandler<String> handler = new PollableCompletionHandler<>();
 		synchronized (handler)
@@ -458,7 +469,7 @@ public class TestAsynchronousByteCharChannel
 		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
 			output, Charsets.UTF_8);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		String result = charChannel.readLine().get();
 		assert (result.equals("1")): result;
@@ -487,7 +498,7 @@ public class TestAsynchronousByteCharChannel
 		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
 			output, Charsets.UTF_8);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		PollableCompletionHandler<String> handler = new PollableCompletionHandler<>();
 		synchronized (handler)
@@ -546,7 +557,7 @@ public class TestAsynchronousByteCharChannel
 			AsynchronousByteChannelFactory.fromString(input, output, Charsets.UTF_8), readBarrier,
 			writeBarrier);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		CharBuffer buffer = CharBuffer.allocate(5);
 		Integer result = charChannel.read(buffer).get();
@@ -581,7 +592,7 @@ public class TestAsynchronousByteCharChannel
 			AsynchronousByteChannelFactory.fromString(input, output, Charsets.UTF_8), readBarrier,
 			writeBarrier);
 		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
-			Charsets.UTF_8);
+			Charsets.UTF_8, newChannelGroup());
 
 		CharBuffer buffer = CharBuffer.wrap(input);
 		buffer.limit(5);

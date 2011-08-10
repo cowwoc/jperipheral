@@ -15,6 +15,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.jperipheral.SerialPort.BaudRate;
 import org.jperipheral.SerialPort.DataBits;
 import org.jperipheral.SerialPort.FlowControl;
 import org.jperipheral.SerialPort.Parity;
@@ -59,7 +60,7 @@ public class SerialChannel implements AsynchronousByteChannel
 	})
 	private final long nativeObject;
 	private final SerialPort port;
-	private int baudRate;
+	private BaudRate baudRate;
 	private DataBits dataBits;
 	private StopBits stopBits;
 	private Parity parity;
@@ -95,7 +96,7 @@ public class SerialChannel implements AsynchronousByteChannel
 	 *
 	 * @return the baud rate being used
 	 */
-	public int getBaudRate()
+	public BaudRate getBaudRate()
 	{
 		return baudRate;
 	}
@@ -172,7 +173,7 @@ public class SerialChannel implements AsynchronousByteChannel
 					operationDone.completed(0, attachment);
 					return;
 				}
-				CompletionHandlerExecutor<Integer, ? super A> nativeThreadToExecutor = 
+				CompletionHandlerExecutor<Integer, ? super A> nativeThreadToExecutor =
 					new CompletionHandlerExecutor(operationDone, group.executor());
 				try
 				{
@@ -266,7 +267,7 @@ public class SerialChannel implements AsynchronousByteChannel
 					operationDone.completed(0, attachment);
 					return;
 				}
-				CompletionHandlerExecutor<Integer, ? super A> nativeThreadToExecutor = 
+				CompletionHandlerExecutor<Integer, ? super A> nativeThreadToExecutor =
 					new CompletionHandlerExecutor(operationDone, group.executor());
 				try
 				{
@@ -337,7 +338,7 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * @param flowControl the flow control to use
 	 * @throws IOException if an I/O error occurs while configuring the channel
 	 */
-	public void configure(final int baudRate, final DataBits dataBits, final Parity parity,
+	public void configure(final BaudRate baudRate, final DataBits dataBits, final Parity parity,
 		final StopBits stopBits, final FlowControl flowControl)
 		throws IOException
 	{
@@ -400,7 +401,7 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * @param flowControl the flow control to use
 	 * @throws IOException if an I/O error occurs while configuring the channel
 	 */
-	private native void nativeConfigure(int baudRate, DataBits dataBits, Parity parity,
+	private native void nativeConfigure(BaudRate baudRate, DataBits dataBits, Parity parity,
 		StopBits stopBits, FlowControl flowControl) throws IOException;
 
 	/**

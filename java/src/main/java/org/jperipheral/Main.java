@@ -9,6 +9,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.jperipheral.SerialPort.BaudRate;
+import org.jperipheral.SerialPort.DataBits;
+import org.jperipheral.SerialPort.FlowControl;
+import org.jperipheral.SerialPort.Parity;
+import org.jperipheral.SerialPort.StopBits;
 
 /**
  * @author Gili Tzabari
@@ -20,7 +25,7 @@ public class Main
 		Executors.newFixedThreadPool(2, new ThreadFactoryBuilder().setDaemon(true).
 		setNameFormat(Main.class.getSimpleName() + "-%d").build());
 	private final PeripheralChannelGroup channelGroup = new PeripheralChannelGroup(executor);
-	private final String portName = "\\\\.\\COM1";
+	private final String portName = "COM1";
 
 	public Main()
 	{
@@ -39,9 +44,9 @@ public class Main
 		for (int i = 0; i < 1000; ++i)
 		{
 			send(i + ": 0123456789");
-			System.out.println("got: " + receive())	;
+			System.out.println("got: " + receive());
 		}
-		
+
 		System.out.println("Time Elapsed: " + ((System.currentTimeMillis() - first) / 10000 - 0.83));
 //		flush();
 //		send("version");
@@ -74,8 +79,8 @@ public class Main
 		SerialChannel byteChannel = port.newAsynchronousChannel(channelGroup);
 		try
 		{
-			byteChannel.configure(115200, SerialPort.DataBits.EIGHT, SerialPort.Parity.NONE,
-				SerialPort.StopBits.ONE, SerialPort.FlowControl.NONE);
+			byteChannel.configure(BaudRate._115200, DataBits.EIGHT, Parity.NONE, StopBits.ONE,
+				FlowControl.NONE);
 			channel = AsynchronousByteCharChannel.open(byteChannel, Charset.forName("UTF-8"),
 				channelGroup);
 			System.out.println("Flushing...");
@@ -98,8 +103,8 @@ public class Main
 		SerialChannel byteChannel = port.newAsynchronousChannel(channelGroup);
 		try
 		{
-			byteChannel.configure(115200, SerialPort.DataBits.EIGHT, SerialPort.Parity.NONE,
-				SerialPort.StopBits.ONE, SerialPort.FlowControl.NONE);
+			byteChannel.configure(BaudRate._115200, DataBits.EIGHT, Parity.NONE,
+				StopBits.ONE, FlowControl.NONE);
 			channel = AsynchronousByteCharChannel.open(byteChannel, Charset.forName("UTF-8"),
 				channelGroup);
 			for (String line: lines)
@@ -114,15 +119,15 @@ public class Main
 			byteChannel.close();
 		}
 	}
-	
+
 	private String receive() throws Exception
 	{
 		SerialPort port = new SerialPort(portName);
 		SerialChannel byteChannel = port.newAsynchronousChannel(channelGroup);
 		try
 		{
-			byteChannel.configure(115200, SerialPort.DataBits.EIGHT, SerialPort.Parity.NONE,
-				SerialPort.StopBits.ONE, SerialPort.FlowControl.NONE);
+			byteChannel.configure(BaudRate._115200, DataBits.EIGHT, Parity.NONE,
+				StopBits.ONE, FlowControl.NONE);
 			channel = AsynchronousByteCharChannel.open(byteChannel, Charset.forName("UTF-8"),
 				channelGroup);
 //				System.out.println("sending: " + line);

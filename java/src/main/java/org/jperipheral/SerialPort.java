@@ -4,12 +4,44 @@ import com.google.common.base.Preconditions;
 
 /**
  * A serial port.
- * <p/>
+ * 
  * @author Gili Tzabari
  * @see http://www.lammertbies.nl/comm/info/RS-232_specs.html
  */
 public final class SerialPort implements Peripheral
 {
+	/**
+	 * @author Gili Tzabari
+	 * @see http://en.wikipedia.org/wiki/baud
+	 */
+	public enum BaudRate
+	{
+		_110, _300, _600, _1200, _2400, _4800, _9600, _14400, _19200, _28800, _38400, _56000, _57600,
+		_115200;
+
+		/**
+		 * Constructs a BaudRate from an int.
+		 * 
+		 * @param value the int
+		 * @return the BaudRate
+		 * @throws IllegalArgumentException if the specified value does not match any BaudRate
+		 */
+		public static BaudRate valueOf(int value)
+		{
+			return BaudRate.valueOf("_" + value);
+		}
+
+		/**
+		 * Returns the int representation of the baud rate.
+		 * 
+		 * @return the int representation of the baud rate
+		 */
+		public int toInt()
+		{
+			return Integer.parseInt(name().substring(1));
+		}
+	}
+
 	/**
 	 * The number of data bits in a word.
 	 */
@@ -21,9 +53,9 @@ public final class SerialPort implements Peripheral
 		FIVE
 		{
 			@Override
-			public String toString()
+			public int toInt()
 			{
-				return "5";
+				return 5;
 			}
 		},
 		/**
@@ -32,9 +64,9 @@ public final class SerialPort implements Peripheral
 		SIX
 		{
 			@Override
-			public String toString()
+			public int toInt()
 			{
-				return "6";
+				return 6;
 			}
 		},
 		/**
@@ -43,9 +75,9 @@ public final class SerialPort implements Peripheral
 		SEVEN
 		{
 			@Override
-			public String toString()
+			public int toInt()
 			{
-				return "7";
+				return 7;
 			}
 		},
 		/**
@@ -54,10 +86,24 @@ public final class SerialPort implements Peripheral
 		EIGHT
 		{
 			@Override
-			public String toString()
+			public int toInt()
 			{
-				return "8";
+				return 8;
 			}
+		};
+		static int test = 5;
+
+		/**
+		 * Returns the int representation of the data bits.
+		 * 
+		 * @return the int representation of the data bits
+		 */
+		public abstract int toInt();
+
+		@Override
+		public String toString()
+		{
+			return String.valueOf(toInt());
 		}
 	}
 
@@ -67,7 +113,7 @@ public final class SerialPort implements Peripheral
 	public enum FlowControl
 	{
 		/**
-		 * Hardware flow control.
+		 * Hardware flow control. Request to Send / Clear to Send.
 		 */
 		RTS_CTS
 		{

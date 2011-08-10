@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
 		"aopalliance.jar;"
 		"guice-3.0.jar;"
 		"javax.inject-1.jar;"
-		"jace-runtime-1.2.3.jar;"
+		"jace-runtime-1.2.4.jar;"
 		"logback-classic-0.9.26.jar;"
 		"logback-core-0.9.26.jar;"
 		));

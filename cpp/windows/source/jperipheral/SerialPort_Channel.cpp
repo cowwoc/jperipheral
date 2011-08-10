@@ -7,14 +7,17 @@ using jace::proxy::types::JLong;
 using jace::proxy::types::JInt;
 using jace::proxy::types::JByte;
 
+#include "jace/proxy/org/jperipheral/SerialPort_BaudRate.h"
+using jace::proxy::org::jperipheral::SerialPort_BaudRate;
+
+#include "jace/proxy/org/jperipheral/SerialPort_DataBits.h"
+using jace::proxy::org::jperipheral::SerialPort_DataBits;
+
 #include "jace/proxy/org/jperipheral/SerialPort_StopBits.h"
 using jace::proxy::org::jperipheral::SerialPort_StopBits;
 
 #include "jace/proxy/org/jperipheral/SerialPort_Parity.h"
 using jace::proxy::org::jperipheral::SerialPort_Parity;
-
-#include "jace/proxy/org/jperipheral/SerialPort_DataBits.h"
-using jace::proxy::org::jperipheral::SerialPort_DataBits;
 
 #include "jace/proxy/org/jperipheral/SerialPort_FlowControl.h"
 using jace::proxy::org::jperipheral::SerialPort_FlowControl;
@@ -401,6 +404,7 @@ JLong SerialChannel::nativeOpen(String name)
 			case ERROR_FILE_NOT_FOUND:
 				throw PeripheralNotFoundException(jace::java_new<PeripheralNotFoundException>(name, Throwable()));
 			case ERROR_ACCESS_DENIED:
+			case ERROR_SHARING_VIOLATION:
 				throw PeripheralInUseException(jace::java_new<PeripheralInUseException>(name, Throwable()));
 			default:
 			{
@@ -423,7 +427,7 @@ JLong SerialChannel::nativeOpen(String name)
 	return reinterpret_cast<intptr_t>(result);
 }
 
-void SerialChannel::nativeConfigure(JInt baudRate,
+void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 																		SerialPort_DataBits dataBits,
 																		SerialPort_Parity parity,
 																		SerialPort_StopBits stopBits,
@@ -437,33 +441,8 @@ void SerialChannel::nativeConfigure(JInt baudRate,
 		throw IOException(jace::java_new<IOException>(L"GetCommState() failed with error: " +
 			getErrorMessage(GetLastError())));
 	}
-	dcb.BaudRate = baudRate;
-
-	switch (dataBits.ordinal())
-	{
-		case SerialPort_DataBits::Ordinals::FIVE:
-		{
-			dcb.ByteSize = 5;
-			break;
-		}
-		case SerialPort_DataBits::Ordinals::SIX:
-		{
-		  dcb.ByteSize = 6;
-			break;
-		}
-		case SerialPort_DataBits::Ordinals::SEVEN:
-		{
-			dcb.ByteSize = 7;
-			break;
-		}
-		case SerialPort_DataBits::Ordinals::EIGHT:
-		{
-			dcb.ByteSize = 8;
-			break;
-		}
-		default:
-			throw AssertionError(jace::java_new<AssertionError>(dataBits));
-	}
+	dcb.BaudRate = baudRate.toInt();
+	dcb.ByteSize = (BYTE) dataBits.toInt();
 
 	switch (parity.ordinal())
 	{

@@ -1,8 +1,8 @@
 package org.jperipheral;
 
 import com.google.inject.Singleton;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,13 +17,13 @@ public final class Peripherals
 	private final Logger log = LoggerFactory.getLogger(Peripherals.class);
 
 	/**
-	 * Returns all available peripherals.
+	 * Returns a list of all peripherals.
 	 * 
-	 * @return a set of opened peripherals
+	 * @return a list of all peripherals
 	 */
-	public Set<Peripheral> all()
+	public List<Peripheral> all()
 	{
-		Set<Peripheral> result = new HashSet<Peripheral>();
+		List<Peripheral> result = new ArrayList<>();
 		for (int i = 1; i <= 256; i++)
 		{
 			try

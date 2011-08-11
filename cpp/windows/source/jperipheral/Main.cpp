@@ -40,7 +40,6 @@ int main(int argc, char* argv[])
 	OptionList options;
 
 	options.push_back(ClassPath("jperipheral-java-1.0-SNAPSHOT.jar;"
-		"joda-time-1.6.jar;"
 		"slf4j-api-1.6.1.jar;"
 		"guava-r09.jar;"
 		"aopalliance.jar;"

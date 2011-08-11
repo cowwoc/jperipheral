@@ -103,11 +103,6 @@
 			<version>0.9.26</version>
 		</dependency>
 		<dependency>
-			<groupId>joda-time</groupId>
-			<artifactId>joda-time</artifactId>
-			<version>1.6.2</version>
-		</dependency>
-		<dependency>
 			<groupId>com.googlecode.jace</groupId>
 			<artifactId>jace-runtime</artifactId>
 			<version>1.2.4</version>

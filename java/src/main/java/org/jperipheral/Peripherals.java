@@ -3,8 +3,6 @@ package org.jperipheral;
 import com.google.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Returns peripherals.
@@ -14,8 +12,6 @@ import org.slf4j.LoggerFactory;
 @Singleton
 public final class Peripherals
 {
-	private final Logger log = LoggerFactory.getLogger(Peripherals.class);
-
 	/**
 	 * Returns a list of all peripherals.
 	 * 
@@ -25,16 +21,7 @@ public final class Peripherals
 	{
 		List<Peripheral> result = new ArrayList<>();
 		for (int i = 1; i <= 256; i++)
-		{
-			try
-			{
-				result.add(new SerialPort("COM" + i));
-			}
-			catch (PeripheralNotFoundException e)
-			{
-				// skip
-			}
-		}
+			result.add(new SerialPort("COM" + i));
 		return result;
 	}
 }

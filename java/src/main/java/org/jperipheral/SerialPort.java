@@ -258,7 +258,6 @@ public final class SerialPort implements Peripheral
 	 * @throws IllegalStateException if name.trim().isEmpty()
 	 */
 	public SerialPort(String name)
-		throws PeripheralNotFoundException
 	{
 		Preconditions.checkNotNull(name, "name may not be null");
 		Preconditions.checkArgument(!name.trim().isEmpty(), "name may not be an empty string");

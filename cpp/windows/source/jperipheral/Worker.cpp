@@ -72,6 +72,14 @@ void Worker::run()
 			{
 				case ERROR_HANDLE_EOF:
 					break;
+				case ERROR_OPERATION_ABORTED:
+				{
+					// The port was closed
+					task->getHandler()->failed(AsynchronousCloseException(
+						jace::java_new<AsynchronousCloseException>("Port closed")), *task->getAttachment());
+					delete overlappedContainer;
+					break;
+				}
 				default:
 				{
 					task->getHandler()->failed(IOException(jace::java_new<IOException>(

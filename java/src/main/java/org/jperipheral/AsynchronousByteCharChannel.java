@@ -11,7 +11,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.channels.AsynchronousByteChannel;
-import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.CompletionHandler;
 import java.nio.channels.ReadPendingException;
 import java.nio.channels.ShutdownChannelGroupException;
@@ -137,7 +137,7 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 				{
 					if (closed.get())
 					{
-						handler.failed(new AsynchronousCloseException(), attachment);
+						handler.failed(new ClosedChannelException(), attachment);
 						return;
 					}
 					if (!reading.compareAndSet(false, true))
@@ -175,7 +175,7 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 			public Integer call() throws Exception
 			{
 				if (closed.get())
-					throw new AsynchronousCloseException();
+					throw new ClosedChannelException();
 				if (!reading.compareAndSet(false, true))
 					throw new ReadPendingException();
 				try
@@ -221,7 +221,7 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 				{
 					if (closed.get())
 					{
-						handler.failed(new AsynchronousCloseException(), attachment);
+						handler.failed(new ClosedChannelException(), attachment);
 						return;
 					}
 					if (!reading.compareAndSet(false, true))
@@ -251,7 +251,7 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 			public String call() throws Exception
 			{
 				if (closed.get())
-					throw new AsynchronousCloseException();
+					throw new ClosedChannelException();
 				if (!reading.compareAndSet(false, true))
 					throw new ReadPendingException();
 				try
@@ -295,7 +295,7 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 				{
 					if (closed.get())
 					{
-						handler.failed(new AsynchronousCloseException(), attachment);
+						handler.failed(new ClosedChannelException(), attachment);
 						return;
 					}
 					if (!writing.compareAndSet(false, true))
@@ -343,7 +343,7 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 			public Integer call() throws Exception
 			{
 				if (closed.get())
-					throw new AsynchronousCloseException();
+					throw new ClosedChannelException();
 				if (!writing.compareAndSet(false, true))
 					throw new WritePendingException();
 				try

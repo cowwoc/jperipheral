@@ -34,6 +34,9 @@ using jace::proxy::java::lang::Throwable;
 #include "jace/proxy/java/nio/ByteBuffer.h"
 using jace::proxy::java::nio::ByteBuffer;
 
+#include "jace/proxy/java/nio/channels/AsynchronousCloseException.h"
+using jace::proxy::java::nio::channels::AsynchronousCloseException;
+
 #include <iostream>
 using std::cerr;
 using std::endl;
@@ -76,7 +79,7 @@ void Worker::run()
 				{
 					// The port was closed
 					task->getHandler()->failed(AsynchronousCloseException(
-						jace::java_new<AsynchronousCloseException>("Port closed")), *task->getAttachment());
+						jace::java_new<AsynchronousCloseException>()), *task->getAttachment());
 					delete overlappedContainer;
 					break;
 				}

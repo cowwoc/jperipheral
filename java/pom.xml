@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>com.googlecode.jperipheral</groupId>
 		<artifactId>jperipheral</artifactId>
-		<version>1.0.0</version>
+		<version>1.0.1-SNAPSHOT</version>
 	</parent>
 	<artifactId>jperipheral-java</artifactId>
 	<name>JPeripheral Java</name>

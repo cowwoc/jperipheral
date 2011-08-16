@@ -92,7 +92,6 @@ public final class SerialPort implements Peripheral
 				return 8;
 			}
 		};
-		static int test = 5;
 
 		/**
 		 * Returns the int representation of the data bits.

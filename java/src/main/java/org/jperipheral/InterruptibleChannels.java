@@ -30,7 +30,7 @@ public class InterruptibleChannels
 	 */
 	private static final ScheduledExecutorService timer = Executors.newScheduledThreadPool(0,
 		new ThreadFactoryBuilder().setDaemon(false).setNameFormat(InterruptibleChannels.class.getName()
-																															+ "-%d").build());
+		+ "-%d").build());
 
 	/**
 	 * Opens a new InterruptibleByteChannel.
@@ -75,7 +75,7 @@ public class InterruptibleChannels
 
 		@Override
 		public <A> void read(ByteBuffer target, long timeout, TimeUnit unit, A attachment,
-												 CompletionHandler<Integer, ? super A> handler)
+			CompletionHandler<Integer, ? super A> handler)
 			throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 		{
 			if (target.isReadOnly())
@@ -87,15 +87,16 @@ public class InterruptibleChannels
 				timeoutTimer = Futures.immediateFuture(null);
 			else
 				timeoutTimer = timer.schedule(new CloseChannel(delegate, interrupted), timeout, unit);
-			DoneReading<Integer, Void> doneReading = new DoneReading(attachment, handler, timeoutTimer);
+			DoneReading<Integer, ? super A> doneReading = new DoneReading<>(attachment, handler,
+				timeoutTimer);
 			delegate.read(target, interrupted, doneReading);
 		}
 
 		@Override
 		public <A> void write(ByteBuffer source, long timeout, TimeUnit unit, A attachment,
-													CompletionHandler<Integer, ? super A> handler)
+			CompletionHandler<Integer, ? super A> handler)
 			throws IllegalArgumentException, WritePendingException, ShutdownChannelGroupException,
-						 UnsupportedOperationException
+			UnsupportedOperationException
 		{
 			final AtomicBoolean interrupted = new AtomicBoolean();
 			Future<Void> timeoutTimer;
@@ -103,13 +104,14 @@ public class InterruptibleChannels
 				timeoutTimer = Futures.immediateFuture(null);
 			else
 				timeoutTimer = timer.schedule(new CloseChannel(delegate, interrupted), timeout, unit);
-			DoneWriting<Integer, Void> doneWriting = new DoneWriting(attachment, handler, timeoutTimer);
+			DoneWriting<Integer, ? super A> doneWriting = new DoneWriting<>(attachment, handler,
+				timeoutTimer);
 			delegate.write(source, interrupted, doneWriting);
 		}
 
 		@Override
 		public <A> void close(final A attachment,
-													final CompletionHandler<Void, ? super A> handler)
+			final CompletionHandler<Void, ? super A> handler)
 		{
 			timer.execute(new Runnable()
 			{
@@ -151,7 +153,7 @@ public class InterruptibleChannels
 
 		@Override
 		public <A> void read(CharBuffer target, long timeout, TimeUnit unit, A attachment,
-												 CompletionHandler<Integer, ? super A> handler)
+			CompletionHandler<Integer, ? super A> handler)
 			throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 		{
 			if (target.isReadOnly())
@@ -162,13 +164,14 @@ public class InterruptibleChannels
 				timeoutTimer = Futures.immediateFuture(null);
 			else
 				timeoutTimer = timer.schedule(new CloseChannel(delegate, interrupted), timeout, unit);
-			DoneReading<Integer, Void> doneReading = new DoneReading(attachment, handler, timeoutTimer);
+			DoneReading<Integer, ? super A> doneReading = new DoneReading<>(attachment, handler,
+				timeoutTimer);
 			delegate.read(target, interrupted, doneReading);
 		}
 
 		@Override
 		public <A> void readLine(long timeout, TimeUnit unit, A attachment,
-														 CompletionHandler<String, ? super A> handler)
+			CompletionHandler<String, ? super A> handler)
 			throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException
 		{
 			final AtomicBoolean interrupted = new AtomicBoolean();
@@ -177,15 +180,16 @@ public class InterruptibleChannels
 				timeoutTimer = Futures.immediateFuture(null);
 			else
 				timeoutTimer = timer.schedule(new CloseChannel(delegate, interrupted), timeout, unit);
-			DoneReading<String, Void> doneReading = new DoneReading(attachment, handler, timeoutTimer);
+			DoneReading<String, ? super A> doneReading = new DoneReading<>(attachment, handler,
+				timeoutTimer);
 			delegate.readLine(interrupted, doneReading);
 		}
 
 		@Override
 		public <A> void write(CharBuffer source, long timeout, TimeUnit unit, A attachment,
-													CompletionHandler<Integer, ? super A> handler)
+			CompletionHandler<Integer, ? super A> handler)
 			throws IllegalArgumentException, WritePendingException, ShutdownChannelGroupException,
-						 UnsupportedOperationException
+			UnsupportedOperationException
 		{
 			final AtomicBoolean interrupted = new AtomicBoolean();
 			Future<Void> timeoutTimer;
@@ -193,13 +197,14 @@ public class InterruptibleChannels
 				timeoutTimer = Futures.immediateFuture(null);
 			else
 				timeoutTimer = timer.schedule(new CloseChannel(delegate, interrupted), timeout, unit);
-			DoneWriting<Integer, Void> doneWriting = new DoneWriting(attachment, handler, timeoutTimer);
+			DoneWriting<Integer, ? super A> doneWriting = new DoneWriting<>(attachment, handler,
+				timeoutTimer);
 			delegate.write(source, interrupted, doneWriting);
 		}
 
 		@Override
 		public <A> void close(final A attachment,
-													final CompletionHandler<Void, ? super A> handler)
+			final CompletionHandler<Void, ? super A> handler)
 		{
 			timer.execute(new Runnable()
 			{

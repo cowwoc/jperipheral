@@ -174,7 +174,7 @@ public class SerialChannel implements AsynchronousByteChannel
 					return;
 				}
 				CompletionHandlerExecutor<Integer, ? super A> nativeThreadToExecutor =
-					new CompletionHandlerExecutor(operationDone, group.executor());
+					new CompletionHandlerExecutor<>(operationDone, group.executor());
 				try
 				{
 					nativeRead(target, Long.MAX_VALUE, attachment, nativeThreadToExecutor);
@@ -268,7 +268,7 @@ public class SerialChannel implements AsynchronousByteChannel
 					return;
 				}
 				CompletionHandlerExecutor<Integer, ? super A> nativeThreadToExecutor =
-					new CompletionHandlerExecutor(operationDone, group.executor());
+					new CompletionHandlerExecutor<>(operationDone, group.executor());
 				try
 				{
 					nativeWrite(source, Long.MAX_VALUE, attachment, nativeThreadToExecutor);

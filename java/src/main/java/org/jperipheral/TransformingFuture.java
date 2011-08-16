@@ -18,6 +18,7 @@ import java.util.concurrent.TimeoutException;
  */
 public abstract class TransformingFuture<I, O> implements Future<O>
 {
+	@SuppressWarnings("ProtectedField")
 	protected Future<I> delegate;
 
 	/**

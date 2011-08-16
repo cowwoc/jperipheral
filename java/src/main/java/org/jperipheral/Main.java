@@ -76,8 +76,7 @@ public class Main
 	private void flush() throws Exception
 	{
 		SerialPort port = new SerialPort(portName);
-		SerialChannel byteChannel = port.newAsynchronousChannel(channelGroup);
-		try
+		try (SerialChannel byteChannel = port.newAsynchronousChannel(channelGroup))
 		{
 			byteChannel.configure(BaudRate._115200, DataBits.EIGHT, Parity.NONE, StopBits.ONE,
 				FlowControl.NONE);
@@ -91,17 +90,12 @@ public class Main
 		{
 			// eventually there is no more data to read...
 		}
-		finally
-		{
-			byteChannel.close();
-		}
 	}
 
 	private void send(String... lines) throws Exception
 	{
 		SerialPort port = new SerialPort(portName);
-		SerialChannel byteChannel = port.newAsynchronousChannel(channelGroup);
-		try
+		try (SerialChannel byteChannel = port.newAsynchronousChannel(channelGroup))
 		{
 			byteChannel.configure(BaudRate._115200, DataBits.EIGHT, Parity.NONE,
 				StopBits.ONE, FlowControl.NONE);
@@ -114,17 +108,13 @@ public class Main
 //				System.out.println("got : " + channel.readLine().get(30, TimeUnit.SECONDS));
 			}
 		}
-		finally
-		{
-			byteChannel.close();
-		}
 	}
 
 	private String receive() throws Exception
 	{
 		SerialPort port = new SerialPort(portName);
-		SerialChannel byteChannel = port.newAsynchronousChannel(channelGroup);
-		try
+
+		try (SerialChannel byteChannel = port.newAsynchronousChannel(channelGroup))
 		{
 			byteChannel.configure(BaudRate._115200, DataBits.EIGHT, Parity.NONE,
 				StopBits.ONE, FlowControl.NONE);
@@ -133,10 +123,6 @@ public class Main
 //				System.out.println("sending: " + line);
 			return channel.readLine().get(30, TimeUnit.SECONDS);
 //				System.out.println("got : " + channel.readLine().get(30, TimeUnit.SECONDS));
-		}
-		finally
-		{
-			byteChannel.close();
 		}
 	}
 }

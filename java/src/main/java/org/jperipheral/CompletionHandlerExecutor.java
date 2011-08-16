@@ -7,6 +7,8 @@ import java.util.concurrent.Executor;
 /**
  * Invokes a delegate CompletionHandler using a specific Executor.
  * 
+ * @param <V> the result type of the I/O operation
+ * @param <A> the type of the object attached to the I/O operation
  * @author Gili Tzabari
  */
 public class CompletionHandlerExecutor<V, A> implements CompletionHandler<V, A>

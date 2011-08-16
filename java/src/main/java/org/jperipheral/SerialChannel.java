@@ -336,11 +336,11 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * @param parity the parity mechanism to use
 	 * @param stopBits the number of stop bits to use
 	 * @param flowControl the flow control to use
-	 * @throws IOException if an I/O error occurs while configuring the channel
+	 * @throws PeripheralConfigurationException if an I/O error occurs while configuring the channel
 	 */
 	public void configure(final BaudRate baudRate, final DataBits dataBits, final Parity parity,
 		final StopBits stopBits, final FlowControl flowControl)
-		throws IOException
+		throws PeripheralConfigurationException
 	{
 		nativeConfigure(baudRate, dataBits, parity, stopBits, flowControl);
 		this.baudRate = baudRate;
@@ -399,10 +399,10 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * @param parity the parity mechanism to use
 	 * @param stopBits the number of stop bits to use
 	 * @param flowControl the flow control to use
-	 * @throws IOException if an I/O error occurs while configuring the channel
+	 * @throws PeripheralConfigurationException if an I/O error occurs while configuring the channel
 	 */
 	private native void nativeConfigure(BaudRate baudRate, DataBits dataBits, Parity parity,
-		StopBits stopBits, FlowControl flowControl) throws IOException;
+		StopBits stopBits, FlowControl flowControl) throws PeripheralConfigurationException;
 
 	/**
 	 * Closes the port.

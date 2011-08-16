@@ -41,6 +41,9 @@ using jace::proxy::org::jperipheral::PeripheralNotFoundException;
 #include "jace/proxy/org/jperipheral/PeripheralInUseException.h"
 using jace::proxy::org::jperipheral::PeripheralInUseException;
 
+#include "jace/proxy/org/jperipheral/PeripheralConfigurationException.h"
+using jace::proxy::org::jperipheral::PeripheralConfigurationException;
+
 #include "jace/proxy/java/nio/channels/CompletionHandler.h"
 using jace::proxy::java::nio::channels::CompletionHandler;
 
@@ -438,8 +441,8 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 
 	if (!GetCommState(context->getPort(), &dcb))
 	{
-		throw IOException(jace::java_new<IOException>(L"GetCommState() failed with error: " +
-			getErrorMessage(GetLastError())));
+		throw PeripheralConfigurationException(jace::java_new<PeripheralConfigurationException>(
+			L"GetCommState() failed with error: " + getErrorMessage(GetLastError()), Throwable()));
 	}
 	dcb.BaudRate = baudRate.toInt();
 	dcb.ByteSize = (BYTE) dataBits.toInt();
@@ -538,8 +541,8 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 
 	if (!SetCommState(context->getPort(), &dcb))
 	{
-		throw IOException(jace::java_new<IOException>(L"SetCommState() failed with error: " +
-			getErrorMessage(GetLastError())));
+		throw PeripheralConfigurationException(jace::java_new<PeripheralConfigurationException>(
+			L"SetCommState() failed with error: " + getErrorMessage(GetLastError()), Throwable()));
 	}
 }
 

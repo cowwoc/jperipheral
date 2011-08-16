@@ -1,6 +1,7 @@
 package org.jperipheral;
 
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 
 /**
  * A serial port.
@@ -278,6 +279,21 @@ public final class SerialPort implements Peripheral
 	public String getName()
 	{
 		return name;
+	}
+
+	@Override
+	public boolean equals(Object o)
+	{
+		if (!(o instanceof SerialPort))
+			return false;
+		final SerialPort other = (SerialPort) o;
+		return name.equals(other.getName());
+	}
+
+	@Override
+	public int hashCode()
+	{
+		return Objects.hash(this.name);
 	}
 
 	@Override

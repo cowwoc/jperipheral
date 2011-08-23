@@ -684,11 +684,8 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 				break;
 			}
 			String result = target.toString();
-			if (result.isEmpty())
-			{
-				assert (endOfStream): endOfStream;
+			if (endOfStream && result.isEmpty())
 				result = null;
-			}
 			handler.completed(result, attachment);
 		}
 
@@ -755,11 +752,8 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 				break;
 			}
 			String result = target.toString();
-			if (result.isEmpty())
-			{
-				assert (endOfStream): endOfStream;
+			if (endOfStream && result.isEmpty())
 				result = null;
-			}
 			return result;
 		}
 	}

@@ -543,6 +543,26 @@ public class TestAsynchronousByteCharChannel
 	}
 
 	@Test
+	public void readEmptyLineFuture() throws InterruptedException, ExecutionException
+	{
+		log.trace("start");
+		String input = "\r";
+		StringBuilder output = new StringBuilder();
+
+		AsynchronousByteChannel byteChannel = AsynchronousByteChannelFactory.fromString(input,
+			output, Charsets.UTF_8);
+		AsynchronousCharChannel charChannel = AsynchronousByteCharChannel.open(byteChannel,
+			Charsets.UTF_8, newChannelGroup());
+
+		String result = charChannel.readLine().get();
+		
+		// Empty lines used to be misinterpreted as end-of-stream.
+		assert (result != null): result;
+		assert (result.isEmpty()): result;
+		log.trace("stop");
+	}
+
+	@Test
 	public void readCharactersInterruptMidCharacter() throws InterruptedException, ExecutionException
 	{
 		// Interrupts the read operation in the middle of a character.

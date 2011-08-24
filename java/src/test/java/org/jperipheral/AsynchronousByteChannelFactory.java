@@ -64,6 +64,11 @@ public class AsynchronousByteChannelFactory
 						{
 							handler.failed(e, attachment);
 						}
+						catch (Error e)
+						{
+							handler.failed(e, attachment);
+							throw e;
+						}
 					}
 				});
 			}
@@ -100,6 +105,11 @@ public class AsynchronousByteChannelFactory
 						catch (IOException e)
 						{
 							handler.failed(e, attachment);
+						}
+						catch (Error e)
+						{
+							handler.failed(e, attachment);
+							throw e;
 						}
 					}
 				});

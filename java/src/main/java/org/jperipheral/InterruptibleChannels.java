@@ -123,9 +123,14 @@ public class InterruptibleChannels
 						delegate.close();
 						handler.completed(null, attachment);
 					}
-					catch (Throwable t)
+					catch (Exception e)
 					{
-						handler.failed(t, attachment);
+						handler.failed(e, attachment);
+					}
+					catch (Error e)
+					{
+						handler.failed(e, attachment);
+						throw e;
 					}
 				}
 			});
@@ -216,9 +221,14 @@ public class InterruptibleChannels
 						delegate.close();
 						handler.completed(null, attachment);
 					}
-					catch (Throwable t)
+					catch (Exception e)
 					{
-						handler.failed(t, attachment);
+						handler.failed(e, attachment);
+					}
+					catch (Error e)
+					{
+						handler.failed(e, attachment);
+						throw e;
 					}
 				}
 			});

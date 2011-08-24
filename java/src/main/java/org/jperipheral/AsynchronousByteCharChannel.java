@@ -135,23 +135,31 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 				@Override
 				public void run()
 				{
-					if (closed.get())
+					try
 					{
-						handler.failed(new ClosedChannelException(), attachment);
-						return;
+						if (closed.get())
+						{
+							handler.failed(new ClosedChannelException(), attachment);
+							return;
+						}
+						if (!reading.compareAndSet(false, true))
+							throw new ReadPendingException();
+						OperationDone<Integer, ? super A> operationDone = new OperationDone<>(handler, reading);
+						if (target.remaining() <= 0)
+						{
+							operationDone.completed(0, attachment);
+							return;
+						}
+						skipNextNewline = false;
+						// Read zero bytes to indicate that the read buffer should be checked before reading from
+						// the underlying channel.
+						new ReadCharacters<>(null, target, operationDone).completed(false, attachment);
 					}
-					if (!reading.compareAndSet(false, true))
-						throw new ReadPendingException();
-					OperationDone<Integer, ? super A> operationDone = new OperationDone<>(handler, reading);
-					if (target.remaining() <= 0)
+					catch (Error e)
 					{
-						operationDone.completed(0, attachment);
-						return;
+						handler.failed(e, attachment);
+						throw e;
 					}
-					skipNextNewline = false;
-					// Read zero bytes to indicate that the read buffer should be checked before reading from
-					// the underlying channel.
-					new ReadCharacters<>(null, target, operationDone).completed(false, attachment);
 				}
 			});
 		}
@@ -219,17 +227,25 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 				@Override
 				public void run()
 				{
-					if (closed.get())
+					try
 					{
-						handler.failed(new ClosedChannelException(), attachment);
-						return;
+						if (closed.get())
+						{
+							handler.failed(new ClosedChannelException(), attachment);
+							return;
+						}
+						if (!reading.compareAndSet(false, true))
+							throw new ReadPendingException();
+						OperationDone<String, ? super A> doneReading = new OperationDone<>(handler, reading);
+						// Read zero bytes to indicate that the read buffer should be checked before reading from
+						// the underlying channel.
+						new ReadLine<>(null, doneReading).completed(false, attachment);
 					}
-					if (!reading.compareAndSet(false, true))
-						throw new ReadPendingException();
-					OperationDone<String, ? super A> doneReading = new OperationDone<>(handler, reading);
-					// Read zero bytes to indicate that the read buffer should be checked before reading from
-					// the underlying channel.
-					new ReadLine<>(null, doneReading).completed(false, attachment);
+					catch (Error e)
+					{
+						handler.failed(e, attachment);
+						throw e;
+					}
 				}
 			});
 		}
@@ -293,35 +309,43 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 				@Override
 				public void run()
 				{
-					if (closed.get())
-					{
-						handler.failed(new ClosedChannelException(), attachment);
-						return;
-					}
-					if (!writing.compareAndSet(false, true))
-						throw new WritePendingException();
-					OperationDone<Integer, ? super A> operationDone = new OperationDone<>(handler, writing);
-					if (source.remaining() <= 0)
-					{
-						operationDone.completed(0, attachment);
-						return;
-					}
-					EncodingReadableByteChannel encoder = new EncodingReadableByteChannel(charset);
-					encoder.append(source);
-					bytesToWrite.clear();
 					try
 					{
-						encoder.read(bytesToWrite);
-						bytesToWrite.flip();
+						if (closed.get())
+						{
+							handler.failed(new ClosedChannelException(), attachment);
+							return;
+						}
+						if (!writing.compareAndSet(false, true))
+							throw new WritePendingException();
+						OperationDone<Integer, ? super A> operationDone = new OperationDone<>(handler, writing);
+						if (source.remaining() <= 0)
+						{
+							operationDone.completed(0, attachment);
+							return;
+						}
+						EncodingReadableByteChannel encoder = new EncodingReadableByteChannel(charset);
+						encoder.append(source);
+						bytesToWrite.clear();
+						try
+						{
+							encoder.read(bytesToWrite);
+							bytesToWrite.flip();
+						}
+						catch (IOException e)
+						{
+							handler.failed(e, attachment);
+							return;
+						}
+						WriteCharacters<? super A> writeCharacters =
+							new WriteCharacters<>(null, source, operationDone);
+						channel.write(bytesToWrite, attachment, writeCharacters);
 					}
-					catch (IOException e)
+					catch (Error e)
 					{
 						handler.failed(e, attachment);
-						return;
+						throw e;
 					}
-					WriteCharacters<? super A> writeCharacters =
-						new WriteCharacters<>(null, source, operationDone);
-					channel.write(bytesToWrite, attachment, writeCharacters);
 				}
 			});
 		}

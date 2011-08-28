@@ -171,6 +171,9 @@
 										<include>*.dll</include>
 										<include>*.pdb</include>
 									</includes>
+									<excludes>
+										<exclude>main.pdb</exclude>
+									</excludes>
 									<targetPath>lib</targetPath>
 								</resource>
 							</resources>

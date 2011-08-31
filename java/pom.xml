@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>com.googlecode.jperipheral</groupId>
 		<artifactId>jperipheral</artifactId>
-		<version>1.0.4</version>
+		<version>1.0.4-SNAPSHOT</version>
 	</parent>
 	<artifactId>jperipheral-java</artifactId>
 	<name>JPeripheral Java</name>
@@ -51,7 +51,7 @@
 			<plugin>
 				<groupId>com.googlecode.jace</groupId>
 				<artifactId>jace-maven-plugin</artifactId>
-				<version>1.2.4</version>
+				<version>1.2.5</version>
 				<executions>
 					<execution>
 						<id>enhance-SerialChannel</id>
@@ -104,7 +104,7 @@
 		<dependency>
 			<groupId>com.googlecode.jace</groupId>
 			<artifactId>jace-runtime</artifactId>
-			<version>1.2.4</version>
+			<version>1.2.5</version>
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>

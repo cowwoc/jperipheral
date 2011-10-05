@@ -129,8 +129,9 @@ SerialPortContext::~SerialPortContext()
 {
 	if (!CloseHandle(port))
 	{
+		DWORD lastError = GetLastError();
 		throw IOException(jace::java_new<IOException>(L"CloseHandle() failed with error: " + 
-		  getErrorMessage(GetLastError())));
+		  getErrorMessage(lastError)));
 	}
 }
 
@@ -158,14 +159,16 @@ wstring jperipheral::getErrorMessage(DWORD errorCode)
 	if (!FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, 
 		0, errorCode, 0, (LPWSTR) &buffer, 0, 0))
 	{
+		DWORD lastError = GetLastError();
 		throw AssertionError(jace::java_new<AssertionError>(L"FormatMessage() failed with error: " + 
-			toWString(GetLastError())));
+			toWString(lastError)));
 	}
 	wstring result = buffer;
 	if (LocalFree(buffer))
 	{
+		DWORD lastError = GetLastError();
 		throw AssertionError(jace::java_new<AssertionError>(L"LocalFree() failed with error: " + 
-			toWString(GetLastError())));
+			toWString(lastError)));
 	}
 	return result;
 }

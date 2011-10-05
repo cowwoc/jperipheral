@@ -67,11 +67,11 @@ void Worker::run()
 		if (!GetQueuedCompletionStatus(completionPort, &bytesTransfered, &completionKey,
 			&overlapped, INFINITE))
 		{
-			DWORD errorCode = GetLastError();
+			DWORD lastError = GetLastError();
 			OverlappedContainer<Task>* overlappedContainer = OverlappedContainer<Task>::fromOverlapped(overlapped);
 			boost::shared_ptr<Task> task(overlappedContainer->getData());
 				
-			switch (errorCode)
+			switch (lastError)
 			{
 				case ERROR_HANDLE_EOF:
 					break;
@@ -86,7 +86,7 @@ void Worker::run()
 				default:
 				{
 					task->getHandler()->failed(IOException(jace::java_new<IOException>(
-						L"GetQueuedCompletionStatus() failed with error: " + getErrorMessage(errorCode))), *task->getAttachment());
+						L"GetQueuedCompletionStatus() failed with error: " + getErrorMessage(lastError))), *task->getAttachment());
 					delete overlappedContainer;
 					break;
 				}
@@ -131,7 +131,10 @@ Worker::Worker()
 	// the use of multiple threads.
 	completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
 	if (completionPort==0)
-		throw AssertionError(jace::java_new<AssertionError>(L"CreateIoCompletionPort() failed with error: " + getErrorMessage(GetLastError())));
+	{
+		DWORD lastError = GetLastError();
+		throw AssertionError(jace::java_new<AssertionError>(L"CreateIoCompletionPort() failed with error: " + getErrorMessage(lastError)));
+	}
 	
 	boost::mutex::scoped_lock lock(mutex);
 	thread = new boost::thread(boost::bind(&Worker::run, this));
@@ -142,15 +145,17 @@ Worker::~Worker()
 {
 	if (!PostQueuedCompletionStatus(completionPort, 0, Task::SHUTDOWN, 0))
 	{
+		DWORD lastError = GetLastError();
 		throw IOException(jace::java_new<IOException>(getSourceCodePosition(WIDEN(__FILE__), __LINE__) + 
-			L" PostQueuedCompletionStatus() failed with error: " + getErrorMessage(GetLastError())));
+			L" PostQueuedCompletionStatus() failed with error: " + getErrorMessage(lastError)));
 	}
 	thread->join();
 	delete thread;
 	if (!CloseHandle(completionPort))
 	{
+		DWORD lastError = GetLastError();
 		throw IOException(jace::java_new<IOException>(L"CloseHandle(completionPort) failed with error: " + 
-			getErrorMessage(GetLastError())));
+			getErrorMessage(lastError)));
 	}
 }
 

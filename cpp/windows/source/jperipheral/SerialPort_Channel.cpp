@@ -92,8 +92,9 @@ void setReadTimeout(HANDLE port, JLong timeout)
 	COMMTIMEOUTS timeouts = {0};
 	if (!GetCommTimeouts(port, &timeouts))
 	{
+		DWORD lastError = GetLastError();
 		throw IOException(jace::java_new<IOException>(L"GetCommTimeouts() failed with error: " +
-			getErrorMessage(GetLastError())));
+			getErrorMessage(lastError)));
 	}
 	timeouts.ReadIntervalTimeout = MAXDWORD;
 	timeouts.ReadTotalTimeoutMultiplier = MAXDWORD;
@@ -121,8 +122,9 @@ void setReadTimeout(HANDLE port, JLong timeout)
 	}
 	if (!SetCommTimeouts(port, &timeouts))
 	{
+		DWORD lastError = GetLastError();
 		throw IOException(jace::java_new<IOException>(L"SetCommTimeouts() failed with error: " +
-			getErrorMessage(GetLastError())));
+			getErrorMessage(lastError)));
 	}
 }
 
@@ -137,8 +139,9 @@ void setWriteTimeout(HANDLE port, JLong timeout)
 	COMMTIMEOUTS timeouts = {0};
 	if (!GetCommTimeouts(port, &timeouts))
 	{
+		DWORD lastError = GetLastError();
 		throw IOException(jace::java_new<IOException>(L"GetCommTimeouts() failed with error: " +
-			getErrorMessage(GetLastError())));
+			getErrorMessage(lastError)));
 	}
 	timeouts.WriteTotalTimeoutMultiplier = 0;
 	if (timeout == Long::MAX_VALUE())
@@ -164,8 +167,9 @@ void setWriteTimeout(HANDLE port, JLong timeout)
 	}
 	if (!SetCommTimeouts(port, &timeouts))
 	{
+		DWORD lastError = GetLastError();
 		throw IOException(jace::java_new<IOException>(L"SetCommTimeouts() failed with error: " +
-			getErrorMessage(GetLastError())));
+			getErrorMessage(lastError)));
 	}
 }
 
@@ -266,12 +270,11 @@ public:
 			if (!ReadFile(port, nativeBuffer + this->nativeBuffer->position(), remaining, &bytesTransferred,
 				&userData->getOverlapped()))
 			{
-				DWORD errorCode = GetLastError();
-				if (errorCode != ERROR_IO_PENDING)
+				DWORD lastError = GetLastError();
+				if (lastError != ERROR_IO_PENDING)
 				{
-					cerr << "ReadTask.error" << endl;
 					handler->failed(IOException(jace::java_new<IOException>(L"ReadFile() failed with error: " +
-						getErrorMessage(errorCode))), *attachment);
+						getErrorMessage(lastError))), *attachment);
 					return;
 				}
 			}
@@ -361,11 +364,11 @@ public:
 			if (!WriteFile(port, nativeBuffer + this->nativeBuffer->position(), remaining, &bytesTransferred,
 				&userData->getOverlapped()))
 			{
-				DWORD errorCode = GetLastError();
-				if (errorCode != ERROR_IO_PENDING)
+				DWORD lastError = GetLastError();
+				if (lastError != ERROR_IO_PENDING)
 				{
 					handler->failed(IOException(jace::java_new<IOException>(L"WriteFile() failed with error: " +
-						getErrorMessage(errorCode))), *attachment);
+						getErrorMessage(lastError))), *attachment);
 					return;
 				}
 			}
@@ -400,9 +403,9 @@ JLong SerialChannel::nativeOpen(String name)
 		0);											// hTemplate must be NULL for comm devices
 	if (port == INVALID_HANDLE_VALUE)
 	{
-		DWORD errorCode = GetLastError();
+		DWORD lastError = GetLastError();
 
-		switch (errorCode)
+		switch (lastError)
 		{
 			case ERROR_FILE_NOT_FOUND:
 				throw PeripheralNotFoundException(jace::java_new<PeripheralNotFoundException>(name, Throwable()));
@@ -412,7 +415,7 @@ JLong SerialChannel::nativeOpen(String name)
 			default:
 			{
 				throw IOException(jace::java_new<IOException>(L"CreateFile() failed with error: " +
-					getErrorMessage(GetLastError())));
+					getErrorMessage(lastError)));
 			}
 		}
 	}
@@ -421,8 +424,9 @@ JLong SerialChannel::nativeOpen(String name)
 	HANDLE completionPort = CreateIoCompletionPort(port, ::jperipheral::worker->completionPort, Task::COMPLETION, 0);
 	if (completionPort==0)
 	{
+		DWORD lastError = GetLastError();
 		throw AssertionError(jace::java_new<AssertionError>(L"CreateIoCompletionPort() failed with error: " +
-			getErrorMessage(GetLastError())));
+			getErrorMessage(lastError)));
 	}
 
 	// Bind the native serial port to Java serial port
@@ -441,8 +445,9 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 
 	if (!GetCommState(context->getPort(), &dcb))
 	{
+		DWORD lastError = GetLastError();
 		throw PeripheralConfigurationException(jace::java_new<PeripheralConfigurationException>(
-			L"GetCommState() failed with error: " + getErrorMessage(GetLastError()), Throwable()));
+			L"GetCommState() failed with error: " + getErrorMessage(lastError), Throwable()));
 	}
 	dcb.BaudRate = baudRate.toInt();
 	dcb.ByteSize = (BYTE) dataBits.toInt();
@@ -541,8 +546,9 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 
 	if (!SetCommState(context->getPort(), &dcb))
 	{
+		DWORD lastError = GetLastError();
 		throw PeripheralConfigurationException(jace::java_new<PeripheralConfigurationException>(
-			L"SetCommState() failed with error: " + getErrorMessage(GetLastError()), Throwable()));
+			L"SetCommState() failed with error: " + getErrorMessage(lastError), Throwable()));
 	}
 }
 
@@ -556,8 +562,9 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 //	SerialPortContext* context = getContext(getJaceProxy());
 //  if (!ClearCommError(context->port, &errors, &comStat))
 //	{
+//      DWORD lastError = GetLastError();
 //		throw IOException(jace::java_new<IOException>(L"ClearCommError() failed with error: " +
-//			getErrorMessage(GetLastError())));
+//			getErrorMessage(lastError)));
 //	}
 //
 //  // Get error flags.

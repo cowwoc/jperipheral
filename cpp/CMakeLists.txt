@@ -36,17 +36,17 @@ if (MSVC)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /WX")
 endif ()
 
-include_directories (target/generated-sources/include windows/include ${JACE_INCLUDE} ${BOOST_INCLUDE} $ENV{JAVA_HOME}/include $ENV{JAVA_HOME}/include/win32) 
+include_directories (${CMAKE_CURRENT_BINARY_DIR}/../generated-sources/include windows/include ${JACE_INCLUDE} ${BOOST_INCLUDE} $ENV{JAVA_HOME}/include $ENV{JAVA_HOME}/include/win32) 
 link_directories (${JACE_LIBRARY})
 
 get_headers ("${CMAKE_CURRENT_SOURCE_DIR}/windows/include" TEMP)
 set (HEADER_FILES ${TEMP})
-get_headers ("${CMAKE_CURRENT_SOURCE_DIR}/target/generated-sources/include" TEMP)
+get_headers ("${CMAKE_CURRENT_BINARY_DIR}/../generated-sources/include" TEMP)
 set (HEADER_FILES ${HEADER_FILES} ${TEMP})
 
 get_sources ("${CMAKE_CURRENT_SOURCE_DIR}/windows/source" TEMP)
 set (SOURCE_FILES ${TEMP})
-get_sources ("${CMAKE_CURRENT_SOURCE_DIR}/target/generated-sources/source" TEMP)
+get_sources ("${CMAKE_CURRENT_BINARY_DIR}/../generated-sources/source" TEMP)
 set (SOURCE_FILES ${SOURCE_FILES} ${TEMP})
 
 add_library (jperipheral SHARED ${SOURCE_FILES} ${HEADER_FILES})

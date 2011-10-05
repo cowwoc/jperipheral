@@ -18,6 +18,12 @@ using std::endl;
 #include <vector>
 using std::vector;
 
+#include <string>
+using std::string;
+
+#include "boost/filesystem.hpp"
+using namespace boost::filesystem;
+
 #include "jace/proxy/org/jperipheral/Main.h"
 using jace::proxy::org::jperipheral::Main;
 
@@ -30,6 +36,23 @@ using jace::proxy::java::lang::String;
 #include "jace/proxy/java/lang/Throwable.h"
 using jace::proxy::java::lang::Throwable;
 
+/**
+	* Adds all JAR files in a directory to the classpath.
+	*/
+void addJars(path directory, string& classpath)
+{
+	directory_iterator end;
+	for (directory_iterator i(directory); i != end; ++i)
+	{
+		if (!is_regular_file(i->status()))
+			continue;
+		if (i->path().extension() != ".jar")
+			continue;
+		classpath += i->path().string();
+		classpath += ";";
+	}
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -38,17 +61,9 @@ int main(int argc, char* argv[])
 	argv = 0;
 
 	OptionList options;
-
-	options.push_back(ClassPath("jperipheral-java-1.0-SNAPSHOT.jar;"
-		"slf4j-api-1.6.1.jar;"
-		"guava-r09.jar;"
-		"aopalliance.jar;"
-		"guice-3.0.jar;"
-		"javax.inject-1.jar;"
-		"jace-runtime-1.2.4.jar;"
-		"logback-classic-0.9.26.jar;"
-		"logback-core-0.9.26.jar;"
-		));
+	string classpath;
+	addJars(path("."), classpath);
+	options.push_back(ClassPath(classpath));
 	//options.push_back(Verbose(Verbose::JNI));
 	//options.push_back(Verbose(Verbose::CLASS));
 	options.push_back(CustomOption("-ea"));

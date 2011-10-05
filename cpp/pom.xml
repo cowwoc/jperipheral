@@ -29,6 +29,7 @@
 		</developer>
 	</developers>
 	<build>
+		<outputDirectory>${project.build.directory}/${jperipheral.classifier}/classes</outputDirectory>
 		<plugins>
 			<plugin>
 				<artifactId>maven-dependency-plugin</artifactId>
@@ -39,84 +40,21 @@
 						<id>unpack-dependencies</id>
 						<phase>generate-sources</phase>
 						<goals>
-							<goal>unpack</goal>
+							<goal>unpack-dependencies</goal>
 						</goals>
 						<configuration>
-							<artifactItems>
-								<artifactItem>
-									<groupId>com.googlecode.boost-maven-project</groupId>
-									<artifactId>boost-api</artifactId>
-									<version>${boost.version}</version>
-									<outputDirectory>${project.build.directory}/dependency/boost/${boost.classifier}</outputDirectory>
-								</artifactItem>
-								<artifactItem>
-									<groupId>com.googlecode.jace</groupId>
-									<artifactId>jace-core-cpp</artifactId>
-									<classifier>${classifier}</classifier>
-									<version>1.2.5</version>
-									<outputDirectory>${project.build.directory}/dependency/jace/${classifier}</outputDirectory>
-								</artifactItem>
-								<artifactItem>
-									<groupId>com.googlecode.jperipheral</groupId>
-									<artifactId>jperipheral-java</artifactId>
-									<version>${project.version}</version>
-									<outputDirectory>${project.build.directory}/dependency/jperipheral</outputDirectory>
-								</artifactItem>
-								<artifactItem>
-									<groupId>org.slf4j</groupId>
-									<artifactId>slf4j-api</artifactId>
-									<version>1.6.1</version>
-									<outputDirectory>${project.build.directory}/dependency/slf4j</outputDirectory>
-								</artifactItem>
-							</artifactItems>
+							<outputDirectory>${project.build.directory}/${jperipheral.classifier}/dependency</outputDirectory>
+							<markersDirectory>${project.build.directory}/${jperipheral.classifier}/dependency-maven-plugin-markers</markersDirectory>
 						</configuration>
 					</execution>
 					<execution>
 						<id>copy-dependencies</id>
 						<phase>generate-sources</phase>
 						<goals>
-							<goal>copy</goal>
+							<goal>copy-dependencies</goal>
 						</goals>
 						<configuration>
-							<outputDirectory>${project.build.directory}/cmake/${platform}</outputDirectory>
-							<artifactItems>
-								<artifactItem>
-									<groupId>com.google.guava</groupId>
-									<artifactId>guava</artifactId>
-									<version>r09</version>
-								</artifactItem>
-								<artifactItem>
-									<groupId>org.slf4j</groupId>
-									<artifactId>slf4j-api</artifactId>
-									<version>1.6.1</version>
-								</artifactItem>
-								<artifactItem>
-									<groupId>ch.qos.logback</groupId>
-									<artifactId>logback-classic</artifactId>
-									<version>0.9.26</version>
-									<scope>test</scope>
-								</artifactItem>
-								<artifactItem>
-									<groupId>com.google.inject</groupId>
-									<artifactId>guice</artifactId>
-									<version>3.0</version>
-								</artifactItem>
-								<artifactItem>
-									<groupId>javax.inject</groupId>
-									<artifactId>javax.inject</artifactId>
-									<version>1</version>
-								</artifactItem>
-								<artifactItem>
-									<groupId>com.googlecode.jace</groupId>
-									<artifactId>jace-runtime</artifactId>
-									<version>1.2.5</version>
-								</artifactItem>
-								<artifactItem>
-									<groupId>${project.groupId}</groupId>
-									<artifactId>jperipheral-java</artifactId>
-									<version>${project.version}</version>
-								</artifactItem>
-							</artifactItems>
+							<outputDirectory>${project.build.directory}/${jperipheral.classifier}/cmake</outputDirectory>
 						</configuration>
 					</execution>
 				</executions>
@@ -137,13 +75,13 @@
 				</executions>
 				<configuration>
 					<sourcePath>${basedir}/../cpp</sourcePath>
-					<targetPath>${project.build.directory}/cmake/${platform}</targetPath>
+					<targetPath>${project.build.directory}/${jperipheral.classifier}/cmake</targetPath>
 					<generator>${cmake.generator}</generator>
-					<projectPath>${project.build.directory}/cmake/${platform}/jperipheral.sln</projectPath>
+					<projectPath>${project.build.directory}/${jperipheral.classifier}/cmake/jperipheral.sln</projectPath>
 					<buildType>${build.type}</buildType>
 					<environmentVariables>
-						<BOOST_HOME>${project.build.directory}/dependency/boost/${boost.classifier}</BOOST_HOME>
-						<JACE_HOME>${project.build.directory}/dependency/jace/${classifier}</JACE_HOME>
+						<BOOST_HOME>${project.build.directory}/${jperipheral.classifier}/dependency</BOOST_HOME>
+						<JACE_HOME>${project.build.directory}/${jperipheral.classifier}/dependency</JACE_HOME>
 					</environmentVariables>					
 				</configuration>
 			</plugin>
@@ -151,7 +89,11 @@
 				<artifactId>maven-jar-plugin</artifactId>
 				<version>2.3.2</version>
 				<configuration>
-					<classifier>${classifier}</classifier>
+					<classifier>${jperipheral.classifier}</classifier>
+					<excludes>
+						<!-- We use this for debugging, but it shouldn't be exported by libraries -->
+						<exclude>logback.xml</exclude>
+					</excludes>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -165,9 +107,9 @@
 							<goal>generate-cpp-peer</goal>
 						</goals>
 						<configuration>
-							<classFile>${project.build.directory}/dependency/jperipheral/org/jperipheral/SerialChannel.class</classFile>
-							<outputHeaders>${project.build.directory}/generated-sources/include</outputHeaders>
-							<outputSources>${project.build.directory}/generated-sources/source</outputSources>
+							<classFile>${project.build.directory}/${jperipheral.classifier}/dependency/org/jperipheral/SerialChannel.class</classFile>
+							<outputHeaders>${project.build.directory}/${jperipheral.classifier}/generated-sources/include</outputHeaders>
+							<outputSources>${project.build.directory}/${jperipheral.classifier}/generated-sources/source</outputSources>
 						</configuration>
 					</execution>
 					<execution>
@@ -178,18 +120,17 @@
 						<configuration>
 							<inputHeaders>
 								<path>${project.build.directory}/../windows/include</path>
-								<path>${project.build.directory}/generated-sources/include</path>
+								<path>${project.build.directory}/${jperipheral.classifier}/generated-sources/include</path>
 							</inputHeaders>
 							<inputSources>
 								<path>${project.build.directory}/../windows/source</path>
-								<path>${project.build.directory}/generated-sources/source</path>
+								<path>${project.build.directory}/${jperipheral.classifier}/generated-sources/source</path>
 							</inputSources>
-							<outputHeaders>${project.build.directory}/generated-sources/include</outputHeaders>
-							<outputSources>${project.build.directory}/generated-sources/source</outputSources>
+							<outputHeaders>${project.build.directory}/${jperipheral.classifier}/generated-sources/include</outputHeaders>
+							<outputSources>${project.build.directory}/${jperipheral.classifier}/generated-sources/source</outputSources>
 							<classPath>
 								<entry>${env.JAVA_HOME}/jre/lib/rt.jar</entry>
-								<entry>${project.build.directory}/dependency/jperipheral</entry>
-								<entry>${project.build.directory}/dependency/slf4j</entry>
+								<entry>${project.build.directory}/${jperipheral.classifier}/dependency</entry>
 							</classPath>
 							<exportSymbols>true</exportSymbols>
 							<accessibility>PRIVATE</accessibility>
@@ -215,7 +156,7 @@
 							<outputDirectory>${project.build.outputDirectory}</outputDirectory>
 							<resources>
 								<resource>
-									<directory>${project.build.directory}/cmake/${platform}/${build.type}</directory>
+									<directory>${project.build.directory}/${jperipheral.classifier}/cmake/${build.type}</directory>
 									<includes>
 										<include>*.lib</include>
 										<include>*.dll</include>
@@ -243,6 +184,16 @@
 									<targetPath>windows</targetPath>
 								</resource>
 							</resources>              
+						</configuration>            
+					</execution>
+					<execution>
+						<id>resources</id>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>resources</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.directory}/${jperipheral.classifier}/cmake</outputDirectory>
 						</configuration>            
 					</execution>
 				</executions>
@@ -278,8 +229,7 @@
 	</build>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<classifier>${platform}-${build.type}</classifier>
-		<boost.version>1.47.0-b1</boost.version>
+		<jperipheral.classifier>${platform}-${build.type}</jperipheral.classifier>
 	</properties>
 	<profiles>
 		<profile>
@@ -319,4 +269,39 @@
 			</properties>
 		</profile>
 	</profiles>
+	<dependencies>
+		<dependency>
+			<groupId>com.googlecode.boost-maven-project</groupId>
+			<artifactId>boost-api</artifactId>
+			<version>1.47.0-b1</version>
+		</dependency>
+		<dependency>
+			<groupId>com.googlecode.boost-maven-project</groupId>
+			<artifactId>boost-filesystem</artifactId>
+			<version>1.47.0-b1</version>
+			<classifier>${boost.classifier}</classifier>
+		</dependency>
+		<dependency>
+			<groupId>com.googlecode.boost-maven-project</groupId>
+			<artifactId>boost-system</artifactId>
+			<version>1.47.0-b1</version>
+			<classifier>${boost.classifier}</classifier>
+		</dependency>
+		<dependency>
+			<groupId>com.googlecode.jace</groupId>
+			<artifactId>jace-core-cpp</artifactId>
+			<version>1.2.5</version>
+			<classifier>${jperipheral.classifier}</classifier>
+		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>jperipheral-java</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+	 <dependency>
+	  <groupId>ch.qos.logback</groupId>
+	  <artifactId>logback-classic</artifactId>
+	  <version>0.9.30</version>
+	 </dependency>
+	</dependencies>
 </project>

@@ -79,7 +79,6 @@
 				<configuration>
 					<excludes>
 						<exclude>logback.xml</exclude>
-						<exclude>org/jperipheral/unsupported/**</exclude>
 					</excludes>
 				</configuration>			
 			</plugin>

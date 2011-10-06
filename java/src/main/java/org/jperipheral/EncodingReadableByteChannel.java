@@ -15,7 +15,7 @@ import java.nio.charset.CoderResult;
  * 
  * @author Gili Tzabari
  */
-public class EncodingReadableByteChannel implements ReadableByteChannel
+class EncodingReadableByteChannel implements ReadableByteChannel
 {
 	private final StringBuilder input = new StringBuilder();
 	private boolean endOfInput;

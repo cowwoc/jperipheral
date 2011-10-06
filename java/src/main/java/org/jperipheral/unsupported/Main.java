@@ -1,4 +1,4 @@
-package org.jperipheral;
+package org.jperipheral.unsupported;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Guice;
@@ -9,6 +9,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.jperipheral.AsynchronousByteCharChannel;
+import org.jperipheral.GuiceModule;
+import org.jperipheral.PeripheralChannelGroup;
+import org.jperipheral.SerialChannel;
+import org.jperipheral.SerialPort;
 import org.jperipheral.SerialPort.BaudRate;
 import org.jperipheral.SerialPort.DataBits;
 import org.jperipheral.SerialPort.FlowControl;

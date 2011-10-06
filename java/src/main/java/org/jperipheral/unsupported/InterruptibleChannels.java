@@ -1,4 +1,4 @@
-package org.jperipheral;
+package org.jperipheral.unsupported;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
@@ -19,6 +19,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.jperipheral.AsynchronousCharChannel;
 
 /**
  * @author Gili Tzabari

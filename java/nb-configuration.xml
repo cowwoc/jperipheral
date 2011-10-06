@@ -55,7 +55,5 @@ Any value defined here will override the pom.xml file value but is only applicab
         <org-netbeans-modules-editor-indent.text.x-java.CodeStyle.project.wrapThrowsList>WRAP_IF_LONG</org-netbeans-modules-editor-indent.text.x-java.CodeStyle.project.wrapThrowsList>
         <org-netbeans-modules-editor-indent.CodeStyle.project.text-line-wrap>words</org-netbeans-modules-editor-indent.CodeStyle.project.text-line-wrap>
         <netbeans.compile.on.save>none</netbeans.compile.on.save>
-        <org-netbeans-modules-editor-indent.text.x-java.CodeStyle.project.generateParagraphTagOnBlankLines>false</org-netbeans-modules-editor-indent.text.x-java.CodeStyle.project.generateParagraphTagOnBlankLines>
-        <org-netbeans-modules-editor-indent.text.x-java.CodeStyle.project.enableCommentFormatting>false</org-netbeans-modules-editor-indent.text.x-java.CodeStyle.project.enableCommentFormatting>
     </properties>
 </project-shared-configuration>

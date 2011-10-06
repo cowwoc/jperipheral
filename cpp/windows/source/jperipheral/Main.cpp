@@ -24,8 +24,8 @@ using std::string;
 #include "boost/filesystem.hpp"
 using namespace boost::filesystem;
 
-#include "jace/proxy/org/jperipheral/Main.h"
-using jace::proxy::org::jperipheral::Main;
+#include "jace/proxy/org/jperipheral/unsupported/Main.h"
+using jace::proxy::org::jperipheral::unsupported::Main;
 
 #include "jace/JArray.h"
 using jace::JArray;

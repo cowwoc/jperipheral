@@ -14,7 +14,7 @@ import java.nio.charset.CoderResult;
  * 
  * @author Gili Tzabari
  */
-public class DecodingWriteableByteChannel implements WritableByteChannel
+class DecodingWriteableByteChannel implements WritableByteChannel
 {
 	private final CharsetDecoder decoder;
 	private boolean closed;

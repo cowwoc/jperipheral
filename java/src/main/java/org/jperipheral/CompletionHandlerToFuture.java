@@ -10,7 +10,7 @@ import java.nio.channels.CompletionHandler;
  * @param <V> the result type of the I/O operation
  * @author Gili Tzabari
  */
-public class CompletionHandlerToFuture<V> implements CompletionHandler<V, Void>
+class CompletionHandlerToFuture<V> implements CompletionHandler<V, Void>
 {
 	private final SettableFuture<V> future;
 

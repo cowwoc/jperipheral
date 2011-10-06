@@ -1,4 +1,4 @@
-package org.jperipheral;
+package org.jperipheral.unsupported;
 
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -21,51 +21,38 @@ public interface InterruptibleCharChannel
 	/**
 	 * Reads a sequence of characters from this channel into the given buffer.
 	 *
-	 * <p> This method initiates an asynchronous read operation to read a
-	 * sequence of characters from this channel into the given buffer. The {@code
-	 * handler} parameter is a completion handler that is invoked when the read
-	 * operation completes (or fails). The result passed to the completion
-	 * handler is the number of characters read or {@code -1} if no characters could be
-	 * read because the channel has reached end-of-stream.
+	 * <p> This method initiates an asynchronous read operation to read a sequence of characters from
+	 * this channel into the given buffer. The {@code
+	 * handler} parameter is a completion handler that is invoked when the read operation completes
+	 * (or fails). The result passed to the completion handler is the number of characters read or {@code -1}
+	 * if no characters could be read because the channel has reached end-of-stream.
 	 *
-	 * <p> If a timeout is specified and the timeout elapses before the operation
-	 * completes then the operation completes with the exception {@link
-	 * InterruptedByTimeoutException}. Where a timeout occurs, and the
-	 * implementation cannot guarantee that characters have not been read, or will not
-	 * be read from the channel into the given buffer, then further attempts to
-	 * read from the channel will cause an unspecific runtime exception to be
+	 * <p> If a timeout is specified and the timeout elapses before the operation completes then the
+	 * operation completes with the exception {@link
+	 * InterruptedByTimeoutException}. Where a timeout occurs, and the implementation cannot guarantee
+	 * that characters have not been read, or will not be read from the channel into the given buffer,
+	 * then further attempts to read from the channel will cause an unspecific runtime exception to be
 	 * thrown.
 	 *
 	 * <p> Otherwise this method works in the same manner as the {@link
-	 * AsynchronousByteChannel#read(ByteBuffer,Object,CompletionHandler)}
-	 * method.
+	 * AsynchronousByteChannel#read(ByteBuffer,Object,CompletionHandler)} method.
 	 *
-	 * @param   <A>
-	 *          The attachment type
-	 * @param   target
-	 *          The buffer into which characters are to be transferred
-	 * @param   timeout
-	 *          The timeout, or {@code 0L} for no timeout
-	 * @param   unit
-	 *          The time unit of the {@code timeout} argument
-	 * @param   attachment
-	 *          The object to attach to the I/O operation; can be {@code null}
-	 * @param   handler
-	 *          The handler for consuming the result
+	 * @param <A> The attachment type
+	 * @param target The buffer into which characters are to be transferred
+	 * @param timeout The timeout, or {@code 0L} for no timeout
+	 * @param unit The time unit of the {@code timeout} argument
+	 * @param attachment The object to attach to the I/O operation; can be {@code null}
+	 * @param handler The handler for consuming the result
 	 *
-	 * @throws  IllegalArgumentException
-	 *          If the {@code timeout} parameter is negative or the buffer is
-	 *          read-only
-	 * @throws  ReadPendingException
-	 *          If a read operation is already in progress on this channel
-	 * @throws  ShutdownChannelGroupException
-	 *          If the channel is associated with a {@link AsynchronousChannelGroup
+	 * @throws IllegalArgumentException If the {@code timeout} parameter is negative or the buffer is
+	 * read-only
+	 * @throws ReadPendingException If a read operation is already in progress on this channel
+	 * @throws ShutdownChannelGroupException If the channel is associated with a {@link AsynchronousChannelGroup
 	 *          group} that has terminated
-	 * @throws  UnsupportedOperationException
-	 *          If the implementation does not support this operation
+	 * @throws UnsupportedOperationException If the implementation does not support this operation
 	 */
 	 <A> void read(CharBuffer target, long timeout, TimeUnit unit, A attachment,
-								 CompletionHandler<Integer, ? super A> handler)
+		CompletionHandler<Integer, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;
 
 	/**
@@ -122,7 +109,7 @@ public interface InterruptibleCharChannel
 	 *          group} that has terminated
 	 */
 	 <A> void readLine(long timeout, TimeUnit unit, A attachment,
-										 CompletionHandler<String, ? super A> handler)
+		CompletionHandler<String, ? super A> handler)
 		throws IllegalArgumentException, ReadPendingException, ShutdownChannelGroupException;
 
 	/**
@@ -143,7 +130,7 @@ public interface InterruptibleCharChannel
 	 * thrown.
 	 *
 	 * <p> Otherwise this method works in the same manner as the {@link
-	 * AsynchronousByteChannel#write(ByteBuffer,Object,CompletionHandler,boolean)}
+	 * AsynchronousByteChannel#write(java.nio.ByteBuffer, java.lang.Object, java.nio.channels.CompletionHandler)}
 	 * method.
 	 *
 	 * The handler fails with <code>MalformedInputException</code> if source is not a legal
@@ -175,7 +162,7 @@ public interface InterruptibleCharChannel
 	 *          If the implementation does not support this operation
 	 */
 	 <A> void write(CharBuffer source, final long timeout, final TimeUnit unit, A attachment,
-									CompletionHandler<Integer, ? super A> handler);
+		CompletionHandler<Integer, ? super A> handler);
 
 	/**
 	 * Closes this channel. The underlying channel might take an arbitrary amount of time to cancel

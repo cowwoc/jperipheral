@@ -6,8 +6,8 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 
 /**
- * The guice module.
- * 
+ * Guice configuration module.
+ *
  * @author Gili Tzabari
  */
 public class GuiceModule implements Module

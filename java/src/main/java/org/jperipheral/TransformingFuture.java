@@ -16,7 +16,7 @@ import java.util.concurrent.TimeoutException;
  * @param <O> the return value of this Future
  * @author Gili Tzabari
  */
-public abstract class TransformingFuture<I, O> implements Future<O>
+abstract class TransformingFuture<I, O> implements Future<O>
 {
 	@SuppressWarnings("ProtectedField")
 	protected Future<I> delegate;

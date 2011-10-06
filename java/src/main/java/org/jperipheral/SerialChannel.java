@@ -4,16 +4,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.SettableFuture;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousByteChannel;
-import java.nio.channels.AsynchronousCloseException;
-import java.nio.channels.CompletionHandler;
-import java.nio.channels.InterruptedByTimeoutException;
-import java.nio.channels.ReadPendingException;
-import java.nio.channels.ShutdownChannelGroupException;
-import java.nio.channels.WritePendingException;
+import java.nio.channels.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.jperipheral.SerialPort.BaudRate;
 import org.jperipheral.SerialPort.DataBits;
@@ -28,14 +21,15 @@ import org.slf4j.LoggerFactory;
  *
  * <h4>Timeouts</h4>
  *
- * The {@link #read(ByteBuffer,long,TimeUnit,Object,CompletionHandler) read} and
- * {@link #write(ByteBuffer,long,TimeUnit,Object,CompletionHandler) write} methods defined by this
- * class allow a timeout to be specified when initiating a read or write operation. If the timeout
- * elapses before an operation completes then the operation completes with the exception
+ * The {@link #read(java.nio.ByteBuffer, java.lang.Object, java.nio.channels.CompletionHandler) read}
+ * and {@link #write(java.nio.ByteBuffer, java.lang.Object, java.nio.channels.CompletionHandler) write}
+ * methods defined by this class allow a timeout to be specified when initiating a read or write
+ * operation. If the timeout elapses before an operation completes then the operation completes with
+ * the exception
  * {@link InterruptedByTimeoutException}. A timeout may leave the channel, or the underlying
  * connection, in an inconsistent state. Where the implementation cannot guarantee that bytes have
- * not been read from the channel then it puts the channel into an implementation specific
- * <em>error state</em>. A subsequent attempt to initiate a {
+ * not been read from the channel then it puts the channel into an implementation specific <em>error
+ * state</em>. A subsequent attempt to initiate a {
  * @code read} operation causes an unspecified runtime exception to be thrown. Similarly if a
  * {@code write} operation times out and the implementation cannot guarantee bytes have not been
  * written to the channel then further attempts to {@code write} to the channel cause an unspecified

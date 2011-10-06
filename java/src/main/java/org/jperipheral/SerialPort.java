@@ -7,13 +7,13 @@ import java.util.Objects;
  * A serial port.
  * 
  * @author Gili Tzabari
- * @see http://www.lammertbies.nl/comm/info/RS-232_specs.html
+ * @see "http://www.lammertbies.nl/comm/info/RS-232_specs.html"
  */
 public final class SerialPort implements Peripheral
 {
 	/**
 	 * @author Gili Tzabari
-	 * @see http://en.wikipedia.org/wiki/baud
+	 * @see "http://en.wikipedia.org/wiki/baud"
 	 */
 	public enum BaudRate
 	{

@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>com.googlecode.jperipheral</groupId>
 		<artifactId>jperipheral</artifactId>
-		<version>1.0.7-SNAPSHOT</version>
+		<version>1.0.7</version>
 	</parent>
 	<artifactId>jperipheral-cpp</artifactId>
 	<name>JPeripheral C++</name>

@@ -29,7 +29,8 @@
 		</developer>
 	</developers>
 	<build>
-		<outputDirectory>${project.build.directory}/${jperipheral.classifier}/classes</outputDirectory>
+		<directory>${basedir}/target/${jperipheral.classifier}</directory>
+		<sourceDirectory>src/main/cpp</sourceDirectory>
 		<plugins>
 			<plugin>
 				<artifactId>maven-dependency-plugin</artifactId>
@@ -43,8 +44,7 @@
 							<goal>unpack-dependencies</goal>
 						</goals>
 						<configuration>
-							<outputDirectory>${project.build.directory}/${jperipheral.classifier}/dependency</outputDirectory>
-							<markersDirectory>${project.build.directory}/${jperipheral.classifier}/dependency-maven-plugin-markers</markersDirectory>
+							<excludes>${boost.excludes}</excludes>
 						</configuration>
 					</execution>
 					<execution>
@@ -54,7 +54,7 @@
 							<goal>copy-dependencies</goal>
 						</goals>
 						<configuration>
-							<outputDirectory>${project.build.directory}/${jperipheral.classifier}/cmake</outputDirectory>
+							<outputDirectory>${project.build.directory}/cmake</outputDirectory>
 						</configuration>
 					</execution>
 				</executions>
@@ -66,7 +66,7 @@
 				<executions>
 					<execution>
 						<id>cmake</id>
-						<phase>generate-resources</phase>
+						<phase>process-resources</phase>
 						<goals>
 							<goal>generate</goal>
 							<goal>compile</goal>
@@ -74,63 +74,101 @@
 					</execution>
 				</executions>
 				<configuration>
-					<sourcePath>${basedir}/../cpp</sourcePath>
-					<targetPath>${project.build.directory}/${jperipheral.classifier}/cmake</targetPath>
+					<sourcePath>${project.build.directory}/sources</sourcePath>
+					<targetPath>${project.build.directory}/cmake</targetPath>
 					<generator>${cmake.generator}</generator>
-					<projectPath>${project.build.directory}/${jperipheral.classifier}/cmake/jperipheral.sln</projectPath>
+					<projectPath>${project.build.directory}/cmake/jperipheral.sln</projectPath>
 					<buildType>${build.type}</buildType>
 					<environmentVariables>
-						<BOOST_HOME>${project.build.directory}/${jperipheral.classifier}/dependency</BOOST_HOME>
-						<JACE_HOME>${project.build.directory}/${jperipheral.classifier}/dependency</JACE_HOME>
+						<BOOST_HOME>${project.build.directory}/dependency</BOOST_HOME>
+						<JACE_HOME>${project.build.directory}/dependency</JACE_HOME>
 					</environmentVariables>					
 				</configuration>
 			</plugin>
 			<plugin>
-				<artifactId>maven-jar-plugin</artifactId>
-				<version>2.3.2</version>
+				<artifactId>maven-resources-plugin</artifactId>
+				<version>2.5</version>
+				<executions>
+					<execution>
+						<id>copy-sources</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>copy-resources</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.directory}/sources</outputDirectory>
+							<resources>
+								<resource>
+									<directory>${project.build.sourceDirectory}</directory>
+								</resource>
+							</resources>
+						</configuration>            
+					</execution>
+					<execution>
+						<id>copy-binaries</id>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>copy-resources</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.outputDirectory}</outputDirectory>
+							<resources>
+								<resource>
+									<directory>${project.build.directory}/cmake/${build.type}</directory>
+									<targetPath>lib</targetPath>
+									<includes>
+										<include>*.dll</include>
+										<include>*.pdb</include>
+									</includes>
+									<excludes>
+										<exclude>main.pdb</exclude>
+									</excludes>
+								</resource>
+							</resources>              
+						</configuration>            
+					</execution>
+				</executions>
 				<configuration>
-					<classifier>${jperipheral.classifier}</classifier>
-					<excludes>
-						<!-- We use this for debugging, but it shouldn't be exported by libraries -->
-						<exclude>logback.xml</exclude>
-					</excludes>
+					<encoding>${project.build.sourceEncoding}</encoding>
 				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>com.googlecode.jace</groupId>
 				<artifactId>jace-maven-plugin</artifactId>
-				<version>1.2.5</version>
+				<version>1.2.13</version>
 				<executions>
 					<execution>
 						<id>jace.generate.SerialChannel.peer</id>
+						<phase>process-resources</phase>
 						<goals>
 							<goal>generate-cpp-peer</goal>
 						</goals>
 						<configuration>
-							<classFile>${project.build.directory}/${jperipheral.classifier}/dependency/org/jperipheral/SerialChannel.class</classFile>
-							<outputHeaders>${project.build.directory}/${jperipheral.classifier}/generated-sources/include</outputHeaders>
-							<outputSources>${project.build.directory}/${jperipheral.classifier}/generated-sources/source</outputSources>
+							<classFile>${project.build.directory}/dependency/org/jperipheral/SerialChannel.class</classFile>
+							<outputHeaders>${project.build.directory}/generated-sources/include</outputHeaders>
+							<outputSources>${project.build.directory}/generated-sources/source</outputSources>
 						</configuration>
 					</execution>
 					<execution>
 						<id>jace.generate.SerialChannel.proxies</id>
+						<phase>process-resources</phase>
 						<goals>
 							<goal>generate-cpp-proxies</goal>
 						</goals>
 						<configuration>
 							<inputHeaders>
-								<path>${project.build.directory}/../windows/include</path>
-								<path>${project.build.directory}/${jperipheral.classifier}/generated-sources/include</path>
+								<path>${project.build.directory}/sources/windows/include</path>
+								<path>${project.build.directory}/generated-sources/include</path>
 							</inputHeaders>
 							<inputSources>
-								<path>${project.build.directory}/../windows/source</path>
-								<path>${project.build.directory}/${jperipheral.classifier}/generated-sources/source</path>
+								<path>${project.build.directory}/sources/windows/source</path>
+								<path>${project.build.directory}/generated-sources/source</path>
 							</inputSources>
-							<outputHeaders>${project.build.directory}/${jperipheral.classifier}/generated-sources/include</outputHeaders>
-							<outputSources>${project.build.directory}/${jperipheral.classifier}/generated-sources/source</outputSources>
+							<outputHeaders>${project.build.directory}/generated-sources/include</outputHeaders>
+							<outputSources>${project.build.directory}/generated-sources/source</outputSources>
 							<classPath>
 								<entry>${env.JAVA_HOME}/jre/lib/rt.jar</entry>
-								<entry>${project.build.directory}/${jperipheral.classifier}/dependency</entry>
+								<entry>${project.build.directory}/dependency</entry>
 							</classPath>
 							<exportSymbols>true</exportSymbols>
 							<accessibility>PRIVATE</accessibility>
@@ -143,68 +181,12 @@
 				<version>2.3.1</version>
 			</plugin>
 			<plugin>
-				<artifactId>maven-resources-plugin</artifactId>
-				<version>2.5</version>
-				<executions>
-					<execution>
-						<id>copy-resources</id>
-						<phase>generate-resources</phase>
-						<goals>
-							<goal>copy-resources</goal>
-						</goals>
-						<configuration>
-							<outputDirectory>${project.build.outputDirectory}</outputDirectory>
-							<resources>
-								<resource>
-									<directory>${project.build.directory}/${jperipheral.classifier}/cmake/${build.type}</directory>
-									<includes>
-										<include>*.lib</include>
-										<include>*.dll</include>
-										<include>*.pdb</include>
-									</includes>
-									<excludes>
-										<exclude>main.pdb</exclude>
-									</excludes>
-									<targetPath>lib</targetPath>
-								</resource>
-							</resources>              
-						</configuration>            
-					</execution>
-					<execution>
-						<id>copy-sources</id>
-						<phase>generate-resources</phase>
-						<goals>
-							<goal>copy-resources</goal>
-						</goals>
-						<configuration>
-							<outputDirectory>${project.build.directory}/sources</outputDirectory>
-							<resources>
-								<resource>
-									<directory>${basedir}/windows</directory>
-									<targetPath>windows</targetPath>
-								</resource>
-							</resources>              
-						</configuration>            
-					</execution>
-					<execution>
-						<id>resources</id>
-						<phase>process-resources</phase>
-						<goals>
-							<goal>resources</goal>
-						</goals>
-						<configuration>
-							<outputDirectory>${project.build.directory}/${jperipheral.classifier}/cmake</outputDirectory>
-						</configuration>            
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>build-helper-maven-plugin</artifactId>
 				<version>1.7</version>
 				<executions>
 					<execution>
-						<phase>generate-sources</phase>
+						<phase>process-resources</phase>
 						<goals>
 							<goal>add-source</goal>
 						</goals>
@@ -225,50 +207,19 @@
 					<target>1.7</target>
 				</configuration>
 			</plugin>
+			<plugin>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>2.3.2</version>
+				<configuration>
+					<classifier>${jperipheral.classifier}</classifier>
+					<excludes>
+						<!-- We use this for debugging, but it shouldn't be exported by libraries -->
+						<exclude>logback.xml</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
-	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<jperipheral.classifier>${platform}-${build.type}</jperipheral.classifier>
-	</properties>
-	<profiles>
-		<profile>
-			<id>windows-i386-vs10-debug</id>
-			<properties>
-				<cmake.generator>Visual Studio 10</cmake.generator>
-				<platform>windows-i386-vs10</platform>
-				<build.type>debug</build.type>
-				<boost.classifier>windows-i386-vs10</boost.classifier>
-			</properties>
-		</profile>
-		<profile>
-			<id>windows-i386-vs10-release</id>
-			<properties>
-				<cmake.generator>Visual Studio 10</cmake.generator>
-				<platform>windows-i386-vs10</platform>
-				<build.type>release</build.type>
-				<boost.classifier>windows-i386-vs10</boost.classifier>
-			</properties>
-		</profile>
-		<profile>
-			<id>windows-amd64-vs10-debug</id>
-			<properties>
-				<cmake.generator>Visual Studio 10 Win64</cmake.generator>
-				<platform>windows-amd64-vs10</platform>
-				<build.type>debug</build.type>
-				<boost.classifier>windows-amd64-vs10</boost.classifier>
-			</properties>
-		</profile>
-		<profile>
-			<id>windows-amd64-vs10-release</id>
-			<properties>
-				<cmake.generator>Visual Studio 10 Win64</cmake.generator>
-				<platform>windows-amd64-vs10</platform>
-				<build.type>release</build.type>
-				<boost.classifier>windows-amd64-vs10</boost.classifier>
-			</properties>
-		</profile>
-	</profiles>
 	<dependencies>
 		<dependency>
 			<groupId>com.googlecode.boost-maven-project</groupId>
@@ -290,7 +241,7 @@
 		<dependency>
 			<groupId>com.googlecode.jace</groupId>
 			<artifactId>jace-core-cpp</artifactId>
-			<version>1.2.5</version>
+			<version>1.2.13</version>
 			<classifier>${jperipheral.classifier}</classifier>
 		</dependency>
 		<dependency>
@@ -298,10 +249,56 @@
 			<artifactId>jperipheral-java</artifactId>
 			<version>${project.version}</version>
 		</dependency>
-	 <dependency>
-	  <groupId>ch.qos.logback</groupId>
-	  <artifactId>logback-classic</artifactId>
-	  <version>0.9.30</version>
-	 </dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<version>1.0.0</version>
+		</dependency>
 	</dependencies>
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<jperipheral.classifier>${platform}-${build.type}</jperipheral.classifier>
+	</properties>
+	<profiles>
+		<profile>
+			<id>windows-i386-vs10-debug</id>
+			<properties>
+				<cmake.generator>Visual Studio 10</cmake.generator>
+				<platform>windows-i386-vs10</platform>
+				<build.type>debug</build.type>
+				<boost.classifier>windows-i386-vs10</boost.classifier>
+				<boost.excludes>**/*boost*-mt-1*,**/*boost*-*s*-*</boost.excludes>
+			</properties>
+		</profile>
+		<profile>
+			<id>windows-i386-vs10-release</id>
+			<properties>
+				<cmake.generator>Visual Studio 10</cmake.generator>
+				<platform>windows-i386-vs10</platform>
+				<build.type>release</build.type>
+				<boost.classifier>windows-i386-vs10</boost.classifier>
+				<boost.excludes>**/*boost*-*gd*-*,**/*boost*-*s*-*</boost.excludes>
+			</properties>
+		</profile>
+		<profile>
+			<id>windows-amd64-vs10-debug</id>
+			<properties>
+				<cmake.generator>Visual Studio 10 Win64</cmake.generator>
+				<platform>windows-amd64-vs10</platform>
+				<build.type>debug</build.type>
+				<boost.classifier>windows-amd64-vs10</boost.classifier>
+				<boost.excludes>**/*boost*-mt-1*,**/*boost*-*s*-*</boost.excludes>
+			</properties>
+		</profile>
+		<profile>
+			<id>windows-amd64-vs10-release</id>
+			<properties>
+				<cmake.generator>Visual Studio 10 Win64</cmake.generator>
+				<platform>windows-amd64-vs10</platform>
+				<build.type>release</build.type>
+				<boost.classifier>windows-amd64-vs10</boost.classifier>
+				<boost.excludes>**/*boost*-*gd*-*,**/*boost*-*s*-*</boost.excludes>
+			</properties>
+		</profile>
+	</profiles>
 </project>

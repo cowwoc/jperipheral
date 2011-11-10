@@ -248,6 +248,7 @@
 			<groupId>${project.groupId}</groupId>
 			<artifactId>jperipheral-java</artifactId>
 			<version>${project.version}</version>
+			<classifier>${jperipheral.classifier}</classifier>
 		</dependency>
 		<dependency>
 			<groupId>ch.qos.logback</groupId>

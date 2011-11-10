@@ -29,6 +29,7 @@
 		</developer>
 	</developers>
 	<build>
+		<directory>${basedir}/target/${jperipheral.classifier}</directory>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -63,8 +64,8 @@
 							<outputFile>${project.build.directory}/classes/org/jperipheral/SerialChannel.class</outputFile>
 							<deallocationMethod>close</deallocationMethod>
 							<libraries>
-								<library>boost_date_time-vc100-mt-gd-1_47</library>
-								<library>boost_thread-vc100-mt-gd-1_47</library>
+								<library>${boost.dateTime}</library>
+								<library>${boost.thread}</library>
 								<library>jace</library>
 								<library>JPeripheral</library>
 							</libraries>
@@ -77,7 +78,9 @@
 				<artifactId>maven-jar-plugin</artifactId>
 				<version>2.3.2</version>
 				<configuration>
+					<classifier>${jperipheral.classifier}</classifier>
 					<excludes>
+						<!-- We use this for debugging, but it shouldn't be exported by libraries -->
 						<exclude>logback.xml</exclude>
 					</excludes>
 				</configuration>			
@@ -129,5 +132,44 @@
 	</dependencies>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<jperipheral.classifier>${platform}-${build.type}</jperipheral.classifier>
 	</properties>
+	<profiles>
+		<profile>
+			<id>windows-i386-vs10-debug</id>
+			<properties>
+				<platform>windows-i386-vs10</platform>
+				<build.type>debug</build.type>
+				<boost.dateTime>boost_date_time-vc100-mt-gd-1_47</boost.dateTime>
+				<boost.thread>boost_thread-vc100-mt-gd-1_47</boost.thread>
+			</properties>
+		</profile>
+		<profile>
+			<id>windows-i386-vs10-release</id>
+			<properties>
+				<platform>windows-i386-vs10</platform>
+				<build.type>release</build.type>
+				<boost.dateTime>boost_date_time-vc100-mt-1_47</boost.dateTime>
+				<boost.thread>boost_thread-vc100-mt-1_47</boost.thread>
+			</properties>
+		</profile>
+		<profile>
+			<id>windows-amd64-vs10-debug</id>
+			<properties>
+				<platform>windows-amd64-vs10</platform>
+				<build.type>debug</build.type>
+				<boost.dateTime>boost_date_time-vc100-mt-gd-1_47</boost.dateTime>
+				<boost.thread>boost_thread-vc100-mt-gd-1_47</boost.thread>
+			</properties>
+		</profile>
+		<profile>
+			<id>windows-amd64-vs10-release</id>
+			<properties>
+				<platform>windows-amd64-vs10</platform>
+				<build.type>release</build.type>
+				<boost.dateTime>boost_date_time-vc100-mt-1_47</boost.dateTime>
+				<boost.thread>boost_thread-vc100-mt-1_47</boost.thread>
+			</properties>
+		</profile>
+	</profiles>
 </project>

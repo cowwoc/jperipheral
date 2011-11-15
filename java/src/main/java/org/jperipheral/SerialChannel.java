@@ -149,7 +149,7 @@ public class SerialChannel implements AsynchronousByteChannel
 			{
 				if (closed.get())
 				{
-					handler.failed(new AsynchronousCloseException(), attachment);
+					handler.failed(new ClosedChannelException(), attachment);
 					return;
 				}
 				if (!reading.compareAndSet(false, true))
@@ -193,7 +193,7 @@ public class SerialChannel implements AsynchronousByteChannel
 			public Integer call() throws Exception
 			{
 				if (closed.get())
-					throw new AsynchronousCloseException();
+					throw new ClosedChannelException();
 				if (!reading.compareAndSet(false, true))
 					throw new ReadPendingException();
 				try
@@ -243,7 +243,7 @@ public class SerialChannel implements AsynchronousByteChannel
 			{
 				if (closed.get())
 				{
-					handler.failed(new AsynchronousCloseException(), attachment);
+					handler.failed(new ClosedChannelException(), attachment);
 					return;
 				}
 				if (!writing.compareAndSet(false, true))
@@ -285,7 +285,7 @@ public class SerialChannel implements AsynchronousByteChannel
 			public Integer call() throws Exception
 			{
 				if (closed.get())
-					throw new AsynchronousCloseException();
+					throw new ClosedChannelException();
 				if (!writing.compareAndSet(false, true))
 					throw new WritePendingException();
 				try

@@ -62,15 +62,77 @@ void Worker::run()
 		boost::mutex::scoped_lock lock(mutex);
 		running.notify_all();
 	}
-	while (true)
+	bool shutdownRequested = false;
+	do
 	{
+		// Task destructors invoke jace::attach()
+		jace::detach();
+
 		if (!GetQueuedCompletionStatus(completionPort, &bytesTransfered, &completionKey,
 			&overlapped, INFINITE))
 		{
 			DWORD lastError = GetLastError();
 			OverlappedContainer<Task>* overlappedContainer = OverlappedContainer<Task>::fromOverlapped(overlapped);
 			boost::shared_ptr<Task> task(overlappedContainer->getData());
-				
+
+			// Get and clear current errors on the port.
+			DWORD errors;
+			if (!ClearCommError(completionPort, &errors, 0))
+			{
+				lastError = GetLastError();
+				task->getHandler()->failed(jace::java_new<IOException>(
+					L"ClearCommError() failed with error: " + getErrorMessage(lastError)),
+					*task->getAttachment());
+				delete overlappedContainer;
+				continue;
+			}
+
+			if (errors & CE_BREAK)
+			{
+				task->getHandler()->failed(IOException(jace::java_new<IOException>(
+					L"The hardware detected a break condition")), *task->getAttachment());
+				delete overlappedContainer;
+				continue;
+			}
+			else if (errors & CE_FRAME)
+			{
+				task->getHandler()->failed(IOException(jace::java_new<IOException>(
+					L"The hardware detected a framing error")), *task->getAttachment());
+				delete overlappedContainer;
+				continue;
+			}
+			else if (errors & CE_OVERRUN)
+			{
+				task->getHandler()->failed(IOException(jace::java_new<IOException>(
+					L"A character-buffer overrun has occurred. The next character is lost.")), 
+					*task->getAttachment());
+				delete overlappedContainer;
+				continue;
+			}
+			else if (errors & CE_OVERRUN)
+			{
+				task->getHandler()->failed(IOException(jace::java_new<IOException>(
+					L"A character-buffer overrun has occurred. The next character is lost.")), 
+					*task->getAttachment());
+				delete overlappedContainer;
+				continue;
+			}
+			else if (errors & CE_RXOVER)
+			{
+				task->getHandler()->failed(IOException(jace::java_new<IOException>(
+					L"An input buffer overflow has occurred. There is either no room in the input buffer, "
+					L"or a character was received after the end-of-file (EOF) character.")), 
+					*task->getAttachment());
+				delete overlappedContainer;
+				continue;
+			}
+			else if (errors & CE_RXPARITY)
+			{
+				task->getHandler()->failed(IOException(jace::java_new<IOException>(
+					L"The hardware detected a parity error.")), *task->getAttachment());
+				delete overlappedContainer;
+				continue;
+			}
 			switch (lastError)
 			{
 				case ERROR_HANDLE_EOF:
@@ -109,7 +171,8 @@ void Worker::run()
 					//
 					// Someone used PostQueuedCompletionStatus() to post an I/O packet with a shutdown CompletionKey.
 					//
-					return;
+					shutdownRequested = true;
+					break;
 				}
 				default:
 				{
@@ -120,9 +183,10 @@ void Worker::run()
 				}
 			}
 		}
-		// Task destructors invoke jace::attach()
-		jace::detach();
-	}
+	} while (!shutdownRequested);
+
+	// Task destructors invoke jace::attach()
+	jace::detach();
 }
 
 Worker::Worker()

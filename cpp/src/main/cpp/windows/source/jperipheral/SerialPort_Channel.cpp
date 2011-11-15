@@ -515,7 +515,7 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 	dcb.fTXContinueOnXoff = false;
 	dcb.fErrorChar = false;
 	dcb.fNull = false;
-	dcb.fAbortOnError = false;
+	dcb.fAbortOnError = true;
 	dcb.fDsrSensitivity = false;
 	dcb.fOutxCtsFlow = false;
 	dcb.fOutX = false;
@@ -556,7 +556,7 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 //{
 //	COMSTAT comStat;
 //  DWORD errors;
-//  bool fOOP, fOVERRUN, fPTO, fRXOVER, fRXPARITY, fTXFULL, fBREAK, fDNS, fFRAME, fIOE, fMODE;
+//  bool fBREAK, fFRAME, fOVERRUN, fRXOVER, fRXPARITY;
 //
 //  // Get and clear current errors on the port.
 //	SerialPortContext* context = getContext(getJaceProxy());
@@ -568,20 +568,13 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 //	}
 //
 //  // Get error flags.
-//  fDNS = errors & CE_DNS;
-//  fIOE = errors & CE_IOE;
-//  fOOP = errors & CE_OOP;
-//  fPTO = errors & CE_PTO;
-//  fMODE = errors & CE_MODE;
 //  fBREAK = errors & CE_BREAK;
 //  fFRAME = errors & CE_FRAME;
-//  fRXOVER = errors & CE_RXOVER;
-//  fTXFULL = errors & CE_TXFULL;
 //  fOVERRUN = errors & CE_OVERRUN;
+//  fRXOVER = errors & CE_RXOVER;
 //  fRXPARITY = errors & CE_RXPARITY;
 //
-//  // COMSTAT structure contains information regarding
-//  // communications status.
+//  // COMSTAT structure contains information regarding communications status.
 //  if (comStat.fCtsHold)
 //		cerr << "Tx waiting for CTS signal" << endl;
 //

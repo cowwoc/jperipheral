@@ -280,8 +280,10 @@ public:
 			}
 			// ReadFile() may return synchronously in spite of the fact that we requested an asynchronous
 			// operation. The completion port gets notified in either case.
-			//
 			// REFERENCE: http://support.microsoft.com/kb/156932
+			// 
+			// The completion port gets notified in either case.
+			// REFERENCE: http://msdn.microsoft.com/en-us/library/windows/desktop/aa365683%28v=vs.85%29.aspx
 		}
 		catch (Throwable& t)
 		{
@@ -373,9 +375,10 @@ public:
 				}
 			}
 			// WriteFile() may return synchronously in spite of the fact that we requested an asynchronous
-			// operation. The completion port gets notified in either case.
-			//
-			// REFERENCE: http://support.microsoft.com/kb/156932
+			// operation. REFERENCE: http://support.microsoft.com/kb/156932
+			// 
+			// The completion port gets notified in either case.
+			// REFERENCE: http://msdn.microsoft.com/en-us/library/windows/desktop/aa365683%28v=vs.85%29.aspx
 		}
 		catch (Throwable& t)
 		{

@@ -79,16 +79,27 @@ void Worker::run()
 			DWORD errors;
 			if (!ClearCommError(completionPort, &errors, 0))
 			{
-				lastError = GetLastError();
-				task->getHandler()->failed(jace::java_new<IOException>(
-					L"ClearCommError() failed with error: " + getErrorMessage(lastError)),
-					*task->getAttachment());
-				delete overlappedContainer;
-				continue;
+				DWORD lastError2 = GetLastError();
+				if (lastError2 == ERROR_INVALID_HANDLE)
+				{
+					// The operation failed because the port was closed, not because of an error flag
+					errors = 0;
+				}
+				else
+				{
+					task->getHandler()->failed(jace::java_new<IOException>(
+						L"ClearCommError() failed with error: " + getErrorMessage(lastError2)),
+						*task->getAttachment());
+					delete overlappedContainer;
+					continue;
+				}
 			}
 
 			if (errors & CE_BREAK)
 			{
+			  // Seems to be related to SetCommBreak().
+			  // 
+			  // REFERENCE: http://msdn.microsoft.com/en-us/library/windows/desktop/aa363433%28v=vs.85%29.aspx
 				task->getHandler()->failed(IOException(jace::java_new<IOException>(
 					wstring(L"The hardware detected a break condition"))), *task->getAttachment());
 				delete overlappedContainer;
@@ -98,14 +109,6 @@ void Worker::run()
 			{
 				task->getHandler()->failed(IOException(jace::java_new<IOException>(
 					wstring(L"The hardware detected a framing error"))), *task->getAttachment());
-				delete overlappedContainer;
-				continue;
-			}
-			else if (errors & CE_OVERRUN)
-			{
-				task->getHandler()->failed(IOException(jace::java_new<IOException>(
-					wstring(L"A character-buffer overrun has occurred. The next character is lost."))), 
-					*task->getAttachment());
 				delete overlappedContainer;
 				continue;
 			}

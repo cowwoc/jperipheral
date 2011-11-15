@@ -90,21 +90,21 @@ void Worker::run()
 			if (errors & CE_BREAK)
 			{
 				task->getHandler()->failed(IOException(jace::java_new<IOException>(
-					L"The hardware detected a break condition")), *task->getAttachment());
+					wstring(L"The hardware detected a break condition"))), *task->getAttachment());
 				delete overlappedContainer;
 				continue;
 			}
 			else if (errors & CE_FRAME)
 			{
 				task->getHandler()->failed(IOException(jace::java_new<IOException>(
-					L"The hardware detected a framing error")), *task->getAttachment());
+					wstring(L"The hardware detected a framing error"))), *task->getAttachment());
 				delete overlappedContainer;
 				continue;
 			}
 			else if (errors & CE_OVERRUN)
 			{
 				task->getHandler()->failed(IOException(jace::java_new<IOException>(
-					L"A character-buffer overrun has occurred. The next character is lost.")), 
+					wstring(L"A character-buffer overrun has occurred. The next character is lost."))), 
 					*task->getAttachment());
 				delete overlappedContainer;
 				continue;
@@ -112,7 +112,7 @@ void Worker::run()
 			else if (errors & CE_OVERRUN)
 			{
 				task->getHandler()->failed(IOException(jace::java_new<IOException>(
-					L"A character-buffer overrun has occurred. The next character is lost.")), 
+					wstring(L"A character-buffer overrun has occurred. The next character is lost."))), 
 					*task->getAttachment());
 				delete overlappedContainer;
 				continue;
@@ -120,8 +120,8 @@ void Worker::run()
 			else if (errors & CE_RXOVER)
 			{
 				task->getHandler()->failed(IOException(jace::java_new<IOException>(
-					L"An input buffer overflow has occurred. There is either no room in the input buffer, "
-					L"or a character was received after the end-of-file (EOF) character.")), 
+					wstring(L"An input buffer overflow has occurred. There is either no room in the input buffer, "
+					L"or a character was received after the end-of-file (EOF) character."))), 
 					*task->getAttachment());
 				delete overlappedContainer;
 				continue;
@@ -129,7 +129,7 @@ void Worker::run()
 			else if (errors & CE_RXPARITY)
 			{
 				task->getHandler()->failed(IOException(jace::java_new<IOException>(
-					L"The hardware detected a parity error.")), *task->getAttachment());
+					wstring(L"The hardware detected a parity error."))), *task->getAttachment());
 				delete overlappedContainer;
 				continue;
 			}

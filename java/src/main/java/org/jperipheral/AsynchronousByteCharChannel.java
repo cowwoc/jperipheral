@@ -155,7 +155,7 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 						// the underlying channel.
 						new ReadCharacters<>(null, target, operationDone).completed(false, attachment);
 					}
-					catch (Error e)
+					catch (RuntimeException | Error e)
 					{
 						handler.failed(e, attachment);
 						throw e;
@@ -241,7 +241,7 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 						// the underlying channel.
 						new ReadLine<>(null, doneReading).completed(false, attachment);
 					}
-					catch (Error e)
+					catch (RuntimeException | Error e)
 					{
 						handler.failed(e, attachment);
 						throw e;
@@ -341,7 +341,7 @@ public final class AsynchronousByteCharChannel implements AsynchronousCharChanne
 							new WriteCharacters<>(null, source, operationDone);
 						channel.write(bytesToWrite, attachment, writeCharacters);
 					}
-					catch (Error e)
+					catch (RuntimeException | Error e)
 					{
 						handler.failed(e, attachment);
 						throw e;

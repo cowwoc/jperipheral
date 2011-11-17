@@ -124,11 +124,11 @@ public class InterruptibleChannels
 						delegate.close();
 						handler.completed(null, attachment);
 					}
-					catch (Exception e)
+					catch (IOException e)
 					{
 						handler.failed(e, attachment);
 					}
-					catch (Error e)
+					catch (RuntimeException | Error e)
 					{
 						handler.failed(e, attachment);
 						throw e;
@@ -222,11 +222,11 @@ public class InterruptibleChannels
 						delegate.close();
 						handler.completed(null, attachment);
 					}
-					catch (Exception e)
+					catch (IOException e)
 					{
 						handler.failed(e, attachment);
 					}
-					catch (Error e)
+					catch (RuntimeException | Error e)
 					{
 						handler.failed(e, attachment);
 						throw e;

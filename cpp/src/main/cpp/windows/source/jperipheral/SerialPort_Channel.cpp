@@ -432,6 +432,15 @@ JLong SerialChannel::nativeOpen(String name)
 			getErrorMessage(lastError)));
 	}
 
+	// Clear error flags that may have been set the last time the port was open.
+	DWORD errors;
+	if (!ClearCommError(completionPort, &errors, 0))
+	{
+		DWORD lastError = GetLastError();
+		throw AssertionError(jace::java_new<AssertionError>(L"ClearCommError() failed with error: " + 
+			getErrorMessage(lastError)));
+	}
+
 	// Bind the native serial port to Java serial port
 	SerialPortContext* result = new SerialPortContext(port);
 	return reinterpret_cast<intptr_t>(result);

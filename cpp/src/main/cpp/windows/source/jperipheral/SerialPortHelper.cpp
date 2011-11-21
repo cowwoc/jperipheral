@@ -12,6 +12,9 @@ using jace::proxy::org::jperipheral::SerialChannel;
 #include "jace/proxy/java/nio/channels/CompletionHandler.h"
 using jace::proxy::java::nio::channels::CompletionHandler;
 
+#include "jace/proxy/java/lang/Object.h"
+using jace::proxy::java::lang::Object;
+
 #include "jace/proxy/java/lang/AssertionError.h"
 using jace::proxy::java::lang::AssertionError;
 
@@ -60,10 +63,10 @@ SerialPortContext* jperipheral::getContext(SerialChannel channel)
 	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(channel.nativeObject()));
 }
 
-Task::Task(HANDLE& _port, ::jace::proxy::java::lang::Object _attachment, ::jace::proxy::java::nio::channels::CompletionHandler _handler):
+Task::Task(HANDLE& _port, Object _attachment, CompletionHandler _handler):
   port(_port), timeout(0), nativeBuffer(0), javaBuffer(0), attachment(0), handler(0)
 {
-	attachment = new ::jace::proxy::java::lang::Object(_attachment);
+	attachment = new Object(_attachment);
 	handler = new CompletionHandler(_handler);
 }
 
@@ -88,7 +91,7 @@ long Task::getTimeElapsed() const
 	return static_cast<long>(timer.elapsed() * 1000);
 }
 
-::jace::proxy::java::lang::Object* Task::getAttachment()
+Object* Task::getAttachment()
 {
 	return attachment;
 }

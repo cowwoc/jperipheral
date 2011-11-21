@@ -75,66 +75,63 @@ void Worker::run()
 			OverlappedContainer<Task>* overlappedContainer = OverlappedContainer<Task>::fromOverlapped(overlapped);
 			boost::shared_ptr<Task> task(overlappedContainer->getData());
 
-			// Get and clear current errors on the port.
-			DWORD errors;
-			if (!ClearCommError(completionPort, &errors, 0))
+			if (task->isReadTask())
 			{
-				DWORD lastError2 = GetLastError();
-				if (lastError2 == ERROR_INVALID_HANDLE)
+				// Get and clear current errors on the port
+				DWORD errors;
+				if (!ClearCommError(task->getPort(), &errors, 0))
 				{
-					// The operation failed because the port was closed, not because of an error flag
-					errors = 0;
+					DWORD lastError2 = GetLastError();
+					if (lastError2 == ERROR_INVALID_HANDLE)
+					{
+						// The operation failed because the port was closed, not because of an error flag
+						errors = 0;
+					}
+					else
+					{
+						task->getHandler()->failed(jace::java_new<IOException>(
+							L"ClearCommError() failed with error: " + getErrorMessage(lastError2)),
+							*task->getAttachment());
+						delete overlappedContainer;
+						continue;
+					}
 				}
-				else
+
+				// See http://en.wikipedia.org/wiki/Universal_asynchronous_receiver/transmitter#Special_receiver_conditions
+				// for an explanation of the different receiver conditions.
+				if (errors & CE_BREAK)
 				{
-					task->getHandler()->failed(jace::java_new<IOException>(
-						L"ClearCommError() failed with error: " + getErrorMessage(lastError2)),
+					task->getHandler()->failed(IOException(jace::java_new<IOException>(
+						wstring(L"The hardware detected a break condition"))), *task->getAttachment());
+				}
+				else if (errors & CE_FRAME)
+				{
+					task->getHandler()->failed(IOException(jace::java_new<IOException>(
+						wstring(L"The hardware detected a framing error"))), *task->getAttachment());
+				}
+				else if (errors & CE_OVERRUN)
+				{
+					task->getHandler()->failed(IOException(jace::java_new<IOException>(
+						wstring(L"A character-buffer overrun has occurred. The next character is lost."))), 
 						*task->getAttachment());
+				}
+				else if (errors & CE_RXOVER)
+				{
+					task->getHandler()->failed(IOException(jace::java_new<IOException>(
+						wstring(L"An input buffer overflow has occurred. There is either no room in the input buffer, "
+						L"or a character was received after the end-of-file (EOF) character."))), 
+						*task->getAttachment());
+				}
+				else if (errors & CE_RXPARITY)
+				{
+					task->getHandler()->failed(IOException(jace::java_new<IOException>(
+						wstring(L"The hardware detected a parity error."))), *task->getAttachment());
+				}
+				if (errors)
+				{
 					delete overlappedContainer;
 					continue;
 				}
-			}
-
-			if (errors & CE_BREAK)
-			{
-			  // Seems to be related to SetCommBreak().
-			  // 
-			  // REFERENCE: http://msdn.microsoft.com/en-us/library/windows/desktop/aa363433%28v=vs.85%29.aspx
-				task->getHandler()->failed(IOException(jace::java_new<IOException>(
-					wstring(L"The hardware detected a break condition"))), *task->getAttachment());
-				delete overlappedContainer;
-				continue;
-			}
-			else if (errors & CE_FRAME)
-			{
-				task->getHandler()->failed(IOException(jace::java_new<IOException>(
-					wstring(L"The hardware detected a framing error"))), *task->getAttachment());
-				delete overlappedContainer;
-				continue;
-			}
-			else if (errors & CE_OVERRUN)
-			{
-				task->getHandler()->failed(IOException(jace::java_new<IOException>(
-					wstring(L"A character-buffer overrun has occurred. The next character is lost."))), 
-					*task->getAttachment());
-				delete overlappedContainer;
-				continue;
-			}
-			else if (errors & CE_RXOVER)
-			{
-				task->getHandler()->failed(IOException(jace::java_new<IOException>(
-					wstring(L"An input buffer overflow has occurred. There is either no room in the input buffer, "
-					L"or a character was received after the end-of-file (EOF) character."))), 
-					*task->getAttachment());
-				delete overlappedContainer;
-				continue;
-			}
-			else if (errors & CE_RXPARITY)
-			{
-				task->getHandler()->failed(IOException(jace::java_new<IOException>(
-					wstring(L"The hardware detected a parity error."))), *task->getAttachment());
-				delete overlappedContainer;
-				continue;
 			}
 			switch (lastError)
 			{

@@ -167,6 +167,10 @@ public:
 	 * @param timeout the maximum number of milliseconds to wait before throwing InterruptedByTimeoutException
 	 */
 	void setTimeout(::jace::proxy::types::JLong timeout);
+	/**
+	 * @return true if the task represents a read operation.
+	 */
+	virtual bool isReadTask() = 0;
 protected:
 	/**
 	 * Creates a new Task.

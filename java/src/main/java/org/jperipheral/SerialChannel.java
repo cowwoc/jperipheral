@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.jperipheral.SerialPort.BaudRate;
 import org.jperipheral.SerialPort.DataBits;
@@ -59,11 +60,12 @@ public class SerialChannel implements AsynchronousByteChannel
 	private StopBits stopBits;
 	private Parity parity;
 	private FlowControl flowControl;
-	private AtomicBoolean closed = new AtomicBoolean();
-	private AtomicBoolean reading = new AtomicBoolean();
-	private AtomicBoolean readInterrupted = new AtomicBoolean();
-	private AtomicBoolean writing = new AtomicBoolean();
-	private AtomicBoolean writeInterrupted = new AtomicBoolean();
+	private final AtomicBoolean closed = new AtomicBoolean();
+	private final AtomicBoolean reading = new AtomicBoolean();
+	private final AtomicBoolean readInterrupted = new AtomicBoolean();
+	private final AtomicBoolean writing = new AtomicBoolean();
+	private final AtomicBoolean writeInterrupted = new AtomicBoolean();
+	private final Phaser ongoingOperations = new Phaser();
 
 	/**
 	 * Creates a new SerialChannel. The caller is responsible for adding the channel into the group.
@@ -154,7 +156,9 @@ public class SerialChannel implements AsynchronousByteChannel
 				}
 				if (!reading.compareAndSet(false, true))
 					throw new ReadPendingException();
-				OperationDone<Integer, ? super A> operationDone = new OperationDone<>(handler, reading);
+				ongoingOperations.register();
+				OperationDone<Integer, ? super A> operationDone = new OperationDone<>(handler, reading,
+					ongoingOperations);
 				if (readInterrupted.get())
 				{
 					operationDone.failed(new IllegalStateException("The previous read cancellation left the channel in an"
@@ -173,7 +177,7 @@ public class SerialChannel implements AsynchronousByteChannel
 				{
 					nativeRead(target, Long.MAX_VALUE, attachment, nativeThreadToExecutor);
 				}
-				catch (RuntimeException e)
+				catch (RuntimeException | Error e)
 				{
 					operationDone.failed(e, attachment);
 				}
@@ -196,6 +200,7 @@ public class SerialChannel implements AsynchronousByteChannel
 					throw new ClosedChannelException();
 				if (!reading.compareAndSet(false, true))
 					throw new ReadPendingException();
+				ongoingOperations.register();
 				try
 				{
 					if (readInterrupted.get())
@@ -226,6 +231,7 @@ public class SerialChannel implements AsynchronousByteChannel
 				finally
 				{
 					reading.set(false);
+					ongoingOperations.arriveAndDeregister();
 				}
 			}
 		});
@@ -248,7 +254,9 @@ public class SerialChannel implements AsynchronousByteChannel
 				}
 				if (!writing.compareAndSet(false, true))
 					throw new WritePendingException();
-				OperationDone<Integer, ? super A> operationDone = new OperationDone<>(handler, writing);
+				ongoingOperations.register();
+				OperationDone<Integer, ? super A> operationDone = new OperationDone<>(handler, writing,
+					ongoingOperations);
 				if (writeInterrupted.get())
 				{
 					operationDone.failed(new IllegalStateException("The previous write cancellation left the channel in an"
@@ -267,7 +275,7 @@ public class SerialChannel implements AsynchronousByteChannel
 				{
 					nativeWrite(source, Long.MAX_VALUE, attachment, nativeThreadToExecutor);
 				}
-				catch (RuntimeException e)
+				catch (RuntimeException | Error e)
 				{
 					operationDone.failed(e, attachment);
 				}
@@ -288,6 +296,7 @@ public class SerialChannel implements AsynchronousByteChannel
 					throw new ClosedChannelException();
 				if (!writing.compareAndSet(false, true))
 					throw new WritePendingException();
+				ongoingOperations.register();
 				try
 				{
 					if (writeInterrupted.get())
@@ -317,6 +326,7 @@ public class SerialChannel implements AsynchronousByteChannel
 				finally
 				{
 					writing.set(false);
+					ongoingOperations.arriveAndDeregister();
 				}
 			}
 		});
@@ -348,7 +358,17 @@ public class SerialChannel implements AsynchronousByteChannel
 	public void close() throws IOException
 	{
 		if (closed.compareAndSet(false, true))
+		{
 			nativeClose();
+			if (reading.get() || writing.get())
+			{
+				log.trace("Waiting for ongoing operations to complete");
+				ongoingOperations.register();
+				int phase = ongoingOperations.getPhase();
+				ongoingOperations.arriveAndDeregister();
+				ongoingOperations.awaitAdvance(phase);
+			}
+		}
 	}
 
 	@Override
@@ -411,11 +431,10 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * @param <A> the attachment type
 	 * @param target the buffer to write into
 	 * @param timeout the number of milliseconds to wait before throwing
-	 *                InterruptedByTimeoutException. 0 means "return right away".
-	 *                Long.MAX_VALUE means "wait forever"
+	 * InterruptedByTimeoutException. 0 means "return right away". Long.MAX_VALUE means "wait forever"
 	 * @param attachment the attachment associated with handler
-	 * @param handler a handler for consuming the result of an asynchronous I/O operation.
-	 *   On success, returns the number of bytes read.
+	 * @param handler a handler for consuming the result of an asynchronous I/O operation. On success,
+	 * returns the number of bytes read.
 	 */
 	private native <A> void nativeRead(ByteBuffer target, long timeout, A attachment,
 		CompletionHandler<Integer, A> handler);
@@ -426,11 +445,10 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * @param <A> the attachment type
 	 * @param source the buffer to read from
 	 * @param timeout the number of milliseconds to wait before throwing
-	 *                InterruptedByTimeoutException. 0 means "return right away".
-	 *                Long.MAX_VALUE means "wait forever"
+	 * InterruptedByTimeoutException. 0 means "return right away". Long.MAX_VALUE means "wait forever"
 	 * @param attachment the attachment associated with handler
-	 * @param handler a handler for consuming the result of an asynchronous I/O operation.
-	 *   On success, returns the number of bytes written.
+	 * @param handler a handler for consuming the result of an asynchronous I/O operation. On success,
+	 * returns the number of bytes written.
 	 */
 	private native <A> void nativeWrite(ByteBuffer source, long timeout, A attachment,
 		CompletionHandler<Integer, A> handler);
@@ -442,40 +460,50 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * @param <A> the type of the object attached to the I/O operation
 	 * @author Gili Tzabari
 	 */
-	private class OperationDone<V, A> implements CompletionHandler<V, A>
+	private static class OperationDone<V, A> implements CompletionHandler<V, A>
 	{
 		private final CompletionHandler<V, A> delegate;
 		private final AtomicBoolean running;
+		private final Phaser phaser;
+		private final Logger log = LoggerFactory.getLogger(OperationDone.class);
 
 		/**
 		 * Creates a new OperationDone.
 		 *
 		 * @param delegate the handler to delegate to. The current object's attachment is passed to the
-		 *   delegate.
-		 * @param running an AtomicBoolean to set to false when the operation completes
-		 *   through to the delegate.
+		 * delegate.
+		 * @param running an AtomicBoolean to set to false when the operation completes.
+		 * @param phaser a Phaser that should arriveAndDeregister() when the operation completes.
 		 * @throws NullPointerException if delegate or running are null
 		 */
-		public OperationDone(CompletionHandler<V, A> delegate, AtomicBoolean running)
+		public OperationDone(CompletionHandler<V, A> delegate, AtomicBoolean running, Phaser phaser)
 		{
 			Preconditions.checkNotNull(delegate, "delegate may not be null");
 			Preconditions.checkNotNull(running, "running may not be null");
+			Preconditions.checkNotNull(phaser, "phaser may not be null");
 
 			this.delegate = delegate;
 			this.running = running;
+			this.phaser = phaser;
 		}
 
 		@Override
 		public void completed(final V value, final A attachment)
 		{
+			// Set running before delegating in order to allow the delegate to initiate a follow-up
+			// operation.
 			running.set(false);
+			phaser.arriveAndDeregister();
 			delegate.completed(value, attachment);
 		}
 
 		@Override
 		public void failed(final Throwable t, final A attachment)
 		{
+			// Set running before delegating in order to allow the delegate to initiate a follow-up
+			// operation.
 			running.set(false);
+			phaser.arriveAndDeregister();
 			delegate.failed(t, attachment);
 		}
 	}

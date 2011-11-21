@@ -216,6 +216,11 @@ public:
 		setTimeout(_timeout);
 	}
 
+	virtual bool isReadTask()
+	{
+		return true;
+	}
+
 	virtual void onSuccess(int bytesTransfered)
 	{
 		if (bytesTransfered < 1)
@@ -260,6 +265,16 @@ public:
 			JNIEnv* env = jace::attach(0, "ReadTask", true);
 			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(*this->nativeBuffer));
 			assert(nativeBuffer!=0);
+
+			// Clear errors set by the previous operation
+			DWORD errors;
+			if (!ClearCommError(port, &errors, 0))
+			{
+				DWORD lastError = GetLastError();
+				handler->failed(jace::java_new<IOException>(L"ClearCommError() failed with error: " + 
+					getErrorMessage(lastError)), *attachment);
+				return;
+			}
 
 			setReadTimeout(port, timeout);
 
@@ -317,6 +332,12 @@ public:
 			javaBuffer->position(oldPosition);
 		}
 		setTimeout(_timeout);
+	}
+
+
+	virtual bool isReadTask()
+	{
+		return false;
 	}
 
 	virtual void onSuccess(int bytesTransfered)
@@ -432,15 +453,6 @@ JLong SerialChannel::nativeOpen(String name)
 			getErrorMessage(lastError)));
 	}
 
-	// Clear error flags that may have been set the last time the port was open.
-	DWORD errors;
-	if (!ClearCommError(completionPort, &errors, 0))
-	{
-		DWORD lastError = GetLastError();
-		throw AssertionError(jace::java_new<AssertionError>(L"ClearCommError() failed with error: " + 
-			getErrorMessage(lastError)));
-	}
-
 	// Bind the native serial port to Java serial port
 	SerialPortContext* result = new SerialPortContext(port);
 	return reinterpret_cast<intptr_t>(result);
@@ -527,7 +539,7 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 	dcb.fTXContinueOnXoff = false;
 	dcb.fErrorChar = false;
 	dcb.fNull = false;
-	dcb.fAbortOnError = true;
+	dcb.fAbortOnError = false;
 	dcb.fDsrSensitivity = false;
 	dcb.fOutxCtsFlow = false;
 	dcb.fOutX = false;

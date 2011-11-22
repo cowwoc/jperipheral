@@ -3,6 +3,8 @@ package org.jperipheral;
 import com.google.common.base.Preconditions;
 import java.nio.channels.CompletionHandler;
 import java.util.concurrent.Executor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Invokes a delegate CompletionHandler using a specific Executor.
@@ -15,10 +17,11 @@ class CompletionHandlerExecutor<V, A> implements CompletionHandler<V, A>
 {
 	private final CompletionHandler<V, ? super A> delegate;
 	private final Executor executor;
+	private final Logger log = LoggerFactory.getLogger(CompletionHandlerExecutor.class);
 
 	/**
 	 * Creates a CompletionHandlerExecutor.
-	 * 
+	 *
 	 * @param delegate the CompletionHandler to forward calls to
 	 * @param executor the Executor used to invoke the delegate
 	 * @throws NullPointerException if executor or delegate are null
@@ -35,26 +38,40 @@ class CompletionHandlerExecutor<V, A> implements CompletionHandler<V, A>
 	@Override
 	public void completed(final V result, final A attachment)
 	{
-		executor.execute(new Runnable()
+		try
 		{
-			@Override
-			public void run()
+			executor.execute(new Runnable()
 			{
-				delegate.completed(result, attachment);
-			}
-		});
+				@Override
+				public void run()
+				{
+					delegate.completed(result, attachment);
+				}
+			});
+		}
+		catch (RuntimeException | Error e)
+		{
+			log.error("", e);
+		}
 	}
 
 	@Override
 	public void failed(final Throwable t, final A attachment)
 	{
-		executor.execute(new Runnable()
+		try
 		{
-			@Override
-			public void run()
+			executor.execute(new Runnable()
 			{
-				delegate.failed(t, attachment);
-			}
-		});
+				@Override
+				public void run()
+				{
+					delegate.failed(t, attachment);
+				}
+			});
+		}
+		catch (RuntimeException | Error e)
+		{
+			log.error("", e);
+		}
 	}
 }

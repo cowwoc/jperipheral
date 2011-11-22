@@ -360,9 +360,22 @@ public class SerialChannel implements AsynchronousByteChannel
 		if (closed.compareAndSet(false, true))
 		{
 			nativeClose();
-			if (reading.get() || writing.get())
+			boolean ongoingRead = reading.get();
+			boolean ongoingWrite = writing.get();
+			if (ongoingRead || ongoingWrite)
 			{
-				log.trace("Waiting for ongoing operations to complete");
+				if (log.isTraceEnabled())
+				{
+					StringBuilder cause = new StringBuilder("Waiting for ongoing ");
+					if (ongoingRead)
+						cause.append("read ");
+					if (ongoingRead && ongoingWrite)
+						cause.append("and ");
+					if (ongoingWrite)
+						cause.append("write ");
+					cause.append("operations to complete");
+					log.trace(cause.toString());
+				}
 				ongoingOperations.register();
 				int phase = ongoingOperations.getPhase();
 				ongoingOperations.arriveAndDeregister();

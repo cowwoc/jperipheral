@@ -377,9 +377,11 @@ public class SerialChannel implements AsynchronousByteChannel
 					log.trace(cause.toString());
 				}
 				ongoingOperations.register();
-				int phase = ongoingOperations.getPhase();
-				ongoingOperations.arriveAndDeregister();
+				int phase = ongoingOperations.arriveAndDeregister();
+				log.debug("Unarrived parties: {}, phase: {}", ongoingOperations.getUnarrivedParties(), 
+					phase);
 				ongoingOperations.awaitAdvance(phase);
+				log.trace("Port closed");
 			}
 		}
 	}

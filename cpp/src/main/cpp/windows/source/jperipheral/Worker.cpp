@@ -38,7 +38,7 @@ using jace::proxy::java::nio::ByteBuffer;
 using jace::proxy::java::nio::channels::AsynchronousCloseException;
 
 #include <iostream>
-using std::cerr;
+using std::wcerr;
 using std::endl;
 
 #pragma warning(push)

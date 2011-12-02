@@ -46,7 +46,7 @@ using std::wstring;
 using std::stringstream;
 
 #include <iostream>
-using std::cerr;
+using std::wcerr;
 using std::endl;
 
 #pragma warning(push)

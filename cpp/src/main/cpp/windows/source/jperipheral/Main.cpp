@@ -12,7 +12,7 @@ using jace::CustomOption;
 using jace::Win32VmLoader;
 
 #include <iostream>
-using std::cerr;
+using std::wcerr;
 using std::endl;
 
 #include <vector>
@@ -73,8 +73,8 @@ int main(int argc, char* argv[])
   }
   catch (std::exception& e)
 	{
-    cerr << "Unable to create the virtual machine: " << endl;
-    cerr << e.what() << endl;
+    wcerr << L"Unable to create the virtual machine: " << endl;
+    wcerr << e.what() << endl;
     return -2;
   }
 	try
@@ -89,7 +89,7 @@ int main(int argc, char* argv[])
 	}
 	catch (std::exception& e)
 	{
-		cerr << e.what() << endl;
+		wcerr << e.what() << endl;
 	}
 	jace::destroyVm();
 	return 0;

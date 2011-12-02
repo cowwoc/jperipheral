@@ -157,29 +157,27 @@ public class SerialChannel implements AsynchronousByteChannel
 				if (!reading.compareAndSet(false, true))
 					throw new ReadPendingException();
 				ongoingOperations.register();
-				OperationDone<Integer, ? super A> operationDone = new OperationDone<>(handler, reading,
-					ongoingOperations);
+				OperationDone<Integer, ? super A> operationDone = new OperationDone<>(attachment, handler,
+					reading, ongoingOperations);
 				if (readInterrupted.get())
 				{
 					operationDone.failed(new IllegalStateException("The previous read cancellation left the channel in an"
 						+ "inconsistent state. See java.nio.channels.AsynchronousChannel section Cancellation"
-						+ "for more information."), attachment);
+						+ "for more information."), true);
 					return;
 				}
 				if (target.remaining() <= 0)
 				{
-					operationDone.completed(0, attachment);
+					operationDone.completed(0, true);
 					return;
 				}
-				CompletionHandlerExecutor<Integer, ? super A> nativeThreadToExecutor =
-					new CompletionHandlerExecutor<>(operationDone, group.executor());
 				try
 				{
-					nativeRead(target, Long.MAX_VALUE, attachment, nativeThreadToExecutor);
+					nativeRead(target, Long.MAX_VALUE, false, operationDone);
 				}
 				catch (RuntimeException | Error e)
 				{
-					operationDone.failed(e, attachment);
+					operationDone.failed(e, true);
 				}
 			}
 		});
@@ -255,29 +253,27 @@ public class SerialChannel implements AsynchronousByteChannel
 				if (!writing.compareAndSet(false, true))
 					throw new WritePendingException();
 				ongoingOperations.register();
-				OperationDone<Integer, ? super A> operationDone = new OperationDone<>(handler, writing,
-					ongoingOperations);
+				OperationDone<Integer, ? super A> operationDone = new OperationDone<>(attachment, handler,
+					writing, ongoingOperations);
 				if (writeInterrupted.get())
 				{
 					operationDone.failed(new IllegalStateException("The previous write cancellation left the channel in an"
 						+ "inconsistent state. See java.nio.channels.AsynchronousChannel section Cancellation"
-						+ "for more information."), attachment);
+						+ "for more information."), true);
 					return;
 				}
 				if (source.remaining() <= 0)
 				{
-					operationDone.completed(0, attachment);
+					operationDone.completed(0, true);
 					return;
 				}
-				CompletionHandlerExecutor<Integer, ? super A> nativeThreadToExecutor =
-					new CompletionHandlerExecutor<>(operationDone, group.executor());
 				try
 				{
-					nativeWrite(source, Long.MAX_VALUE, attachment, nativeThreadToExecutor);
+					nativeWrite(source, Long.MAX_VALUE, false, operationDone);
 				}
 				catch (RuntimeException | Error e)
 				{
-					operationDone.failed(e, attachment);
+					operationDone.failed(e, true);
 				}
 			}
 		});
@@ -366,19 +362,22 @@ public class SerialChannel implements AsynchronousByteChannel
 			{
 				if (log.isTraceEnabled())
 				{
-					StringBuilder cause = new StringBuilder("Waiting for ongoing ");
+					StringBuilder cause = new StringBuilder("Waiting for ");
 					if (ongoingRead)
 						cause.append("read ");
 					if (ongoingRead && ongoingWrite)
 						cause.append("and ");
 					if (ongoingWrite)
 						cause.append("write ");
-					cause.append("operations to complete");
+					cause.append("operation");
+					if (ongoingRead && ongoingWrite)
+						cause.append("s");
+					cause.append(" to complete");
 					log.trace(cause.toString());
 				}
 				ongoingOperations.register();
 				int phase = ongoingOperations.arriveAndDeregister();
-				log.debug("Unarrived parties: {}, phase: {}", ongoingOperations.getUnarrivedParties(), 
+				log.debug("Unarrived parties: {}, phase: {}", ongoingOperations.getUnarrivedParties(),
 					phase);
 				ongoingOperations.awaitAdvance(phase);
 				log.trace("Port closed");
@@ -469,14 +468,18 @@ public class SerialChannel implements AsynchronousByteChannel
 		CompletionHandler<Integer, A> handler);
 
 	/**
-	 * Notified when a read operation completes.
+	 * Notified when a read or write operation completes.
 	 *
-	 * @param <V> the result type of the I/O operation
-	 * @param <A> the type of the object attached to the I/O operation
+	 * The attachment indicates whether the delegate completion handler may be invoked directly, or
+	 * whether it must be scheduled for asynchronous execution by the AsynchronousChannelGroup.
+	 *
+	 * @param <V> the result type expected by the delegate completion handler
+	 * @param <A> the type of the object attached to the delegate handler
 	 * @author Gili Tzabari
 	 */
-	private static class OperationDone<V, A> implements CompletionHandler<V, A>
+	private class OperationDone<V, A> implements CompletionHandler<V, Boolean>
 	{
+		private final A attachment;
 		private final CompletionHandler<V, A> delegate;
 		private final AtomicBoolean running;
 		private final Phaser phaser;
@@ -485,41 +488,50 @@ public class SerialChannel implements AsynchronousByteChannel
 		/**
 		 * Creates a new OperationDone.
 		 *
-		 * @param delegate the handler to delegate to. The current object's attachment is passed to the
-		 * delegate.
+		 * @param attachment the attachment to pass to
+		 * <code>delegate</code>
+		 * @param delegate the handler to delegate to
 		 * @param running an AtomicBoolean to set to false when the operation completes.
 		 * @param phaser a Phaser that should arriveAndDeregister() when the operation completes.
 		 * @throws NullPointerException if delegate or running are null
 		 */
-		public OperationDone(CompletionHandler<V, A> delegate, AtomicBoolean running, Phaser phaser)
+		public OperationDone(A attachment, CompletionHandler<V, A> delegate, AtomicBoolean running,
+			Phaser phaser)
 		{
 			Preconditions.checkNotNull(delegate, "delegate may not be null");
 			Preconditions.checkNotNull(running, "running may not be null");
 			Preconditions.checkNotNull(phaser, "phaser may not be null");
 
+			this.attachment = attachment;
 			this.delegate = delegate;
 			this.running = running;
 			this.phaser = phaser;
 		}
 
 		@Override
-		public void completed(final V value, final A attachment)
+		public void completed(final V value, Boolean groupThread)
 		{
 			// Set running before delegating in order to allow the delegate to initiate a follow-up
 			// operation.
 			running.set(false);
 			phaser.arriveAndDeregister();
-			delegate.completed(value, attachment);
+			if (groupThread)
+				delegate.completed(value, attachment);
+			else
+				new CompletionHandlerExecutor<>(delegate, group.executor()).completed(value, attachment);
 		}
 
 		@Override
-		public void failed(final Throwable t, final A attachment)
+		public void failed(final Throwable t, Boolean groupThread)
 		{
 			// Set running before delegating in order to allow the delegate to initiate a follow-up
 			// operation.
 			running.set(false);
 			phaser.arriveAndDeregister();
-			delegate.failed(t, attachment);
+			if (groupThread)
+				delegate.failed(t, attachment);
+			else
+				new CompletionHandlerExecutor<>(delegate, group.executor()).failed(t, attachment);
 		}
 	}
 }

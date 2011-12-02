@@ -75,10 +75,9 @@ using jace::toWString;
 
 #include <string>
 using std::wstring;
-using std::string;
 
 #include <iostream>
-using std::cerr;
+using std::wcerr;
 using std::endl;
 
 /**
@@ -197,7 +196,7 @@ static void onTimeout(boost::shared_ptr<Task> task)
 	}
 	catch (Throwable& t)
 	{
-		cerr << __FILE__ << ":" << __LINE__ << endl;
+		wcerr << __FILE__ << ":" << __LINE__ << endl;
 		t.printStackTrace();
 	}
 }
@@ -245,7 +244,7 @@ public:
 		}
 		catch (Throwable& t)
 		{
-			cerr << __FILE__ << ":" << __LINE__ << endl;
+			wcerr << __FILE__ << ":" << __LINE__ << endl;
 			t.printStackTrace();
 		}
 	}
@@ -358,7 +357,7 @@ public:
 		}
 		catch (Throwable& t)
 		{
-			cerr << __FILE__ << ":" << __LINE__ << endl;
+			wcerr << __FILE__ << ":" << __LINE__ << endl;
 			t.printStackTrace();
 		}
 	}
@@ -600,31 +599,31 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 //
 //  // COMSTAT structure contains information regarding communications status.
 //  if (comStat.fCtsHold)
-//		cerr << "Tx waiting for CTS signal" << endl;
+//		wcerr << "Tx waiting for CTS signal" << endl;
 //
 //  if (comStat.fDsrHold)
-//		cerr << "Tx waiting for DSR signal" << endl;
+//		wcerr << "Tx waiting for DSR signal" << endl;
 //
 //  if (comStat.fRlsdHold)
-//    cerr << "Tx waiting for RLSD signal" << endl;
+//    wcerr << "Tx waiting for RLSD signal" << endl;
 //
 //  if (comStat.fXoffHold)
-//    cerr << "Tx waiting, XOFF char rec'd" << endl;
+//    wcerr << "Tx waiting, XOFF char rec'd" << endl;
 //
 //  if (comStat.fXoffSent)
-//    cerr << "Tx waiting, XOFF char sent" << endl;
+//    wcerr << "Tx waiting, XOFF char sent" << endl;
 //
 //  if (comStat.fEof)
-//    cerr << "EOF character received" << endl;
+//    wcerr << "EOF character received" << endl;
 //
 //  if (comStat.fTxim)
-//    cerr << "Character waiting for Tx; char queued with TransmitCommChar" << endl;
+//    wcerr << "Character waiting for Tx; char queued with TransmitCommChar" << endl;
 //
 //  if (comStat.cbInQue)
-//    cerr << comStat.cbInQue << " bytes have been received, but not read" << endl;
+//    wcerr << comStat.cbInQue << " bytes have been received, but not read" << endl;
 //
 //  if (comStat.cbOutQue)
-//    cerr << comStat.cbOutQue << " bytes are awaiting transfer" << endl;
+//    wcerr << comStat.cbOutQue << " bytes are awaiting transfer" << endl;
 //}
 
 void SerialChannel::nativeClose()

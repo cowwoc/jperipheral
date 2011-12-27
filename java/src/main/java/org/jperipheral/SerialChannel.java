@@ -358,9 +358,12 @@ public class SerialChannel implements AsynchronousByteChannel
 			nativeClose();
 			boolean ongoingRead = reading.get();
 			boolean ongoingWrite = writing.get();
+			log.debug("ongoingRead: {}, ongoingWrite: {}", ongoingRead, ongoingWrite);
+			assert (!ongoingRead): "ongoingRead: " + ongoingRead;
+			assert (!ongoingWrite): "ongoingWrite: " + ongoingWrite;
 			if (ongoingRead || ongoingWrite)
 			{
-				if (log.isTraceEnabled())
+				if (log.isDebugEnabled())
 				{
 					StringBuilder cause = new StringBuilder("Waiting for ");
 					if (ongoingRead)
@@ -373,14 +376,13 @@ public class SerialChannel implements AsynchronousByteChannel
 					if (ongoingRead && ongoingWrite)
 						cause.append("s");
 					cause.append(" to complete");
-					log.trace(cause.toString());
+					log.debug(cause.toString());
 				}
 				ongoingOperations.register();
 				int phase = ongoingOperations.arriveAndDeregister();
-				log.debug("Unarrived parties: {}, phase: {}", ongoingOperations.getUnarrivedParties(),
-					phase);
+				log.debug("ongoingOperations: {}, phase: {}", ongoingOperations, phase);
 				ongoingOperations.awaitAdvance(phase);
-				log.trace("Port closed");
+				log.debug("Port closed");
 			}
 		}
 	}

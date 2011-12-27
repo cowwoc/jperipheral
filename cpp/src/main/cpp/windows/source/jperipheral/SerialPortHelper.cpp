@@ -130,6 +130,12 @@ SerialPortContext::SerialPortContext(HANDLE _port):
 
 SerialPortContext::~SerialPortContext()
 {
+	if (!FlushFileBuffers(port))
+	{
+		DWORD lastError = GetLastError();
+		throw IOException(jace::java_new<IOException>(L"FlushFileBuffers() failed with error: " + 
+		  getErrorMessage(lastError)));
+	}
 	if (!CloseHandle(port))
 	{
 		DWORD lastError = GetLastError();

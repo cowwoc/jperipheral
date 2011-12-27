@@ -433,7 +433,6 @@ JLong SerialChannel::nativeOpen(String name)
 			case ERROR_FILE_NOT_FOUND:
 				throw PeripheralNotFoundException(jace::java_new<PeripheralNotFoundException>(name, Throwable()));
 			case ERROR_ACCESS_DENIED:
-			case ERROR_SHARING_VIOLATION:
 				throw PeripheralInUseException(jace::java_new<PeripheralInUseException>(name, Throwable()));
 			default:
 			{

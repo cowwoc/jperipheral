@@ -26,17 +26,16 @@ import org.slf4j.LoggerFactory;
  * and {@link #write(java.nio.ByteBuffer, java.lang.Object, java.nio.channels.CompletionHandler) write}
  * methods defined by this class allow a timeout to be specified when initiating a read or write
  * operation. If the timeout elapses before an operation completes then the operation completes with
- * the exception
- * {@link InterruptedByTimeoutException}. A timeout may leave the channel, or the underlying
- * connection, in an inconsistent state. Where the implementation cannot guarantee that bytes have
- * not been read from the channel then it puts the channel into an implementation specific <em>error
- * state</em>. A subsequent attempt to initiate a {
- * @code read} operation causes an unspecified runtime exception to be thrown. Similarly if a
- * {@code write} operation times out and the implementation cannot guarantee bytes have not been
- * written to the channel then further attempts to {@code write} to the channel cause an unspecified
- * runtime exception to be thrown. When a timeout elapses then the state of the {@link ByteBuffer},
- * or the sequence of buffers, for the I/O operation is not defined. Buffers should be discarded or
- * at least care must be taken to ensure that the buffers are not accessed while the channel remains
+ * the exception {@link InterruptedByTimeoutException}. A timeout may leave the channel, or the
+ * underlying connection, in an inconsistent state. Where the implementation cannot guarantee that
+ * bytes have not been read from the channel then it puts the channel into an implementation
+ * specific <em>error state</em>. A subsequent attempt to initiate a {
+ * @code read} operation causes an unspecified runtime exception to be thrown. Similarly if a {@code write}
+ * operation times out and the implementation cannot guarantee bytes have not been written to the
+ * channel then further attempts to {@code write} to the channel cause an unspecified runtime
+ * exception to be thrown. When a timeout elapses then the state of the {@link ByteBuffer}, or the
+ * sequence of buffers, for the I/O operation is not defined. Buffers should be discarded or at
+ * least care must be taken to ensure that the buffers are not accessed while the channel remains
  * open.
  *
  * @author Gili Tzabari
@@ -359,8 +358,6 @@ public class SerialChannel implements AsynchronousByteChannel
 			boolean ongoingRead = reading.get();
 			boolean ongoingWrite = writing.get();
 			log.debug("ongoingRead: {}, ongoingWrite: {}", ongoingRead, ongoingWrite);
-			assert (!ongoingRead): "ongoingRead: " + ongoingRead;
-			assert (!ongoingWrite): "ongoingWrite: " + ongoingWrite;
 			if (ongoingRead || ongoingWrite)
 			{
 				if (log.isDebugEnabled())

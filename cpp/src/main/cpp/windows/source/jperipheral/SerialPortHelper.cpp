@@ -136,6 +136,9 @@ SerialPortContext::~SerialPortContext()
 		throw IOException(jace::java_new<IOException>(L"FlushFileBuffers() failed with error: " + 
 		  getErrorMessage(lastError)));
 	}
+	// NOTE: Although outstanding operations are supposedly flushed by this point, the completion port
+	// (running in a separate thread) is not guaranteed to have received the associated callbacks.
+	// This means that for all intensive purposes nativeClose() is an asynchronous operation.
 	if (!CloseHandle(port))
 	{
 		DWORD lastError = GetLastError();

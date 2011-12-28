@@ -8,7 +8,7 @@
 	</parent>
 	<groupId>com.googlecode.jperipheral</groupId>
 	<artifactId>jperipheral</artifactId>
-	<version>1.0.15-SNAPSHOT</version>
+	<version>1.0.15</version>
 	<packaging>pom</packaging>
 	<name>JPeripheral</name>
 	<description>Java peripheral library</description>

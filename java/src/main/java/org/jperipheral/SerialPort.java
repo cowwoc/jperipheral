@@ -2,6 +2,7 @@ package org.jperipheral;
 
 import com.google.common.base.Preconditions;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A serial port.
@@ -269,7 +270,16 @@ public final class SerialPort implements Peripheral
 	public SerialChannel newAsynchronousChannel(PeripheralChannelGroup group)
 		throws PeripheralNotFoundException, PeripheralInUseException
 	{
-		SerialChannel result = new SerialChannel(this, group);
+		SerialChannel result = new SerialChannel(this, group, 0, TimeUnit.MILLISECONDS);
+		group.addChannel(result);
+		return result;
+	}
+
+	@Override
+	public SerialChannel newAsynchronousChannel(PeripheralChannelGroup group, long timeout,
+		TimeUnit unit) throws PeripheralNotFoundException, PeripheralInUseException
+	{
+		SerialChannel result = new SerialChannel(this, group, timeout, unit);
 		group.addChannel(result);
 		return result;
 	}

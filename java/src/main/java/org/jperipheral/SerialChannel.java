@@ -8,6 +8,7 @@ import java.nio.channels.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.jperipheral.SerialPort.BaudRate;
 import org.jperipheral.SerialPort.DataBits;
@@ -71,19 +72,22 @@ public class SerialChannel implements AsynchronousByteChannel
 	 *
 	 * @param port the serial port
 	 * @param group the group associated with the channel
+	 * @param timeout the minimum amount of time to wait if the port is locked by another process
+	 * before giving up
+	 * @param unit the unit of timeout
 	 * @throws PeripheralNotFoundException if the comport does not exist
-	 * @throws PeripheralInUseException if the peripheral is locked by another application
-	 * @throws NullPointerException if port is null
+	 * @throws PeripheralInUseException if the peripheral is locked by another process
+	 * @throws NullPointerException if port, unit is null
 	 */
-	SerialChannel(final SerialPort port, final PeripheralChannelGroup group)
-		throws PeripheralNotFoundException, PeripheralInUseException
+	SerialChannel(final SerialPort port, final PeripheralChannelGroup group, long timeout,
+		TimeUnit unit) throws PeripheralNotFoundException, PeripheralInUseException
 	{
 		Preconditions.checkNotNull(port, "port may not be null");
 		Preconditions.checkNotNull(group, "group may not be null");
 
 		this.port = port;
 		this.group = group;
-		this.nativeObject = nativeOpen(port.getName());
+		this.nativeObject = nativeOpen(port.getName(), TimeUnit.MILLISECONDS.convert(timeout, unit));
 	}
 
 	/**
@@ -415,11 +419,13 @@ public class SerialChannel implements AsynchronousByteChannel
 	 * Opens the port.
 	 *
 	 * @param name the port name
+	 * @param timeout the minimum number of milliseconds to wait if the port is locked by another
+	 * process before giving up
 	 * @return the native context associated with the port
 	 * @throws PeripheralNotFoundException if the comport does not exist
-	 * @throws PeripheralInUseException if the comport is locked by another application
+	 * @throws PeripheralInUseException if the comport is locked by another process
 	 */
-	private native long nativeOpen(String name)
+	private native long nativeOpen(String name, long timeout)
 		throws PeripheralNotFoundException, PeripheralInUseException;
 
 	/**

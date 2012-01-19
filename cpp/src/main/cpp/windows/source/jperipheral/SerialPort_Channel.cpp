@@ -414,32 +414,55 @@ public:
 	}
 };
 
-JLong SerialChannel::nativeOpen(String name)
+JLong SerialChannel::nativeOpen(String name, JLong timeout)
 {
 	wstring nameWstring = name;
-	HANDLE port = CreateFile((L"\\\\.\\" + nameWstring).c_str(),
-		GENERIC_READ | GENERIC_WRITE,
-		0,											// must be opened with exclusive-access
-		0,											// default security attributes
-		OPEN_EXISTING,					// must use OPEN_EXISTING
-		FILE_FLAG_OVERLAPPED,		// overlapped I/O
-		0);											// hTemplate must be NULL for comm devices
-	if (port == INVALID_HANDLE_VALUE)
-	{
-		DWORD lastError = GetLastError();
 
-		switch (lastError)
+	// WORKAROUND: http://stackoverflow.com/a/8896887/14731
+	boost::timer timer;
+	HANDLE port;
+	const int SLEEP_TIME = 100;
+	
+	while (true)
+	{
+		port = CreateFile((L"\\\\.\\" + nameWstring).c_str(),
+			GENERIC_READ | GENERIC_WRITE,
+			0,											// must be opened with exclusive-access
+			0,											// default security attributes
+			OPEN_EXISTING,					// must use OPEN_EXISTING
+			FILE_FLAG_OVERLAPPED,		// overlapped I/O
+			0);											// hTemplate must be NULL for comm devices
+		if (port == INVALID_HANDLE_VALUE)
 		{
-			case ERROR_FILE_NOT_FOUND:
-				throw PeripheralNotFoundException(jace::java_new<PeripheralNotFoundException>(name, Throwable()));
-			case ERROR_ACCESS_DENIED:
-				throw PeripheralInUseException(jace::java_new<PeripheralInUseException>(name, Throwable()));
-			default:
+			DWORD lastError = GetLastError();
+
+			switch (lastError)
 			{
-				throw IOException(jace::java_new<IOException>(L"CreateFile() failed with error: " +
-					getErrorMessage(lastError)));
+				case ERROR_FILE_NOT_FOUND:
+					throw PeripheralNotFoundException(jace::java_new<PeripheralNotFoundException>(name, Throwable()));
+				case ERROR_ACCESS_DENIED:
+				{
+					if (timer.elapsed() < (timeout / 1000.0))
+					{
+						if (timer.elapsed() + (SLEEP_TIME / 1000.0) > timer.elapsed_max())
+						{
+							// We're about to surpass timer.elapsed_max()
+							timeout = timeout - (jlong) (timer.elapsed() * 1000.0);
+							timer.restart();
+						}
+						boost::this_thread::sleep(boost::posix_time::milliseconds(SLEEP_TIME));
+						continue;
+					}
+					throw PeripheralInUseException(jace::java_new<PeripheralInUseException>(name, Throwable()));
+				}
+				default:
+				{
+					throw IOException(jace::java_new<IOException>(L"CreateFile() failed with error: " +
+						getErrorMessage(lastError)));
+				}
 			}
 		}
+		break;
 	}
 
 	// Associate the file handle with the existing completion port

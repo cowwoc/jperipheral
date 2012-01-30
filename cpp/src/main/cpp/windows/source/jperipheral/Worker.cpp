@@ -1,5 +1,6 @@
 #include "jperipheral/Worker.h"
 using jperipheral::Worker;
+using jperipheral::CancelIoExType;
 
 #include "jace/proxy/java/lang/AssertionError.h"
 using jace::proxy::java::lang::AssertionError;
@@ -34,9 +35,6 @@ using jace::proxy::java::lang::Throwable;
 #include "jace/proxy/java/nio/ByteBuffer.h"
 using jace::proxy::java::nio::ByteBuffer;
 
-#include "jace/proxy/java/nio/channels/AsynchronousCloseException.h"
-using jace::proxy::java::nio::channels::AsynchronousCloseException;
-
 #include <iostream>
 using std::wcerr;
 using std::endl;
@@ -48,6 +46,7 @@ using std::endl;
 
 
 Worker* jperipheral::worker;
+CancelIoExType jperipheral::cancelIoEx;
 
 /**
  * Executes any pending tasks.
@@ -74,85 +73,8 @@ void Worker::run()
 			DWORD lastError = GetLastError();
 			OverlappedContainer<Task>* overlappedContainer = OverlappedContainer<Task>::fromOverlapped(overlapped);
 			boost::shared_ptr<Task> task(overlappedContainer->getData());
-
-			if (task->isReadTask())
-			{
-				// Get and clear current errors on the port
-				DWORD errors;
-				if (!ClearCommError(task->getPort(), &errors, 0))
-				{
-					DWORD lastError2 = GetLastError();
-					if (lastError2 == ERROR_INVALID_HANDLE)
-					{
-						// The operation failed because the port was closed, not because of an error flag
-						errors = 0;
-					}
-					else
-					{
-						task->getHandler()->failed(jace::java_new<IOException>(
-							L"ClearCommError() failed with error: " + getErrorMessage(lastError2)),
-							*task->getAttachment());
-						delete overlappedContainer;
-						continue;
-					}
-				}
-
-				// See http://en.wikipedia.org/wiki/Universal_asynchronous_receiver/transmitter#Special_receiver_conditions
-				// for an explanation of the different receiver conditions.
-				if (errors & CE_BREAK)
-				{
-					task->getHandler()->failed(IOException(jace::java_new<IOException>(
-						wstring(L"The hardware detected a break condition"))), *task->getAttachment());
-				}
-				else if (errors & CE_FRAME)
-				{
-					task->getHandler()->failed(IOException(jace::java_new<IOException>(
-						wstring(L"The hardware detected a framing error"))), *task->getAttachment());
-				}
-				else if (errors & CE_OVERRUN)
-				{
-					task->getHandler()->failed(IOException(jace::java_new<IOException>(
-						wstring(L"A character-buffer overrun has occurred. The next character is lost."))), 
-						*task->getAttachment());
-				}
-				else if (errors & CE_RXOVER)
-				{
-					task->getHandler()->failed(IOException(jace::java_new<IOException>(
-						wstring(L"An input buffer overflow has occurred. There is either no room in the input buffer, "
-						L"or a character was received after the end-of-file (EOF) character."))), 
-						*task->getAttachment());
-				}
-				else if (errors & CE_RXPARITY)
-				{
-					task->getHandler()->failed(IOException(jace::java_new<IOException>(
-						wstring(L"The hardware detected a parity error."))), *task->getAttachment());
-				}
-				if (errors)
-				{
-					delete overlappedContainer;
-					continue;
-				}
-			}
-			switch (lastError)
-			{
-				case ERROR_HANDLE_EOF:
-					break;
-				case ERROR_OPERATION_ABORTED:
-				{
-					// The port was closed
-					task->getHandler()->failed(AsynchronousCloseException(
-						jace::java_new<AsynchronousCloseException>()), *task->getAttachment());
-					delete overlappedContainer;
-					break;
-				}
-				default:
-				{
-					task->getHandler()->failed(IOException(jace::java_new<IOException>(
-						L"GetQueuedCompletionStatus() failed with error: " + getErrorMessage(lastError))), *task->getAttachment());
-					delete overlappedContainer;
-					break;
-				}
-			}
+			task->onFailure(lastError);
+			delete overlappedContainer;
 		}
 		else
 		{
@@ -229,6 +151,12 @@ Worker::~Worker()
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*, void*)
 {
 	jperipheral::worker = new Worker();
+
+	HMODULE hKernel32 = LoadLibrary(L"kernel32.dll");
+	if (hKernel32 == 0)
+		jperipheral::cancelIoEx = 0;
+	else
+		jperipheral::cancelIoEx = (jperipheral::CancelIoExType) GetProcAddress(hKernel32, "CancelIoEx");
 	return JNI_VERSION_1_6;
 }
 

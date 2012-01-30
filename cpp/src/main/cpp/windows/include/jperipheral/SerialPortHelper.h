@@ -125,11 +125,17 @@ public:
 	 */
 	virtual void run() = 0;
 	/**
-	 * Invoked after the operation completes successfully.
+	 * Invoked if the operation completes successfully.
 	 *
 	 * @param bytesTransferred the number of bytes transferred
 	 */
 	virtual void onSuccess(int bytesTransferred) = 0;
+	/**
+	 * Invoked if the operation fails.
+	 *
+	 * @param errorCode the cause of the failure
+	 */
+	virtual void onFailure(DWORD errorCode) = 0;
 	/**
 	 * Returns the attachment associated with the completion handler.
 	 *
@@ -160,26 +166,23 @@ public:
 	 *
 	 * @return the serial port thread associated with the operation
 	 */
-	HANDLE& getPort();
+	SerialPortContext& getPort();
 	/**
 	 * Sets the maximum number of milliseconds to wait before throwing InterruptedByTimeoutException.
 	 *
 	 * @param timeout the maximum number of milliseconds to wait before throwing InterruptedByTimeoutException
 	 */
 	void setTimeout(::jace::proxy::types::JLong timeout);
-	/**
-	 * @return true if the task represents a read operation.
-	 */
-	virtual bool isReadTask() = 0;
 protected:
 	/**
 	 * Creates a new Task.
 	 *
-	 * @param port the comport
+	 * @param portContext the comport context
 	 * @param attachment the attachment to pass into handler
 	 * @param handler the CompletionHandler associated with the operation.
 	 */
-	Task(HANDLE& port, ::jace::proxy::java::lang::Object attachment, ::jace::proxy::java::nio::channels::CompletionHandler handler);
+	Task(SerialPortContext& portContext, ::jace::proxy::java::lang::Object attachment,
+		::jace::proxy::java::nio::channels::CompletionHandler handler);
 	/**
 	 * Sets the java buffer associated with the operation.
 	 *
@@ -209,9 +212,9 @@ protected:
 	 */
 	::jace::proxy::java::nio::channels::CompletionHandler* handler;
 	/**
-	 * The serial port.
+	 * The serial port context.
 	 */
-	HANDLE& port;
+	SerialPortContext& portContext;
 	/**
 	 * Measures how long a task has been running.
 	 */
@@ -246,6 +249,28 @@ public:
 	 * Returns the serial port.
 	 */
 	HANDLE& getPort();
+
+	/**
+	 * Synchronizes access to this object's state.
+	 */
+	boost::mutex& getMutex();
+
+	/**
+	 * Adds a task associated with this port.
+	 */
+	void addTask(boost::shared_ptr<Task> task);
+
+	/**
+	 * Removes a task associated with this port.
+	 */
+	void removeTask(boost::shared_ptr<Task> task);
+
+	/**
+	 * Indicates if the port is open.
+	 *
+	 * @return true if the port is open
+	 */
+	bool isOpen();
 private:
 	/**
 	 * Prevent assignment.
@@ -253,6 +278,22 @@ private:
 	SerialPortContext& operator=(const SerialPortContext&);
 
 	HANDLE port;
+	/**
+	 * Synchronizes access to this object's state.
+	 */
+	boost::mutex mutex;
+	/**
+	 * Notified whenever the task list is updated.
+	 */
+	boost::condition tasksUpdated;
+	/**
+	 * Tasks associated with this port.
+	 */
+	std::list<boost::shared_ptr<Task>> tasks;
+	/**
+	 * True if the port is open.
+	 */
+	bool open;
 };
 
 /**

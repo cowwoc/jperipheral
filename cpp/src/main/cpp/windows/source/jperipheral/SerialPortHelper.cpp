@@ -3,6 +3,8 @@ using jperipheral::Task;
 using jperipheral::SerialPortContext;
 using jperipheral::getErrorMessage;
 
+#include "jperipheral/Worker.h"
+
 #include "jace/proxy/org/jperipheral/SerialPort.h"
 using jace::proxy::org::jperipheral::SerialPort;
 
@@ -63,15 +65,15 @@ SerialPortContext* jperipheral::getContext(SerialChannel channel)
 	return reinterpret_cast<SerialPortContext*>(static_cast<intptr_t>(channel.nativeObject()));
 }
 
-Task::Task(HANDLE& _port, Object _attachment, CompletionHandler _handler):
-  port(_port), timeout(0), nativeBuffer(0), javaBuffer(0), attachment(0), handler(0)
+Task::Task(SerialPortContext& _portContext, Object _attachment, CompletionHandler _handler):
+  portContext(_portContext), timeout(0), nativeBuffer(0), javaBuffer(0), attachment(0), handler(0)
 {
 	attachment = new Object(_attachment);
 	handler = new CompletionHandler(_handler);
 }
 
 Task::Task(const Task& other):
-  port(other.port), timeout(other.timeout), nativeBuffer(other.nativeBuffer), 
+  portContext(other.portContext), timeout(other.timeout), nativeBuffer(other.nativeBuffer), 
 	javaBuffer(other.javaBuffer), attachment(other.attachment), handler(other.handler)
 {
 }
@@ -106,16 +108,16 @@ JLong Task::getTimeout() const
 	return timeout;
 }
 
-HANDLE& Task::getPort()
+SerialPortContext& Task::getPort()
 {
-	return port;
+	return portContext;
 }
 
 Task::~Task()
 {
 	delete attachment;
 	delete handler;
-	if (nativeBuffer!=javaBuffer)
+	if (nativeBuffer != javaBuffer)
 	{
 		delete nativeBuffer;
 		delete javaBuffer;
@@ -125,26 +127,75 @@ Task::~Task()
 }
 
 SerialPortContext::SerialPortContext(HANDLE _port):
-	port(_port)
+	port(_port), open(true)
 {}
 
 SerialPortContext::~SerialPortContext()
 {
+	{
+		// Notify tasks that the port handle is no longer valid
+		boost::mutex::scoped_lock lock(mutex);
+		open = false;
+	}
+	if (cancelIoEx != 0)
+	{		
+		// Cancel outstanding tasks, only supported in Vista and newer
+		if (!cancelIoEx(port, 0))
+		{
+			DWORD lastError = GetLastError();
+			if (lastError != ERROR_NOT_FOUND)
+			{
+				throw IOException(jace::java_new<IOException>(L"CancelIoEx() failed with error: " + 
+					getErrorMessage(lastError)));
+			}
+		}
+		// Wait for tasks to complete
+		boost::mutex::scoped_lock lock(mutex);
+		while (!tasks.empty())
+			tasksUpdated.wait(lock);
+	}
+
+	// Close the port
 	if (!CloseHandle(port))
 	{
 		DWORD lastError = GetLastError();
 		throw IOException(jace::java_new<IOException>(L"CloseHandle() failed with error: " + 
 		  getErrorMessage(lastError)));
 	}
-	// NOTE: Although outstanding operations are supposed to complete by this point, the completion
-	// port (running in a separate thread) is not guaranteed to have received the associated
-	// callbacks. This means that, for all intensive purposes, nativeClose() is an asynchronous
-	// operation.
+	if (cancelIoEx == 0)
+	{
+		// Wait for tasks to complete if they could not be canceled
+		boost::mutex::scoped_lock lock(mutex);
+		while (!tasks.empty())
+			tasksUpdated.wait(lock);
+	}
 }
 
 HANDLE& SerialPortContext::getPort()
 {
 	return port;
+}
+
+boost::mutex& SerialPortContext::getMutex()
+{
+	return mutex;
+}
+
+void SerialPortContext::addTask(boost::shared_ptr<Task> task)
+{
+	tasks.push_back(task);
+	tasksUpdated.notify_all();
+}
+
+void SerialPortContext::removeTask(boost::shared_ptr<Task> task)
+{
+	tasks.remove(task);
+	tasksUpdated.notify_all();
+}
+
+bool SerialPortContext::isOpen()
+{
+	return open;
 }
 
 /**

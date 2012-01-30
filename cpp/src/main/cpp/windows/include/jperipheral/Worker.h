@@ -61,6 +61,13 @@ private:
  */
 extern Worker* worker;
 
+/**
+ * Pointer to CancelIoEx() if the feature is available (Windows Vista and newer), null otherwise.
+ */
+typedef BOOL (WINAPI *CancelIoExType)(HANDLE hFile, LPOVERLAPPED lpOverlapped);
+extern CancelIoExType cancelIoEx;
+
+
 END_NAMESPACE_1(jperipheral)
 
 #endif

@@ -68,6 +68,9 @@ using jace::proxy::java::lang::String;
 #include "jace/proxy/java/nio/channels/InterruptedByTimeoutException.h"
 using jace::proxy::java::nio::channels::InterruptedByTimeoutException;
 
+#include "jace/proxy/java/nio/channels/AsynchronousCloseException.h"
+using jace::proxy::java::nio::channels::AsynchronousCloseException;
+
 #include "jace/Jace.h"
 using jace::toWString;
 
@@ -192,7 +195,8 @@ static void onTimeout(boost::shared_ptr<Task> task)
 	}
 	try
 	{
-		task->getHandler()->failed(jace::java_new<InterruptedByTimeoutException>(), *task->getAttachment());
+		task->getHandler()->failed(jace::java_new<InterruptedByTimeoutException>(),
+			*task->getAttachment());
 	}
 	catch (Throwable& t)
 	{
@@ -204,7 +208,9 @@ static void onTimeout(boost::shared_ptr<Task> task)
 class ReadTask: public Task
 {
 public:
-	ReadTask(HANDLE& _port, ByteBuffer _javaBuffer, JLong _timeout, ::jace::proxy::java::lang::Object _attachment, ::jace::proxy::java::nio::channels::CompletionHandler _handler):
+	ReadTask(SerialPortContext& _port, ByteBuffer _javaBuffer, JLong _timeout,
+		::jace::proxy::java::lang::Object _attachment,
+		::jace::proxy::java::nio::channels::CompletionHandler _handler):
 			Task(_port, _attachment, _handler)
 	{
 		setJavaBuffer(new ByteBuffer(_javaBuffer));
@@ -213,11 +219,6 @@ public:
 		else
 			nativeBuffer = new ByteBuffer(ByteBuffer::allocateDirect(javaBuffer->remaining()));
 		setTimeout(_timeout);
-	}
-
-	virtual bool isReadTask()
-	{
-		return true;
 	}
 
 	virtual void onSuccess(int bytesTransfered)
@@ -247,6 +248,85 @@ public:
 			wcerr << __FILE__ << ":" << __LINE__ << endl;
 			t.printStackTrace();
 		}
+		boost::mutex::scoped_lock lock(portContext.getMutex());
+		portContext.removeTask(shared_from_this());
+	}
+
+	virtual void onFailure(DWORD errorCode)
+	{		
+		bool isOpen;
+		{
+			boost::mutex::scoped_lock lock(portContext.getMutex());
+			isOpen = portContext.isOpen();
+		}
+		if (isOpen)
+		{
+			// Get and clear current errors on the port
+			DWORD errors;
+			if (!ClearCommError(portContext.getPort(), &errors, 0))
+			{
+				DWORD lastError = GetLastError();
+				handler->failed(jace::java_new<IOException>(
+					L"ClearCommError() failed with error: " + getErrorMessage(lastError)),
+					*attachment);
+				boost::mutex::scoped_lock lock(portContext.getMutex());
+				portContext.removeTask(shared_from_this());
+				return;
+			}
+
+			// See http://en.wikipedia.org/wiki/Universal_asynchronous_receiver/transmitter#Special_receiver_conditions
+			// for an explanation of the different receiver conditions.
+			wstring errorMessage;
+			if (errors & CE_BREAK)
+				errorMessage += L"The hardware detected a break condition.\n";
+			if (errors & CE_FRAME)
+				errorMessage += L"The hardware detected a framing error.\n";
+			if (errors & CE_OVERRUN)
+				errorMessage += L"A character-buffer overrun has occurred. The next character is lost..\n";
+			if (errors & CE_RXOVER)
+			{
+				errorMessage += L"An input buffer overflow has occurred. There is either no room in "
+					L"the input buffer, or a character was received after the end-of-file (EOF) "
+					L"character.\n";
+			}
+			if (errors & CE_RXPARITY)
+				errorMessage += L"The hardware detected a parity error.\n";
+			// Erase the last \n character
+			if (!errorMessage.empty())
+				errorMessage.erase(errorMessage.end() - 1);
+			if (!errorMessage.empty())
+			{
+				handler->failed(IOException(jace::java_new<IOException>(errorMessage)), *attachment);
+				boost::mutex::scoped_lock lock(portContext.getMutex());
+				portContext.removeTask(shared_from_this());
+				return;
+			}
+		}
+		switch (errorCode)
+		{
+			case ERROR_OPERATION_ABORTED:
+			{
+				if (isOpen)
+				{
+					handler->failed(AsynchronousCloseException(jace::java_new<AsynchronousCloseException>()), 
+						*attachment);
+					break;
+				}
+				else
+				{
+					// Unexpected, leak through to the default case
+				}
+			}
+			default:
+			{
+				handler->failed(IOException(jace::java_new<IOException>(
+					L"GetQueuedCompletionStatus() failed with error: " + getErrorMessage(errorCode))),
+					*attachment);
+				break;
+			}
+		}
+		boost::mutex::scoped_lock lock(portContext.getMutex());
+		portContext.removeTask(shared_from_this());
 	}
 
 	virtual void run()
@@ -263,10 +343,12 @@ public:
 			}
 			JNIEnv* env = jace::attach(0, "ReadTask", true);
 			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(*this->nativeBuffer));
-			assert(nativeBuffer!=0);
+			assert (nativeBuffer != 0);
 
 			// Clear errors set by the previous operation
 			DWORD errors;
+			boost::mutex::scoped_lock lock(portContext.getMutex());
+			HANDLE port = portContext.getPort();
 			if (!ClearCommError(port, &errors, 0))
 			{
 				DWORD lastError = GetLastError();
@@ -277,12 +359,11 @@ public:
 
 			setReadTimeout(port, timeout);
 
-			OverlappedContainer<Task>* userData =
-				new OverlappedContainer<Task>(shared_from_this());
+			OverlappedContainer<Task>* userData = new OverlappedContainer<Task>(shared_from_this());
 
 			DWORD bytesTransferred;
-			if (!ReadFile(port, nativeBuffer + this->nativeBuffer->position(), remaining, &bytesTransferred,
-				&userData->getOverlapped()))
+			if (!ReadFile(port, nativeBuffer + this->nativeBuffer->position(),
+				remaining, &bytesTransferred, &userData->getOverlapped()))
 			{
 				DWORD lastError = GetLastError();
 				if (lastError != ERROR_IO_PENDING)
@@ -298,6 +379,10 @@ public:
 			// 
 			// The completion port gets notified in either case.
 			// REFERENCE: http://msdn.microsoft.com/en-us/library/windows/desktop/aa365683%28v=vs.85%29.aspx
+			// "However, if I/O completion ports are being used with this asynchronous handle, a
+			//  completion packet will also be sent even though the I/O operation completed immediately."
+
+			portContext.addTask(shared_from_this());
 		}
 		catch (Throwable& t)
 		{
@@ -316,7 +401,9 @@ public:
 class WriteTask: public Task
 {
 public:
-	WriteTask(HANDLE& _port, ByteBuffer _javaBuffer, JLong _timeout, ::jace::proxy::java::lang::Object _attachment, ::jace::proxy::java::nio::channels::CompletionHandler _handler):
+	WriteTask(SerialPortContext& _port, ByteBuffer _javaBuffer, JLong _timeout,
+		::jace::proxy::java::lang::Object _attachment,
+		::jace::proxy::java::nio::channels::CompletionHandler _handler):
 			Task(_port, _attachment, _handler)
 	{
 		setJavaBuffer(new ByteBuffer(_javaBuffer));
@@ -333,11 +420,6 @@ public:
 		setTimeout(_timeout);
 	}
 
-
-	virtual bool isReadTask()
-	{
-		return false;
-	}
 
 	virtual void onSuccess(int bytesTransfered)
 	{
@@ -360,6 +442,42 @@ public:
 			wcerr << __FILE__ << ":" << __LINE__ << endl;
 			t.printStackTrace();
 		}
+		boost::mutex::scoped_lock lock(portContext.getMutex());
+		portContext.removeTask(shared_from_this());
+	}
+
+	virtual void onFailure(DWORD errorCode)
+	{
+		switch (errorCode)
+		{
+			case ERROR_OPERATION_ABORTED:
+			{
+				bool isOpen;
+				{
+					boost::mutex::scoped_lock lock(portContext.getMutex());
+					isOpen = portContext.isOpen();
+				}
+				if (isOpen)
+				{
+					handler->failed(AsynchronousCloseException(jace::java_new<AsynchronousCloseException>()), 
+						*attachment);
+					break;
+				}
+				else
+				{
+					// Unexpected, leak through to the default case
+				}
+			}
+			default:
+			{
+				handler->failed(IOException(jace::java_new<IOException>(
+					L"GetQueuedCompletionStatus() failed with error: " + getErrorMessage(errorCode))),
+					*attachment);
+				break;
+			}
+		}
+		boost::mutex::scoped_lock lock(portContext.getMutex());
+		portContext.removeTask(shared_from_this());
 	}
 
 	virtual void run()
@@ -378,13 +496,14 @@ public:
 			char* nativeBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(*this->nativeBuffer));
 			assert(nativeBuffer!=0);
 
+			boost::mutex::scoped_lock lock(portContext.getMutex());
+			HANDLE port = portContext.getPort();
 			setWriteTimeout(port, timeout);
 
-			OverlappedContainer<Task>* userData =
-				new OverlappedContainer<Task>(shared_from_this());
+			OverlappedContainer<Task>* userData = new OverlappedContainer<Task>(shared_from_this());
 			DWORD bytesTransferred;
-			if (!WriteFile(port, nativeBuffer + this->nativeBuffer->position(), remaining, &bytesTransferred,
-				&userData->getOverlapped()))
+			if (!WriteFile(port, nativeBuffer + this->nativeBuffer->position(),
+				remaining, &bytesTransferred, &userData->getOverlapped()))
 			{
 				DWORD lastError = GetLastError();
 				if (lastError != ERROR_IO_PENDING)
@@ -399,6 +518,10 @@ public:
 			// 
 			// The completion port gets notified in either case.
 			// REFERENCE: http://msdn.microsoft.com/en-us/library/windows/desktop/aa365683%28v=vs.85%29.aspx
+			// "However, if I/O completion ports are being used with this asynchronous handle, a
+			//  completion packet will also be sent even though the I/O operation completed immediately."
+
+			portContext.addTask(shared_from_this());
 		}
 		catch (Throwable& t)
 		{
@@ -496,6 +619,7 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 	}
 	dcb.BaudRate = baudRate.toInt();
 	dcb.ByteSize = (BYTE) dataBits.toInt();
+	dcb.fBinary = true;
 
 	switch (parity.ordinal())
 	{
@@ -533,6 +657,16 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 			throw AssertionError(jace::java_new<AssertionError>(parity));
 	}
 
+	dcb.fOutxDsrFlow = false;
+	dcb.fDtrControl = DTR_CONTROL_ENABLE;
+	dcb.fDsrSensitivity = false;
+	dcb.fTXContinueOnXoff = false;
+	dcb.fErrorChar = false;
+	dcb.fNull = false;
+	dcb.fAbortOnError = false;
+	dcb.wReserved = 0;
+	// Leave default values for XonLim, XoffLim, XonChar, XoffChar, ErrorChar, EofChar, EvtChar.
+
 	switch (stopBits.ordinal())
 	{
 		case SerialPort_StopBits::Ordinals::ONE:
@@ -554,35 +688,30 @@ void SerialChannel::nativeConfigure(SerialPort_BaudRate baudRate,
 			throw AssertionError(jace::java_new<AssertionError>(stopBits));
 	}
 
-	dcb.fOutxDsrFlow = 0;
-	dcb.fDtrControl = DTR_CONTROL_ENABLE;
-	dcb.fRtsControl = RTS_CONTROL_ENABLE;
-	dcb.fTXContinueOnXoff = false;
-	dcb.fErrorChar = false;
-	dcb.fNull = false;
-	dcb.fAbortOnError = false;
-	dcb.fDsrSensitivity = false;
-	dcb.fOutxCtsFlow = false;
-	dcb.fOutX = false;
-	dcb.fInX = false;
-
 	switch (flowControl.ordinal())
 	{
 		case SerialPort_FlowControl::Ordinals::RTS_CTS:
 		{
+			dcb.fOutX = false;
+			dcb.fInX = false;
 			dcb.fOutxCtsFlow = true;
-			dcb.fRtsControl = RTS_CONTROL_HANDSHAKE;
+			dcb.fRtsControl = RTS_CONTROL_TOGGLE;
 			break;
 		}
 		case SerialPort_FlowControl::Ordinals::XON_XOFF:
 		{
 			dcb.fOutX = true;
 			dcb.fInX = true;
+			dcb.fOutxCtsFlow = false;
+			dcb.fRtsControl = RTS_CONTROL_ENABLE;
 			break;
 		}
 		case SerialPort_FlowControl::Ordinals::NONE:
 		{
-			// do nothing
+			dcb.fOutX = false;
+			dcb.fInX = false;
+			dcb.fOutxCtsFlow = false;
+			dcb.fRtsControl = RTS_CONTROL_ENABLE;
 			break;
 		}
 		default:
@@ -658,8 +787,7 @@ void SerialChannel::nativeRead(ByteBuffer target, JLong timeout, Object attachme
 {
 	SerialPortContext* context = getContext(getJaceProxy());
 
-	boost::shared_ptr<Task> task(new ReadTask(context->getPort(), target,
-		timeout, attachment, handler));
+	boost::shared_ptr<Task> task(new ReadTask(*context, target, timeout, attachment, handler));
 	task->run();
 }
 
@@ -667,7 +795,6 @@ void SerialChannel::nativeWrite(ByteBuffer source, JLong timeout, Object attachm
 {
 	SerialPortContext* context = getContext(getJaceProxy());
 
-	boost::shared_ptr<Task> task(new WriteTask(context->getPort(), source,
-		timeout, attachment, handler));
+	boost::shared_ptr<Task> task(new WriteTask(*context, source, timeout, attachment, handler));
 	task->run();
 }

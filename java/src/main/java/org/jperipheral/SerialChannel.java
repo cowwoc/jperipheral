@@ -361,7 +361,6 @@ public class SerialChannel implements AsynchronousByteChannel
 			nativeClose();
 			boolean ongoingRead = reading.get();
 			boolean ongoingWrite = writing.get();
-			log.debug("ongoingRead: {}, ongoingWrite: {}", ongoingRead, ongoingWrite);
 			if (ongoingRead || ongoingWrite)
 			{
 				if (log.isDebugEnabled())
